@@ -10,7 +10,12 @@ std::shared_ptr<CkMessage> copy(const std::shared_ptr<CkMessage>& msg) {
 }
 }
 
+class manager;
+
 struct component {
+  friend class manager;
+
+  using value_t = std::shared_ptr<CkMessage>;
   using id_t = long unsigned int;
 
   std::vector<id_t> incoming;
@@ -20,13 +25,13 @@ struct component {
 
   std::vector<std::shared_ptr<CkMessage>> buffer;
 
-  virtual void accept(const id_t& from, std::shared_ptr<CkMessage>&& msg) {
+  virtual void accept(const id_t& from, value_t&& msg) {
     CkAssert(this->alive && "only living components can accept values");
     this->erase_incoming(from);
     this->buffer.emplace_back(std::move(msg));
   }
 
-  virtual std::shared_ptr<CkMessage> action(void) = 0;
+  virtual value_t action(void) = 0;
 
   virtual int num_expected(void) const { return this->num_available(); }
 
@@ -38,8 +43,12 @@ struct component {
     return this->alive && (this->buffer.size() == this->num_expected());
   }
 
+  bool collectible(void) const {
+    return !this->alive && this->incoming.empty();
+  }
+
  protected:
-  virtual void send(std::shared_ptr<CkMessage>&& msg) {
+  virtual void send(value_t&& msg) {
     CkAssert(!this->alive && "a living component cannot send values");
 
     while (!this->outgoing.empty()) {
@@ -54,7 +63,7 @@ struct component {
     }
   }
 
-  void connection(const id_t& to, const id_t& from) {
+  void connection(const id_t& from, const id_t& to) {
     CkAssert(!this->alive && "cannot connect to a living component");
 
     if (this->id == to) {
@@ -67,7 +76,8 @@ struct component {
   }
 
   void invalidation(const id_t& from) {
-    CkAssert(this->alive && "only living components can invalidate connections");
+    CkAssert(this->alive &&
+             "only living components can invalidate connections");
 
     auto min = this->num_expected();
     this->erase_incoming(from);
@@ -88,29 +98,36 @@ struct component {
   }
 
  public:
-  static void send_value(const id_t& from, const id_t& to,
-                         std::shared_ptr<CkMessage>&& msg) {}
+  static void send_value(const id_t& from, const id_t& to, value_t&& msg);
 
-  static void send_invalidation(const id_t& from, const id_t& to) {}
+  static void send_invalidation(const id_t& from, const id_t& to);
+
+  static void connect(const std::shared_ptr<component>& from,
+                      const std::shared_ptr<component>& to) {
+    to->connection(from->id, to->id);
+    from->connection(from->id, to->id);
+  }
 };
 
-struct passthru_component: public virtual component {
+struct passthru_component : public virtual component {
   virtual std::shared_ptr<CkMessage> action(void) override {
-    CkAssert(this->buffer.size() == 1 && "passthru components only expect one value");
+    CkAssert(this->buffer.size() == 1 &&
+             "passthru components only expect one value");
     std::shared_ptr<CkMessage> msg = std::move(this->buffer[0]);
     this->buffer.clear();
     return msg;
   }
 };
 
-struct monovalue_component: public virtual component {
+struct monovalue_component : public virtual component {
   virtual int num_expected(void) const { return 1; }
 };
 
-struct mux_component: public monovalue_component, public passthru_component {
+struct mux_component : public monovalue_component, public passthru_component {
   virtual bool screen(const std::shared_ptr<CkMessage>&) const = 0;
 
-  virtual void accept(const component::id_t& from, std::shared_ptr<CkMessage>&& msg) {
+  virtual void accept(const component::id_t& from,
+                      std::shared_ptr<CkMessage>&& msg) {
     CkAssert(this->alive && "only living components can accept values");
 
     this->erase_incoming(from);
@@ -123,7 +140,7 @@ struct mux_component: public monovalue_component, public passthru_component {
   }
 };
 
-struct demux_component: public monovalue_component, public passthru_component {
+struct demux_component : public monovalue_component, public passthru_component {
   virtual id_t route(const std::shared_ptr<CkMessage>&) const = 0;
 
   virtual std::shared_ptr<CkMessage> action(void) override {

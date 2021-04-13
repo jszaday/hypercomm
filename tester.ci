@@ -1,0 +1,7 @@
+mainmodule tester {
+    mainchare tester {
+        entry tester(CkArgMsg*);
+    };
+
+    initproc void setup_tester(void);
+}
