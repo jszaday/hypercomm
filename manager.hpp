@@ -105,18 +105,23 @@ struct manager {
 using manager_ptr_t = std::unique_ptr<manager>;
 CkpvDeclare(manager_ptr_t, manager_);
 CkpvDeclare(uint32_t, counter_);
+CkpvDeclare(int, value_handler_idx_);
+CkpvDeclare(int, invalidation_handler_idx_);
+
+void value_handler_(envelope*);
+void invalidation_handler_(envelope*);
 
 void initialize(void) {
-  if (!CkpvInitialized(counter_)) {
-    CkpvInitialize(uint32_t, counter_);
-  }
-
-  if (!CkpvInitialized(manager_)) {
-    CkpvInitialize(manager_ptr_t, manager_);
-  }
-
+  CkpvInitialize(uint32_t, counter_);
   CkpvAccess(counter_) = 0;
+  CkpvInitialize(manager_ptr_t, manager_);
   (CkpvAccess(manager_)).reset(new manager());
+  CkpvInitialize(int, value_handler_idx_);
+  CkpvAccess(value_handler_idx_) =
+      CmiRegisterHandler((CmiHandler)value_handler_);
+  CkpvInitialize(int, invalidation_handler_idx_);
+  CkpvAccess(invalidation_handler_idx_) =
+      CmiRegisterHandler((CmiHandler)invalidation_handler_);
 }
 
 void set_identity(component::id_t& id) {
@@ -132,13 +137,38 @@ void emplace_component(std::shared_ptr<component>&& which) {
   CkpvAccess(manager_)->emplace(std::move(which));
 }
 
+std::tuple<component::id_t&, component::id_t&> get_from_to(envelope* env) {
+  auto hdr =
+      reinterpret_cast<char*>(env) + CmiReservedHeaderSize + sizeof(UInt);
+  CkAssert(((2 * sizeof(component::id_t)) <= sizeof(ck::impl::u_type)) &&
+           "insufficient header space");
+  auto& total_sz = *(reinterpret_cast<UInt*>(hdr + sizeof(ck::impl::u_type)));
+  CkAssert((total_sz == env->getTotalsize()) && "did not find total size");
+  component::id_t& first = *(reinterpret_cast<component::id_t*>(hdr));
+  return std::forward_as_tuple(first, *(&first + 1));
+}
+
 void component::send_value(const id_t& from, const id_t& to,
                            component::value_t&& msg) {
   auto home = get_home(to);
   if (home == CkMyPe()) {
     (CkpvAccess(manager_))->recv_value(from, to, std::move(msg));
   } else {
-    CkAbort("remote sends unavailable");
+    CkMessage* msg_raw = msg.get();
+    CkMessage* msg_ready = nullptr;
+    if (msg.use_count() == 1) {
+      msg_ready = msg_raw;
+      ::new (&msg) component::value_t{};
+    } else {
+      msg_ready = (CkMessage*)CkCopyMsg((void**)&msg_raw);
+    }
+    auto env = UsrToEnv(msg_ready);
+    auto tup = get_from_to(env);
+    std::get<0>(tup) = from;
+    std::get<1>(tup) = to;
+    util::pack_message(msg_ready);
+    CmiSetHandler(env, CkpvAccess(value_handler_idx_));
+    CmiSyncSendAndFree(home, env->getTotalsize(), reinterpret_cast<char*>(env));
   }
 }
 
@@ -147,7 +177,13 @@ void component::send_invalidation(const id_t& from, const id_t& to) {
   if (home == CkMyPe()) {
     (CkpvAccess(manager_))->recv_invalidation(from, to);
   } else {
-    CkAbort("remote invalidations unavailable");
+    auto msg = CkAllocateMarshallMsg(0);
+    auto env = UsrToEnv(msg);
+    auto tup = get_from_to(env);
+    std::get<0>(tup) = from;
+    std::get<1>(tup) = to;
+    CmiSetHandler(env, CkpvAccess(invalidation_handler_idx_));
+    CmiSyncSendAndFree(home, env->getTotalsize(), reinterpret_cast<char*>(env));
   }
 }
 
@@ -156,4 +192,19 @@ void manager::trigger_action(component* ptr) {
   ptr->alive = false;
   ptr->send(std::move(msg));
   CkpvAccess(manager_)->try_collect(ptr->id);
+}
+
+void value_handler_(envelope* env) {
+  auto tup = get_from_to(env);
+  auto msg = std::shared_ptr<CkMessage>((CkMessage*)EnvToUsr(env),
+                                        [](CkMessage* msg) { CkFreeMsg(msg); });
+  util::unpack_message(msg.get());
+  CkpvAccess(manager_)
+      ->recv_value(std::get<0>(tup), std::get<1>(tup), std::move(msg));
+}
+
+void invalidation_handler_(envelope* env) {
+  auto tup = get_from_to(env);
+  CkpvAccess(manager_)->recv_invalidation(std::get<0>(tup), std::get<1>(tup));
+  CkFreeMsg(EnvToUsr(env));
 }
