@@ -6,7 +6,11 @@
 
 namespace util {
 std::shared_ptr<CkMessage> copy(const std::shared_ptr<CkMessage>& msg) {
-  return {};
+  auto msg_raw = msg.get();
+  auto msg_copy = (CkMessage*)CkCopyMsg((void**)&msg_raw);
+  return std::shared_ptr<CkMessage>(msg_copy, [](CkMessage* msg) {
+    CkFreeMsg(msg);
+  });
 }
 }
 
@@ -18,12 +22,11 @@ struct component {
   using value_t = std::shared_ptr<CkMessage>;
   using id_t = long unsigned int;
 
+  std::vector<value_t> buffer;
   std::vector<id_t> incoming;
   std::vector<id_t> outgoing;
   bool alive;
   id_t id;
-
-  std::vector<std::shared_ptr<CkMessage>> buffer;
 
   virtual void accept(const id_t& from, value_t&& msg) {
     CkAssert(this->alive && "only living components can accept values");
@@ -82,7 +85,7 @@ struct component {
     auto min = this->num_expected();
     this->erase_incoming(from);
     auto avail = this->num_available();
-    this->alive = (min >= avail);
+    this->alive = (avail >= min);
 
     while (!(this->alive || this->outgoing.empty())) {
       const id_t to = this->outgoing.back();
