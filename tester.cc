@@ -54,10 +54,17 @@ struct tester : public CBase_tester {
     component::connect(second, third);
     component::connect(second, fourth);
 
-    emplace_component(std::move(fourth));
-    emplace_component(std::move(third));
-    emplace_component(std::move(second));
-    emplace_component(std::move(first));
+    if (value % 2 == 0) {
+      emplace_component(std::move(fourth));
+      emplace_component(std::move(third));
+      emplace_component(std::move(second));
+      emplace_component(std::move(first));
+    } else {
+      emplace_component(std::move(first));
+      emplace_component(std::move(second));
+      emplace_component(std::move(third));
+      emplace_component(std::move(fourth));
+    }
   }
 
   tester(CkArgMsg* msg) {

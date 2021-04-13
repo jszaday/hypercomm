@@ -23,7 +23,12 @@ struct manager {
     } else {
       auto& ptr = search->second;
       if (ptr->alive) {
-        ptr->accept(from, std::move(msg));
+        if (msg) {
+          ptr->accept(from, std::move(msg));
+        } else {
+          ptr->invalidation(from);
+        }
+
         this->try_action(ptr);
       } else {
         ptr->erase_incoming(from);
@@ -34,9 +39,8 @@ struct manager {
 
   void recv_invalidation(const component::id_t& from,
                          const component::id_t& to) {
-    auto& ptr = this->components[to];
-    ptr->invalidation(from);
-    this->try_action(ptr);
+    component::value_t empty{};
+    this->recv_value(from, to, std::move(empty));
   }
 
   void emplace(component_t&& which) {
