@@ -109,6 +109,8 @@ struct component {
   }
 };
 
+struct threaded_component : public virtual component {};
+
 struct passthru_component : public virtual component {
   virtual std::shared_ptr<CkMessage> action(void) override {
     CkAssert(this->buffer.size() == 1 &&

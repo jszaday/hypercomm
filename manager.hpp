@@ -2,6 +2,10 @@
 #include <map>
 #include <deque>
 
+#ifndef CMK_STACKSIZE_DEFAULT
+#define CMK_STACKSIZE_DEFAULT 32768
+#endif
+
 struct manager {
   manager(void) = default;
 
@@ -59,13 +63,20 @@ struct manager {
 
   void try_action(component_t& ptr) {
     if (ptr && ptr->ready()) {
-      // this should probably be a "launch"
-      auto msg = ptr->action();
-      ptr->alive = false;
-      ptr->send(std::move(msg));
-    }
+      auto* raw_ptr = ptr.get();
 
-    this->try_collect(ptr);
+      if (dynamic_cast<threaded_component*>(raw_ptr)) {
+        launch_action(raw_ptr);
+      } else {
+        trigger_action(raw_ptr);
+      }
+    } else {
+      this->try_collect(ptr);
+    }
+  }
+
+  void try_collect(component::id_t& which) {
+    this->try_collect(this->components[which]);
   }
 
   void try_collect(component_t& ptr) {
@@ -77,6 +88,12 @@ struct manager {
       this->components.erase(id);
     }
   }
+
+  static CthThread launch_action(component* ptr) {
+    return CthCreate((CthVoidFn)trigger_action, ptr, 0);
+  }
+
+  static void trigger_action(component*);
 };
 
 using manager_ptr_t = std::unique_ptr<manager>;
@@ -126,4 +143,11 @@ void component::send_invalidation(const id_t& from, const id_t& to) {
   } else {
     CkAbort("remote invalidations unavailable");
   }
+}
+
+void manager::trigger_action(component* ptr) {
+  auto msg = ptr->action();
+  ptr->alive = false;
+  ptr->send(std::move(msg));
+  CkpvAccess(manager_)->try_collect(ptr->id);
 }
