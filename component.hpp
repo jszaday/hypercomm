@@ -125,6 +125,10 @@ struct monovalue_component : public virtual component {
   virtual int num_expected(void) const { return 1; }
 };
 
+struct independent_component : public virtual component {
+  virtual int num_expected(void) const { return 0; }
+};
+
 struct mux_component : public monovalue_component, public passthru_component {
   virtual bool screen(const std::shared_ptr<CkMessage>&) const = 0;
 

@@ -40,6 +40,7 @@ struct manager {
   }
 
   void emplace(component_t&& which) {
+    QdCreate(1);
     const auto& id = which->id;
     which->alive = true;
     this->components.emplace(id, std::move(which));
@@ -66,7 +67,7 @@ struct manager {
       auto* raw_ptr = ptr.get();
 
       if (dynamic_cast<threaded_component*>(raw_ptr)) {
-        launch_action(raw_ptr);
+        CthResume(launch_action(raw_ptr));
       } else {
         trigger_action(raw_ptr);
       }
@@ -86,6 +87,7 @@ struct manager {
         CkPrintf("%lu> warning: component replicated\n", id);
       }
       this->components.erase(id);
+      QdProcess(1);
     }
   }
 
