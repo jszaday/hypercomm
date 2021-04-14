@@ -1,12 +1,22 @@
-#include <hypercomm/util.hpp>
+#include <hypercomm/utilities.hpp>
 #include <hypercomm/components.hpp>
 
 namespace hypercomm {
 namespace components {
 
+CkpvExtern(int, counter_);
 CkpvExtern(int, value_handler_idx_);
 CkpvExtern(int, invalidation_handler_idx_);
 CkpvExtern(int, connection_handler_idx_);
+
+void component::activate(std::shared_ptr<component>&& ptr) {
+  (manager::local())->emplace(std::move(ptr));
+}
+
+void component::generate_identity(component::id_t& id) {
+  auto pe = ((component::id_t)CkMyPe()) << ((8 * sizeof(component::id_t)) / 2);
+  id = pe | (++CkpvAccess(counter_));
+}
 
 void component::accept(const id_t& from, value_t&& msg) {
   CkAssert(this->alive && "only living components can accept values");
@@ -84,7 +94,7 @@ void component::send(value_t&& msg) {
     if (this->outgoing.empty()) {
       ready = std::move(msg);
     } else {
-      ready = std::move(util::copy_message(msg));
+      ready = std::move(utilities::copy_message(msg));
     }
 
     if (is_placeholder(to)) {
@@ -175,7 +185,7 @@ void component::send_value(const id_t& from, const id_t& to,
       auto tup = get_from_to(env);
       std::get<0>(tup) = from;
       std::get<1>(tup) = to;
-      util::pack_message(msg_ready);
+      utilities::pack_message(msg_ready);
       CmiSetHandler(env, CkpvAccess(value_handler_idx_));
       CmiSyncSendAndFree(home, env->getTotalsize(), reinterpret_cast<char*>(env));
     }

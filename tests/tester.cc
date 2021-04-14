@@ -1,9 +1,12 @@
-#include "manager.hpp"
+#include <hypercomm/components.hpp>
+
+using namespace hypercomm::components;
+
 #include "tester.decl.h"
 
-void setup_tester(void) { initialize(); }
+void setup_tester(void) { initialize_module(); }
 
-struct spontaneous : public independent_component {
+struct spontaneous : public n_input_component<0> {
   spontaneous(const int& _1) : value(_1) {}
 
   virtual std::shared_ptr<CkMessage> action(void) override {
@@ -19,7 +22,7 @@ struct spontaneous : public independent_component {
   int value;
 };
 
-struct dependent : public monovalue_component, public threaded_component {
+struct dependent : public threaded_component, public n_input_component<1> {
   virtual std::shared_ptr<CkMessage> action(void) override {
     auto msg = std::move(this->accepted.front());
     auto msg_typed = static_cast<CkMarshallMsg*>(msg.get());
@@ -38,8 +41,7 @@ struct selector : public demux_component {
   }
 };
 
-struct gatherer : public component {
-  virtual int num_expected(void) const override { return 2; }
+struct gatherer : public n_input_component<2> {
   virtual std::shared_ptr<CkMessage> action(void) override {
     int sum = 0;
     for (auto& msg : accepted) {
@@ -55,26 +57,26 @@ struct gatherer : public component {
 struct other : public CBase_other {
   other(const placeholder& a, const placeholder& b) {
     auto g = std::make_shared<gatherer>();
-    set_identity(g->id);
+    component::generate_identity(g->id);
 
     component::connect(a, g);
     component::connect(b, g);
 
-    emplace_component(std::move(g));
+    component::activate(std::move(g));
   }
 };
 
 struct tester : public CBase_tester {
   placeholder test_sequence_a(const int& value) {
     auto first = std::make_shared<spontaneous>(value);
-    set_identity(first->id);
+    component::generate_identity(first->id);
     auto second = std::make_shared<selector>();
-    set_identity(second->id);
+    component::generate_identity(second->id);
 
     auto third = std::make_shared<dependent>();
-    set_identity(third->id);
+    component::generate_identity(third->id);
     auto fourth = std::make_shared<dependent>();
-    set_identity(fourth->id);
+    component::generate_identity(fourth->id);
 
     component::connect(first, second);
     component::connect(second, third);
@@ -83,16 +85,16 @@ struct tester : public CBase_tester {
 
     if (value % 2 == 0) {
       next = third->put_placeholder(false);
-      emplace_component(std::move(fourth));
-      emplace_component(std::move(third));
-      emplace_component(std::move(second));
-      emplace_component(std::move(first));
+      component::activate(std::move(fourth));
+      component::activate(std::move(third));
+      component::activate(std::move(second));
+      component::activate(std::move(first));
     } else {
       next = fourth->put_placeholder(false);
-      emplace_component(std::move(first));
-      emplace_component(std::move(second));
-      emplace_component(std::move(third));
-      emplace_component(std::move(fourth));
+      component::activate(std::move(first));
+      component::activate(std::move(second));
+      component::activate(std::move(third));
+      component::activate(std::move(fourth));
     }
 
     return next;

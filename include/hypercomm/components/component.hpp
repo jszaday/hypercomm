@@ -43,6 +43,9 @@ struct component {
   static void connect(const std::shared_ptr<component>& from,
                       const std::shared_ptr<component>& to);
 
+  static void activate(std::shared_ptr<component>&&);
+  static void generate_identity(component::id_t& id);
+
   id_t port_authority = std::numeric_limits<id_t>::max() << (sizeof(id_t) / 2);
   std::vector<id_t> incoming;
   std::vector<id_t> outgoing;
