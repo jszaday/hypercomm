@@ -207,7 +207,8 @@ void component::send_invalidation(const id_t& from, const id_t& to) {
   }
 }
 
-placeholder component::put_placeholder(const bool& input) {
+placeholder component::put_placeholder(const port_direction& dir) {
+  bool input = (dir == port_direction::INPUT);
   auto port = (++this->port_authority);
 
   if (input) {

@@ -12,6 +12,11 @@ namespace components {
 class manager;
 class placeholder;
 
+enum port_direction: bool {
+  INPUT = true,
+  OUTPUT = false
+};
+
 struct component {
   using value_t = std::shared_ptr<CkMessage>;
   using id_t = std::uint64_t;
@@ -25,7 +30,7 @@ struct component {
   int num_available() const;
   bool ready(void) const;
   bool collectible(void) const;
-  placeholder put_placeholder(const bool& input);
+  placeholder put_placeholder(const port_direction& dir);
   void fill_placeholder(const placeholder&, const id_t&);
 
  protected:

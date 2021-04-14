@@ -3,7 +3,7 @@ BINARY = tester
 
 CHARMCFLAGS = $(OPTS) -I../include/
 CHARMCLINKFLAGS = -language charm++ $(OPTS) -L../src/hypercomm/components -lhypercomm-components  -L../src/hypercomm -lhypercomm-utilities
-TESTFLAGS =  +p1
+TESTFLAGS =  +p2 ++local 
 
 %.o: %.cc
 
@@ -21,7 +21,7 @@ $(BINARY): $(patsubst %.cc,%.o,$(wildcard *.cc))
 	$(CHARMC) $(CHARMCFLAGS) $<
 
 test: $(BINARY)
-	$(call run, ./$(BINARY) 5 $(TESTFLAGS))
+	./charmrun ./$(BINARY) $(TESTFLAGS)
 
 clean:
 	rm -f *.o *.decl.h *.def.h charmrun $(BINARY)

@@ -84,13 +84,13 @@ struct tester : public CBase_tester {
     placeholder next{};
 
     if (value % 2 == 0) {
-      next = third->put_placeholder(false);
+      next = third->put_placeholder(OUTPUT);
       component::activate(std::move(fourth));
       component::activate(std::move(third));
       component::activate(std::move(second));
       component::activate(std::move(first));
     } else {
-      next = fourth->put_placeholder(false);
+      next = fourth->put_placeholder(OUTPUT);
       component::activate(std::move(first));
       component::activate(std::move(second));
       component::activate(std::move(third));
