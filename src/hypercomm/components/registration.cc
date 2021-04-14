@@ -29,8 +29,7 @@ void invalidation_handler_(envelope* env) {
 
 void value_handler_(envelope* env) {
   auto tup = get_from_to(env);
-  auto msg = std::shared_ptr<CkMessage>((CkMessage*)EnvToUsr(env),
-                                        [](CkMessage* msg) { CkFreeMsg(msg); });
+  auto msg = utilities::wrap_message((CkMessage*)EnvToUsr(env));
   utilities::unpack_message(msg.get());
   CkpvAccess(manager_)
       ->recv_value(std::get<0>(tup), std::get<1>(tup), std::move(msg));

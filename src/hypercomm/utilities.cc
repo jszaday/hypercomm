@@ -9,10 +9,19 @@ std::shared_ptr<CkMessage> wrap_message(CkMessage* msg) {
 
 std::shared_ptr<CkMessage> copy_message(const std::shared_ptr<CkMessage>& msg) {
   auto msg_raw = msg.get();
-  auto msg_copy = (CkMessage*)CkCopyMsg((void**)&msg_raw);
-  return std::shared_ptr<CkMessage>(msg_copy,
-                                    [](CkMessage* msg) { CkFreeMsg(msg); });
+  return wrap_message((CkMessage*)CkCopyMsg((void**)&msg_raw));
 }
+
+CkMessage* unwrap_message(std::shared_ptr<CkMessage>&& msg) {
+  auto msg_raw = msg.get();
+  if (msg.use_count() == 1) {
+    ::new (&msg) std::shared_ptr<CkMessage>{};
+    return msg_raw;
+  } else {
+    return (CkMessage*)CkCopyMsg((void**)&msg_raw);
+  }
+}
+
 
 void pack_message(CkMessage* msg) {
   auto idx = UsrToEnv(msg)->getMsgIdx();

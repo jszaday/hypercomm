@@ -174,13 +174,8 @@ void component::send_value(const id_t& from, const id_t& to,
     if (msg_raw == nullptr) {
       component::send_invalidation(from, to);
     } else {
-      CkMessage* msg_ready = nullptr;
-      if (msg.use_count() == 1) {
-        msg_ready = msg_raw;
-        ::new (&msg) component::value_t{};
-      } else {
-        msg_ready = (CkMessage*)CkCopyMsg((void**)&msg_raw);
-      }
+      CkMessage* msg_ready =
+        utilities::unwrap_message(std::move(msg));
       auto env = UsrToEnv(msg_ready);
       auto tup = get_from_to(env);
       std::get<0>(tup) = from;
