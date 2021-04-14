@@ -101,7 +101,7 @@ struct tester : public CBase_tester {
   tester(CkArgMsg* msg) {
     auto a = test_sequence_a(42);
     auto b = test_sequence_a(21);
-    CProxy_other::ckNew(a, b, CkMyPe() + 1);
+    CProxy_other::ckNew(a, b, (CkMyPe() + 1) % CkNumPes());
     CkExitAfterQuiescence();
   }
 };
