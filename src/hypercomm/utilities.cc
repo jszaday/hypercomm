@@ -3,6 +3,10 @@
 namespace hypercomm {
 namespace utilities {
 
+std::shared_ptr<CkMessage> wrap_message(CkMessage* msg) {
+  return std::shared_ptr<CkMessage>(msg, [](CkMessage* msg) { CkFreeMsg(msg); });
+}
+
 std::shared_ptr<CkMessage> copy_message(const std::shared_ptr<CkMessage>& msg) {
   auto msg_raw = msg.get();
   auto msg_copy = (CkMessage*)CkCopyMsg((void**)&msg_raw);
