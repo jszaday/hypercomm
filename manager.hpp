@@ -43,6 +43,14 @@ struct manager {
     this->recv_value(from, to, std::move(empty));
   }
 
+  void recv_connection(const placeholder& p,
+                       const component::id_t& id) {
+    auto& ours = this->components[p.source];
+    CkAssert(ours && "could not find placeholder issuer!");
+    ours->fill_placeholder(p, id);
+    this->try_collect(ours);
+  }
+
   void emplace(component_t&& which) {
     QdCreate(1);
     const auto& id = which->id;
@@ -107,9 +115,11 @@ CkpvDeclare(manager_ptr_t, manager_);
 CkpvDeclare(uint32_t, counter_);
 CkpvDeclare(int, value_handler_idx_);
 CkpvDeclare(int, invalidation_handler_idx_);
+CkpvDeclare(int, connection_handler_idx_);
 
 void value_handler_(envelope*);
 void invalidation_handler_(envelope*);
+void connection_handler_(char*);
 
 void initialize(void) {
   CkpvInitialize(uint32_t, counter_);
@@ -122,6 +132,9 @@ void initialize(void) {
   CkpvInitialize(int, invalidation_handler_idx_);
   CkpvAccess(invalidation_handler_idx_) =
       CmiRegisterHandler((CmiHandler)invalidation_handler_);
+  CkpvInitialize(int, connection_handler_idx_);
+  CkpvAccess(connection_handler_idx_) =
+      CmiRegisterHandler((CmiHandler)connection_handler_);
 }
 
 void set_identity(component::id_t& id) {
@@ -133,6 +146,10 @@ int get_home(const component::id_t& id) {
   return (int)(id >> ((8 * sizeof(component::id_t)) / 2));
 }
 
+bool component::is_placeholder(const component::id_t& id) {
+  return get_home(id) < 0;
+}
+
 void emplace_component(std::shared_ptr<component>&& which) {
   CkpvAccess(manager_)->emplace(std::move(which));
 }
@@ -142,8 +159,10 @@ std::tuple<component::id_t&, component::id_t&> get_from_to(envelope* env) {
       reinterpret_cast<char*>(env) + CmiReservedHeaderSize + sizeof(UInt);
   CkAssert(((2 * sizeof(component::id_t)) <= sizeof(ck::impl::u_type)) &&
            "insufficient header space");
-  auto& total_sz = *(reinterpret_cast<UInt*>(hdr + sizeof(ck::impl::u_type)));
-  CkAssert((total_sz == env->getTotalsize()) && "did not find total size");
+  // TODO fixme?
+  // auto& total_sz = *(reinterpret_cast<UInt*>(hdr + sizeof(ck::impl::u_type)));
+  // CkPrintf("pe=%d> env_size=%x, total_size=%x\n", CkMyPe(), env->getTotalsize(), total_sz);
+  // CkAssert((total_sz == env->getTotalsize()) && "did not find total size");
   component::id_t& first = *(reinterpret_cast<component::id_t*>(hdr));
   return std::forward_as_tuple(first, *(&first + 1));
 }
@@ -154,21 +173,25 @@ void component::send_value(const id_t& from, const id_t& to,
   if (home == CkMyPe()) {
     (CkpvAccess(manager_))->recv_value(from, to, std::move(msg));
   } else {
-    CkMessage* msg_raw = msg.get();
-    CkMessage* msg_ready = nullptr;
-    if (msg.use_count() == 1) {
-      msg_ready = msg_raw;
-      ::new (&msg) component::value_t{};
+    CkMessage* msg_raw = msg ? msg.get() : nullptr;
+    if (msg_raw == nullptr) {
+      component::send_invalidation(from, to);
     } else {
-      msg_ready = (CkMessage*)CkCopyMsg((void**)&msg_raw);
+      CkMessage* msg_ready = nullptr;
+      if (msg.use_count() == 1) {
+        msg_ready = msg_raw;
+        ::new (&msg) component::value_t{};
+      } else {
+        msg_ready = (CkMessage*)CkCopyMsg((void**)&msg_raw);
+      }
+      auto env = UsrToEnv(msg_ready);
+      auto tup = get_from_to(env);
+      std::get<0>(tup) = from;
+      std::get<1>(tup) = to;
+      util::pack_message(msg_ready);
+      CmiSetHandler(env, CkpvAccess(value_handler_idx_));
+      CmiSyncSendAndFree(home, env->getTotalsize(), reinterpret_cast<char*>(env));
     }
-    auto env = UsrToEnv(msg_ready);
-    auto tup = get_from_to(env);
-    std::get<0>(tup) = from;
-    std::get<1>(tup) = to;
-    util::pack_message(msg_ready);
-    CmiSetHandler(env, CkpvAccess(value_handler_idx_));
-    CmiSyncSendAndFree(home, env->getTotalsize(), reinterpret_cast<char*>(env));
   }
 }
 
@@ -207,4 +230,40 @@ void invalidation_handler_(envelope* env) {
   auto tup = get_from_to(env);
   CkpvAccess(manager_)->recv_invalidation(std::get<0>(tup), std::get<1>(tup));
   CkFreeMsg(EnvToUsr(env));
+}
+
+void component::connect(const placeholder& p, const std::shared_ptr<component>& c) {
+  if (p.is_input()) {
+    c->connection(c->id, p.source);
+  } else {
+    c->connection(p.source, c->id);
+  }
+
+  component::send_connection(p, c->id);
+}
+
+void component::send_connection(const placeholder& p, const component::id_t& id) {
+  auto home = get_home(p.source);
+  if (home == CkMyPe()) {
+    (CkpvAccess(manager_))->recv_connection(p, id);
+  } else {
+#if CMK_DEBUG
+    CkPrintf("pe=%d> connecting %lx and %lx via msg\n", CkMyPe(), p.source, id);
+#endif
+    auto tup = std::make_tuple(p, id);
+    auto size = PUP::size(tup);
+    auto total_size = size + CmiMsgHeaderSizeBytes;
+    auto msg = (char*)CmiAlloc(total_size);
+    PUP::toMemBuf(tup, msg + CmiMsgHeaderSizeBytes, size);
+    CmiSetHandler(msg, CkpvAccess(connection_handler_idx_));
+    CmiSyncSendAndFree(home, total_size, msg);
+  }
+}
+
+void connection_handler_(char* msg) {
+  std::tuple<placeholder, component::id_t> tup;
+  PUP::fromMem p(msg + CmiMsgHeaderSizeBytes);
+  p | tup;
+  (CkpvAccess(manager_))->recv_connection(std::get<0>(tup), std::get<1>(tup));
+  CmiFree(msg);
 }

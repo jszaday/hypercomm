@@ -1,5 +1,6 @@
 #include <ck.h>
 
+#include <map>
 #include <memory>
 #include <vector>
 #include <algorithm>
@@ -8,9 +9,8 @@ namespace util {
 std::shared_ptr<CkMessage> copy(const std::shared_ptr<CkMessage>& msg) {
   auto msg_raw = msg.get();
   auto msg_copy = (CkMessage*)CkCopyMsg((void**)&msg_raw);
-  return std::shared_ptr<CkMessage>(msg_copy, [](CkMessage* msg) {
-    CkFreeMsg(msg);
-  });
+  return std::shared_ptr<CkMessage>(msg_copy,
+                                    [](CkMessage* msg) { CkFreeMsg(msg); });
 }
 
 void pack_message(CkMessage* msg) {
@@ -28,10 +28,10 @@ void unpack_message(CkMessage* msg) {
     CkAssert(msg == newMsg && "message changed due to packing!");
   }
 }
-
 }
 
 class manager;
+class placeholder;
 
 struct component {
   friend class manager;
@@ -39,16 +39,24 @@ struct component {
   using value_t = std::shared_ptr<CkMessage>;
   using id_t = long unsigned int;
 
-  std::vector<value_t> buffer;
+  id_t port_authority = std::numeric_limits<id_t>::max() << (sizeof(id_t) / 2);
+  std::vector<value_t> accepted;
   std::vector<id_t> incoming;
   std::vector<id_t> outgoing;
+  std::map<id_t, value_t> inbox;
+  std::map<id_t, value_t> outbox;
   bool alive;
   id_t id;
 
   virtual void accept(const id_t& from, value_t&& msg) {
     CkAssert(this->alive && "only living components can accept values");
-    this->erase_incoming(from);
-    this->buffer.emplace_back(std::move(msg));
+    auto search = std::find(this->incoming.begin(), this->incoming.end(), from);
+    if (search == this->incoming.end()) {
+      this->inbox.emplace(from, std::move(msg));
+    } else {
+      this->accepted.emplace_back(std::move(msg));
+      this->incoming.erase(search);
+    }
   }
 
   virtual value_t action(void) = 0;
@@ -56,16 +64,20 @@ struct component {
   virtual int num_expected(void) const { return this->num_available(); }
 
   int num_available() const {
-    return (this->incoming.size() + this->buffer.size());
+    return (this->incoming.size() + this->accepted.size());
   }
 
   bool ready(void) const {
-    return this->alive && (this->buffer.size() == this->num_expected());
+    return this->alive && (this->accepted.size() == this->num_expected());
   }
 
   bool collectible(void) const {
-    return !this->alive && this->incoming.empty();
+    return !this->alive && this->incoming.empty() && this->outgoing.empty() && this->outbox.empty();
   }
+
+  placeholder put_placeholder(const bool& input);
+
+  void fill_placeholder(const placeholder&, const id_t&);
 
  protected:
   virtual void send(value_t&& msg) {
@@ -75,10 +87,17 @@ struct component {
       const id_t to = this->outgoing.back();
       this->outgoing.pop_back();
 
+      value_t&& ready{};
       if (this->outgoing.empty()) {
-        component::send_value(this->id, to, std::move(msg));
+        ready = std::move(msg);
       } else {
-        component::send_value(this->id, to, std::move(util::copy(msg)));
+        ready = std::move(util::copy(msg));
+      }
+
+      if (is_placeholder(to)) {
+        this->outbox.emplace(to, std::forward<value_t>(ready));
+      } else {
+        component::send_value(this->id, to, std::forward<value_t>(ready));
       }
     }
   }
@@ -104,10 +123,16 @@ struct component {
     auto avail = this->num_available();
     this->alive = (avail >= min);
 
-    while (!(this->alive || this->outgoing.empty())) {
-      const id_t to = this->outgoing.back();
-      this->outgoing.pop_back();
-      component::send_invalidation(this->id, to);
+    auto curr = this->outgoing.begin();
+    while (!this->alive && curr != this->outgoing.end()) {
+      const id_t& to = *curr;
+      if (is_placeholder(to)) {
+        this->outbox[to] = {};
+        curr++;
+      } else {
+        component::send_invalidation(this->id, to);
+        curr = this->outgoing.erase(curr);
+      }
     }
   }
 
@@ -118,9 +143,15 @@ struct component {
   }
 
  public:
+  static bool is_placeholder(const component::id_t& id);
+
   static void send_value(const id_t& from, const id_t& to, value_t&& msg);
 
   static void send_invalidation(const id_t& from, const id_t& to);
+
+  static void send_connection(const placeholder&, const id_t&);
+
+  static void connect(const placeholder&, const std::shared_ptr<component>&);
 
   static void connect(const std::shared_ptr<component>& from,
                       const std::shared_ptr<component>& to) {
@@ -133,10 +164,10 @@ struct threaded_component : public virtual component {};
 
 struct passthru_component : public virtual component {
   virtual std::shared_ptr<CkMessage> action(void) override {
-    CkAssert(this->buffer.size() == 1 &&
+    CkAssert((this->accepted.size() == 1) &&
              "passthru components only expect one value");
-    std::shared_ptr<CkMessage> msg = std::move(this->buffer[0]);
-    this->buffer.clear();
+    std::shared_ptr<CkMessage> msg = std::move(this->accepted[0]);
+    this->accepted.clear();
     return msg;
   }
 };
@@ -154,12 +185,8 @@ struct mux_component : public monovalue_component, public passthru_component {
 
   virtual void accept(const component::id_t& from,
                       std::shared_ptr<CkMessage>&& msg) {
-    CkAssert(this->alive && "only living components can accept values");
-
-    this->erase_incoming(from);
-
     if (this->screen(msg)) {
-      this->buffer.emplace_back(std::move(msg));
+      component::accept(from, std::move(msg));
     } else if (this->incoming.empty()) {
       CkAbort("a multiplexer must accept at least one value");
     }
@@ -191,3 +218,50 @@ struct demux_component : public monovalue_component, public passthru_component {
     return msg;
   }
 };
+
+struct placeholder {
+  component::id_t source;
+  component::id_t port;
+  bool input;
+
+  inline bool is_output(void) const { return !input; }
+  inline const bool& is_input(void) const { return input; }
+};
+
+PUPbytes(placeholder);
+
+placeholder component::put_placeholder(const bool& input) {
+  auto port = (++this->port_authority);
+
+  if (input) {
+    this->connection(port, this->id);
+  } else {
+    this->connection(this->id, port);
+  }
+
+  return placeholder{.source = this->id, .port = port, .input = input};
+}
+
+void component::fill_placeholder(const placeholder& p,
+                                 const component::id_t& id) {
+  CkAssert(((p.source == this->id) && component::is_placeholder(p.port)) &&
+           "invalid placeholder");
+
+  auto end = p.is_input() ? this->incoming.end() : this->outgoing.end();
+  auto search = p.is_input() ? std::find(this->incoming.begin(), end, p.port)
+                             : std::find(this->outgoing.begin(), end, p.port);
+
+  if (search != end) {
+    *search = id;
+
+    if (p.is_input()) {
+      auto&& msg = std::move(this->inbox[id]);
+      component::send_value(id, this->id, std::move(msg));
+      this->inbox.erase(id);
+    }
+  } else if (p.is_output()) {
+    auto&& msg = std::move(this->outbox[p.port]);
+    component::send_value(this->id, id, std::move(msg));
+    this->outbox.erase(p.port);
+  }
+}

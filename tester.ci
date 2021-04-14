@@ -3,5 +3,9 @@ mainmodule tester {
         entry tester(CkArgMsg*);
     };
 
+    chare other {
+        entry other(const placeholder&,const placeholder&);
+    };
+
     initproc void setup_tester(void);
 }
