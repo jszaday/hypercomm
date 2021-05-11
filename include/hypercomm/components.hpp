@@ -5,7 +5,6 @@
 #include "components/component.hpp"
 #include "components/selectors.hpp"
 #include "components/attributes.hpp"
-#include "components/placeholder.hpp"
 #include "components/registration.hpp"
 
 #endif

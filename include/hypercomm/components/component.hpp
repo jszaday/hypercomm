@@ -18,47 +18,81 @@ struct component {
   using value_t = std::shared_ptr<CkMessage>;
   using id_t = component_id_t;
 
+ protected:
+  std::vector<port_id_t> incoming;
+  std::map<port_id_t, callback_ptr> outgoing;
+
+  std::vector<value_t> accepted;
+  std::map<port_id_t, value_t> inbox;
+  std::map<port_id_t, value_t> outbox;
+
+  bool alive;
+  id_t id;
+  port_id_t port_authority = 0;
+
+ public:
   friend class manager;
 
   virtual value_t action(void) = 0;
-  virtual int num_expected(void) const;
 
   virtual void receive_invalidation(const port_id_t&);
   virtual void receive_value(const port_id_t&, value_t&&);
 
   int num_available(void) const;
+  virtual int num_expected(void) const;
+
   bool ready(void) const;
   bool collectible(void) const;
 
-  port_id_t open_in_port(void);
-  port_id_t open_out_port(const callback_ptr&);
+  port_id_t open_in_port(void) {
+    auto id = this->port_authority++;
+    this->incoming.push_back(id);
+    return id;
+  }
+
+  port_id_t open_out_port(const callback_ptr& cb) {
+    auto id = ++this->port_authority;
+    this->outgoing.emplace(id, cb);
+    return id;
+  }
+
+  void update_destination(const port_id_t& port, const callback_ptr& cb) {
+    auto s1 = this->outgoing.find(port);
+    if (s1 == this->outgoing.end()) {
+      auto s2 = this->outbox.find(port);
+      CkAssert((s2 != this->outbox.end()) &&
+               "cannot update cb of non-existent port");
+      cb->send(std::move(s2->second));
+      this->outbox.erase(s2);
+    } else {
+      s1->second = cb;
+    }
+  }
+
+  // TODO decide whether to sync outbox?
+  void resync_queues(void) {
+    for (auto& in : this->inbox) {
+      auto search = std::find(std::begin(this->incoming),
+                              std::end(this->incoming), in.first);
+      if (search != std::end(this->incoming)) {
+        this->receive_value(in.first, std::move(in.second));
+        this->inbox.erase(in.first);
+      }
+    }
+  }
 
  protected:
   virtual void send(value_t&& msg);
-  void connection(const id_t& from, const id_t& to);
-  void invalidation(const id_t& from);
-  void erase_incoming(const id_t& from);
 
- public:
-  static bool is_placeholder(const component::id_t& id);
-  static void send_value(const id_t& from, const id_t& to, value_t&& msg);
-  static void send_invalidation(const id_t& from, const id_t& to);
-  static void send_connection(const placeholder&, const id_t&);
-  static void connect(const placeholder&, const std::shared_ptr<component>&);
-  static void connect(const std::shared_ptr<component>& from,
-                      const std::shared_ptr<component>& to);
+  void erase_incoming(const port_id_t&);
 
-  static void activate(std::shared_ptr<component>&&);
-  static void generate_identity(component::id_t& id);
-
-  id_t port_authority = std::numeric_limits<id_t>::max() << (sizeof(id_t) / 2);
-  std::vector<id_t> incoming;
-  std::vector<id_t> outgoing;
-  std::vector<value_t> accepted;
-  std::map<id_t, value_t> inbox;
-  std::map<id_t, value_t> outbox;
-  bool alive;
-  id_t id;
+  void try_send(const decltype(outgoing)::value_type& dst, value_t&& msg) {
+    if (dst.second) {
+      dst.second->send(std::forward<value_t>(msg));
+    } else {
+      this->outbox.emplace(dst.first, std::forward<value_t>(msg));
+    }
+  }
 };
 }
 }
