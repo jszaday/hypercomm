@@ -1,37 +1,37 @@
 #ifndef __HYPERCOMM_COMPONENTS_COMPONENT_HPP__
 #define __HYPERCOMM_COMPONENTS_COMPONENT_HPP__
 
-#include <ck.h>
+#include <charm++.h>
 
 #include <map>
 #include <memory>
 #include <vector>
 
+#include "../core.hpp"
+#include "identifiers.hpp"
+
 namespace hypercomm {
 namespace components {
 class manager;
-class placeholder;
-
-enum port_direction: bool {
-  INPUT = true,
-  OUTPUT = false
-};
 
 struct component {
   using value_t = std::shared_ptr<CkMessage>;
-  using id_t = std::uint64_t;
+  using id_t = component_id_t;
 
   friend class manager;
 
   virtual value_t action(void) = 0;
   virtual int num_expected(void) const;
-  virtual void accept(const id_t& from, value_t&& msg);
 
-  int num_available() const;
+  virtual void receive_invalidation(const port_id_t&);
+  virtual void receive_value(const port_id_t&, value_t&&);
+
+  int num_available(void) const;
   bool ready(void) const;
   bool collectible(void) const;
-  placeholder put_placeholder(const port_direction& dir);
-  void fill_placeholder(const placeholder&, const id_t&);
+
+  port_id_t open_in_port(void);
+  port_id_t open_out_port(const callback_ptr&);
 
  protected:
   virtual void send(value_t&& msg);
