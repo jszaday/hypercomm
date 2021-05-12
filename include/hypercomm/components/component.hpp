@@ -30,16 +30,22 @@ struct component {
   id_t id;
   port_id_t port_authority = 0;
 
+  component(const id_t& _1): id(_1) {}
+
  public:
   friend class manager;
 
   virtual value_t action(void) = 0;
 
+  // NOTE -- for correct status updates, overrides should
+  //         call the parent
   virtual void receive_invalidation(const port_id_t&);
   virtual void receive_value(const port_id_t&, value_t&&);
 
   int num_available(void) const;
   virtual int num_expected(void) const;
+
+  virtual bool keep_alive(void) const { return false; }
 
   bool ready(void) const;
   bool collectible(void) const;
@@ -96,6 +102,7 @@ struct component {
 };
 }
 
+using component = components::component;
 using component_ptr = std::shared_ptr<components::component>;
 }
 

@@ -21,12 +21,20 @@ namespace components {
 
 void component::receive_value(const port_id_t& from, value_t&& msg) {
   CkAssert(this->alive && "only living components can accept values");
+
   auto search = std::find(this->incoming.begin(), this->incoming.end(), from);
   if (search == this->incoming.end()) {
     this->inbox.emplace(from, std::move(msg));
   } else {
     this->accepted.emplace_back(std::move(msg));
     this->incoming.erase(search);
+  }
+
+  // TODO take threading into consideration when launching
+  if (this->ready()) {
+    auto msg = this->action();
+    this->alive = this->keep_alive();
+    this->send(std::move(msg));
   }
 }
 
