@@ -1,11 +1,11 @@
 #ifndef __HYPERCOMM_TRAITS_HPP__
 #define __HYPERCOMM_TRAITS_HPP__
 
-#include "../core/proxy.hpp"
-#include "polymorph.hpp"
-
 #include <deque>
 #include <list>
+
+#include "../core/proxy.hpp"
+#include "polymorph.hpp"
 
 namespace hypercomm {
 

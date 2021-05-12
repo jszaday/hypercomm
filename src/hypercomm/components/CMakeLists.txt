@@ -1,4 +1,4 @@
-set ( COMPONENT_SOURCES component.cc manager.cc registration.cc )
+set ( COMPONENT_SOURCES component.cc )
 
 add_library(hypercomm-components "${COMPONENT_SOURCES}")
 

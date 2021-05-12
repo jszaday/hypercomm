@@ -1,4 +1,5 @@
 add_subdirectory(components)
+add_subdirectory(serialization)
 
 set ( UTILITIES_SOURCES utilities.cc )
 

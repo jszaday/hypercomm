@@ -1,7 +1,7 @@
 #ifndef __HYPERCOMM_CONSTRUCTION_HPP__
 #define __HYPERCOMM_CONSTRUCTION_HPP__
 
-#include <charm++.h>
+#include <pup.h>
 
 namespace hypercomm {
 
@@ -33,23 +33,14 @@ template <typename T>
 struct temporary {
   typename std::aligned_storage<sizeof(T), alignof(T)>::type data;
 
-  temporary() {
-    reconstruct(&(this->value()));
-  }
+  temporary(void) { reconstruct(&(this->value())); }
 
-  ~temporary() {
-    value().~T();
-  }
+  ~temporary() { value().~T(); }
 
-  const T& value(void) const {
-    return *(reinterpret_cast<const T*>(&data));
-  }
+  const T& value(void) const { return *(reinterpret_cast<const T*>(&data)); }
 
-  T& value(void) {
-    return *(reinterpret_cast<T*>(&data));
-  }
+  T& value(void) { return *(reinterpret_cast<T*>(&data)); }
 };
-
 }
 
 #endif
