@@ -26,13 +26,14 @@ struct component {
   std::map<port_id_t, value_t> inbox;
   std::map<port_id_t, value_t> outbox;
 
-  bool alive;
-  id_t id;
   port_id_t port_authority = 0;
 
   component(const id_t& _1): id(_1) {}
 
  public:
+  bool alive;
+  id_t id;
+
   friend class manager;
 
   virtual value_t action(void) = 0;
