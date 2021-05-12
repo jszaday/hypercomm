@@ -87,6 +87,15 @@ struct component {
     }
   }
 
+  // TODO take threading into consideration when launching
+  void resync_status(void) {
+    if (this->ready()) {
+      auto msg = this->action();
+      this->alive = this->keep_alive();
+      this->send(std::move(msg));
+    }
+  }
+
  protected:
   virtual void send(value_t&& msg);
 

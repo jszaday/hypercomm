@@ -30,12 +30,7 @@ void component::receive_value(const port_id_t& from, value_t&& msg) {
     this->incoming.erase(search);
   }
 
-  // TODO take threading into consideration when launching
-  if (this->ready()) {
-    auto msg = this->action();
-    this->alive = this->keep_alive();
-    this->send(std::move(msg));
-  }
+  this->resync_status();
 }
 
 int component::num_expected(void) const { return this->num_available(); }
@@ -50,7 +45,7 @@ bool component::ready(void) const {
 
 bool component::collectible(void) const {
   return !this->alive && this->incoming.empty() && this->outgoing.empty() &&
-         this->outbox.empty();
+         this->inbox.empty() && this->outbox.empty();
 }
 
 // void component::connection(const id_t& from, const id_t& to) {
