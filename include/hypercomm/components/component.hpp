@@ -95,6 +95,8 @@ struct component {
   }
 };
 }
+
+using component_ptr = std::shared_ptr<components::component>;
 }
 
 #endif

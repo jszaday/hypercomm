@@ -5,9 +5,10 @@
 #include <pup.h>
 
 namespace hypercomm {
-namespace components {
 
 using component_id_t = std::uint64_t;
+
+namespace components {
 using port_id_t = std::uint64_t;
 
 enum port_direction : bool { INPUT = true, OUTPUT = false };
