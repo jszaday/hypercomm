@@ -3,6 +3,7 @@
 
 #include "serdes.hpp"
 #include "traits.hpp"
+#include "enrollment.hpp"
 #include "construction.hpp"
 
 namespace hypercomm {

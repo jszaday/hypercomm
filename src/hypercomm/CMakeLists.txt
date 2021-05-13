@@ -1,3 +1,4 @@
+add_subdirectory(messaging)
 add_subdirectory(components)
 add_subdirectory(serialization)
 

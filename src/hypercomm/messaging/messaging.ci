@@ -1,0 +1,7 @@
+module messaging {
+    namespace hypercomm {
+        namespace messaging {
+            message __msg__;
+        }
+    }
+}
