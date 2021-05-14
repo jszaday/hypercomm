@@ -4,6 +4,8 @@
 #include <charm++.h>
 #include <map>
 
+#include <hypercomm/messaging/messaging.decl.h>
+
 namespace hypercomm {
 using type_registry_t = std::map<std::type_index, polymorph_id_t>;
 using alloc_registry_t = std::map<polymorph_id_t, allocator_fn>;
@@ -12,6 +14,8 @@ CsvDeclare(type_registry_t, type_registry_);
 CsvDeclare(alloc_registry_t, alloc_registry_);
 
 void init_polymorph_registry(void) {
+  _registermessaging();
+
   CsvInitialize(type_registry_t, type_registry_);
   CsvInitialize(alloc_registry_t, alloc_registry_);
 }
@@ -45,7 +49,17 @@ polymorph_id_t identify(const polymorph_ptr& morph) {
 }
 
 polymorph_ptr instantiate(const polymorph_id_t& id) {
+#if CMK_ERROR_CHECKING
+  auto* reg = &(CsvAccess(alloc_registry_));
+  auto search = reg->find(id);
+  if (search == reg->end()) {
+    CkAbort("fatal> could not find allocator for %lx", id);
+  } else {
+    return (search->second)();
+  }
+#else
   return ((CsvAccess(alloc_registry_))[id])();
+#endif
 }
 
 }
