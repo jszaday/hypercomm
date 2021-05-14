@@ -1,11 +1,17 @@
 mainmodule tester {
-    mainchare tester {
-        entry tester(CkArgMsg*);
+    mainchare main {
+        entry main(CkArgMsg*);
     };
 
-    chare other {
-        entry other(const placeholder&,const placeholder&);
+    array [Max] locality_base_ {
+        entry locality_base_(void);
+        entry void demux(hypercomm_msg *msg);
     };
 
-    initproc void setup_tester(void);
+    array [Max] locality : locality_base_ {
+        entry locality(int);
+        entry void consensus(const CkArrayIndex&);
+    };
+
+    initproc void enroll_polymorphs(void);
 }
