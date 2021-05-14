@@ -5,7 +5,10 @@
 
 void enroll_polymorphs(void) {
   hypercomm::init_polymorph_registry();
-  hypercomm::enroll<reduction_port<int>>();
+
+  if (CkMyRank() == 0) {
+    hypercomm::enroll<reduction_port<int>>();
+  }
 }
 
 struct say_hello : public hypercomm::component {
