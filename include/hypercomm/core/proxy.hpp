@@ -32,11 +32,85 @@ public:
   virtual std::string to_string(void) const = 0;
 };
 
+template <typename T, typename Enable = void>
+struct index_for;
+
+template <typename T>
+struct index_for<T, typename std::enable_if<std::is_base_of<CProxy_ArrayBase, T>::value>::type> {
+  using type = CkArrayIndex;
+};
+
+template <typename T, typename Enable = void>
+struct identifier_for;
+
+template <typename T>
+struct identifier_for<T, typename std::enable_if<std::is_base_of<CProxy_ArrayBase, T>::value>::type> {
+  using type = CkArrayID;
+};
+
 template<typename Index>
 struct element_proxy : virtual public proxy {
   virtual Index index() const = 0;
   virtual bool collective(void) const override { return false; }
 };
+
+template<typename Index>
+struct collective_proxy : virtual public proxy {
+  using index_type = Index;
+  using element_type = std::shared_ptr<element_proxy<index_type>>;
+
+  virtual element_type operator[](const index_type& idx) const = 0;
+  virtual bool collective(void) const override { return false; }
+
+  virtual int home(void) const override {
+    throw std::runtime_error("collectives do not have locations");
+  }
+
+  virtual int last_known(void) const override {
+    return collective_proxy<Index>::home();
+  }
+};
+
+template<typename Proxy>
+struct generic_collective_proxy
+: virtual public collective_proxy<typename index_for<Proxy>::type> {
+  using base_type = collective_proxy<typename index_for<Proxy>::type>;
+  using element_type = typename base_type::element_type;
+  using index_type = typename base_type::index_type;
+  using proxy_type = Proxy;
+  using identifier_type = typename identifier_for<Proxy>::type;
+
+  Proxy proxy;
+
+  generic_collective_proxy(const Proxy& _1): proxy(_1) {}
+
+  template<PUP::Requires<std::is_base_of<CProxy_ArrayBase, Proxy>::value> = nullptr>
+  identifier_type id(void) const {
+    return proxy.ckGetArrayID();
+  }
+
+  virtual element_type operator[](const index_type& idx) const;
+
+  // TODO fix this
+  virtual chare_t type(void) const override { return chare_t::TypeArray; }
+
+  virtual bool equals(const hypercomm::proxy& _1) const override {
+    const auto* other = dynamic_cast<const generic_collective_proxy<Proxy>*>(&_1);
+    return (other != nullptr) && (const_cast<proxy_type&>(proxy) == other->proxy);
+  }
+
+  virtual void* local(void) const override {
+    return proxy.ckLocalBranch();
+  }
+
+  virtual std::string to_string(void) const override {
+    std::stringstream ss;
+    ss << "collective(" << typeid(Proxy).name() << ")";
+    return ss.str();
+  }
+};
+
+using array_proxy = generic_collective_proxy<CProxy_ArrayBase>;
 
 struct non_migratable_proxy : virtual public proxy {
   virtual int last_known(void) const override { return this->home(); }
@@ -208,12 +282,31 @@ inline std::shared_ptr<array_element_proxy> make_proxy(const T& base) {
   return std::make_shared<array_element_proxy>(static_cast<const array_element_proxy::proxy_type&>(base));
 }
 
+template<typename T,
+         PUP::Requires<std::is_base_of<array_proxy::proxy_type, T>::value && !std::is_base_of<array_element_proxy::proxy_type, T>::value> = nullptr>
+inline std::shared_ptr<array_proxy> make_proxy(const T& base) {
+  return std::make_shared<array_proxy>(static_cast<const array_proxy::proxy_type&>(base));
+}
+
 inline std::shared_ptr<group_element_proxy> make_proxy(const group_element_proxy::proxy_type& base) {
   return std::make_shared<group_element_proxy>(base);
 }
 
 inline std::shared_ptr<nodegroup_element_proxy> make_proxy(const nodegroup_element_proxy::proxy_type& base) {
   return std::make_shared<nodegroup_element_proxy>(base);
+}
+
+template <typename Proxy, typename Index,
+          PUP::Requires<std::is_base_of<array_proxy::proxy_type, typename Proxy::proxy_type>::value> = nullptr>
+typename Proxy::element_type element_at(const Proxy* proxy, const Index& idx) {
+  using element_proxy_type = array_element_proxy::proxy_type;
+  element_proxy_type element_proxy(proxy->proxy.ckGetArrayID(), idx);
+  return make_proxy(element_proxy);
+}
+
+template <typename T>
+typename generic_collective_proxy<T>::element_type generic_collective_proxy<T>::operator[](const generic_collective_proxy<T>::index_type& idx) const {
+  return element_at(this, idx);
 }
 }
 
