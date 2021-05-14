@@ -14,7 +14,9 @@ CsvDeclare(type_registry_t, type_registry_);
 CsvDeclare(alloc_registry_t, alloc_registry_);
 
 void init_polymorph_registry(void) {
-  _registermessaging();
+  if (CkMyRank() == 0) {
+    _registermessaging();
+  }
 
   CsvInitialize(type_registry_t, type_registry_);
   CsvInitialize(alloc_registry_t, alloc_registry_);
@@ -44,9 +46,7 @@ polymorph_id_t identify(const polymorph& morph) {
   return identify(std::type_index(typeid(morph)));
 }
 
-polymorph_id_t identify(const polymorph_ptr& morph) {
-  return identify(*morph);
-}
+polymorph_id_t identify(const polymorph_ptr& morph) { return identify(*morph); }
 
 polymorph_ptr instantiate(const polymorph_id_t& id) {
 #if CMK_ERROR_CHECKING
@@ -61,5 +61,4 @@ polymorph_ptr instantiate(const polymorph_id_t& id) {
   return ((CsvAccess(alloc_registry_))[id])();
 #endif
 }
-
 }
