@@ -34,12 +34,16 @@ struct located_chare : virtual public proxy {
   }
 };
 
+template <typename T>
+constexpr bool is_array_proxy(void) {
+  return std::is_base_of<CProxy_ArrayBase, T>::value;
+}
+
 template <typename T, typename Enable = void>
 struct index_for;
 
 template <typename T>
-struct index_for<T, typename std::enable_if<
-                        std::is_base_of<CProxy_ArrayBase, T>::value>::type> {
+struct index_for<T, typename std::enable_if<is_array_proxy<T>()>::type> {
   using type = CkArrayIndex;
 };
 
@@ -47,9 +51,16 @@ template <typename T, typename Enable = void>
 struct identifier_for;
 
 template <typename T>
-struct identifier_for<T, typename std::enable_if<std::is_base_of<
-                             CProxy_ArrayBase, T>::value>::type> {
+struct identifier_for<T, typename std::enable_if<is_array_proxy<T>()>::type> {
   using type = CkArrayID;
+};
+
+template <typename T, typename Enable = void>
+struct chare_type_for;
+
+template <typename T>
+struct chare_type_for<T, typename std::enable_if<is_array_proxy<T>()>::type> {
+  static constexpr auto value = chare_t::TypeArray;
 };
 
 template <typename Index>
@@ -80,16 +91,14 @@ struct generic_collective_proxy
 
   generic_collective_proxy(const Proxy& _1) : proxy(_1) {}
 
-  template <
-      PUP::Requires<std::is_base_of<CProxy_ArrayBase, Proxy>::value> = nullptr>
+  template <PUP::Requires<is_array_proxy<Proxy>()> = nullptr>
   identifier_type id(void) const {
     return proxy.ckGetArrayID();
   }
 
   virtual element_type operator[](const index_type& idx) const;
 
-  // TODO fix this
-  virtual chare_t type(void) const override { return chare_t::TypeArray; }
+  virtual chare_t type(void) const override { return chare_type_for<Proxy>::value; }
 
   virtual bool equals(const hypercomm::proxy& _1) const override {
     const auto* other =
