@@ -8,13 +8,15 @@
 #include <vector>
 
 #include "../core.hpp"
+#include "../core/impermanent.hpp"
+
 #include "identifiers.hpp"
 
 namespace hypercomm {
 namespace components {
 class manager;
 
-struct component {
+struct component: virtual public impermanent {
   using value_t = std::shared_ptr<CkMessage>;
   using id_t = component_id_t;
 
@@ -31,7 +33,6 @@ struct component {
   component(const id_t& _1): id(_1) {}
 
  public:
-  bool alive;
   id_t id;
 
   friend class manager;
@@ -45,8 +46,6 @@ struct component {
 
   int num_available(void) const;
   virtual int num_expected(void) const;
-
-  virtual bool keep_alive(void) const { return false; }
 
   bool ready(void) const;
   bool collectible(void) const;

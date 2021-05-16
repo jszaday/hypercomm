@@ -20,7 +20,8 @@ namespace components {
 // }
 
 void component::receive_value(const port_id_t& from, value_t&& msg) {
-  CkAssert(this->alive && "only living components can accept values");
+  // TODO unsure whether this should be enforced
+  // CkAssert(this->alive && "only living components can accept values");
 
   auto search = std::find(this->incoming.begin(), this->incoming.end(), from);
   if (search == this->incoming.end()) {
