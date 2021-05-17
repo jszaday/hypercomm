@@ -16,7 +16,7 @@ struct say_hello : public hypercomm::component {
 
   virtual value_t action(void) override {
     CkPrintf("hello from your friendly neighborhood component!\n");
-    CkExit();
+
     return {};
   }
 };
@@ -25,6 +25,7 @@ struct main : public CBase_main {
   main(CkArgMsg* msg) {
     auto n = CkNumPes();
     CProxy_locality::ckNew(n, n);
+    CkExitAfterQuiescence();
   }
 };
 

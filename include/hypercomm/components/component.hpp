@@ -81,6 +81,7 @@ struct component: virtual public impermanent {
       auto search = std::find(std::begin(this->incoming),
                               std::end(this->incoming), in.first);
       if (search != std::end(this->incoming)) {
+        QdProcess(1);
         this->receive_value(in.first, std::move(in.second));
         this->inbox.erase(in.first);
       }
@@ -90,6 +91,7 @@ struct component: virtual public impermanent {
   // TODO take threading into consideration when launching
   void resync_status(void) {
     if (this->ready()) {
+      QdProcess(this->accepted.size());
       auto msg = this->action();
       this->alive = this->keep_alive();
       this->send(std::move(msg));

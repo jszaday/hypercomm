@@ -26,7 +26,9 @@ struct reduction_port : public virtual entry_port {
     return this->id == theirs->id && this->index == theirs->index;
   }
 
-  virtual hash_code hash(void) const { return hash_code{id}; }
+  virtual hash_code hash(void) const {
+    return hash_combine(hash_code{id}, hash_code{index});
+  }
 
   virtual void __pup__(serdes& s) {
     s | id;
@@ -40,6 +42,7 @@ struct reducer : public hypercomm::component {
   reducer(const reduction_id_t& _1, const hypercomm::combiner_ptr& _2,
           value_t&& _3)
       : component(_1), combiner(_2) {
+    QdCreate(1);
     this->accepted.emplace_back(std::move(_3));
   }
 
@@ -264,7 +267,7 @@ struct locality_base : public virtual common_functions_ {
       auto ours = std::make_shared<reduction_port<Index>>(next, up);
       auto theirs = rdcr->open_in_port();
 
-      this->open(ours, std::make_pair(next, theirs));
+      this->open(ours, std::make_pair(rdcr->id, theirs));
     }
 
     if (dstream.empty()) {
