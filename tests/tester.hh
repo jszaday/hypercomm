@@ -27,7 +27,7 @@ struct reduction_port : public virtual entry_port {
   }
 
   virtual hash_code hash(void) const {
-    return hash_combine(hash_code{id}, hash_code{index});
+    return hash_combine(hash_code(id), hash_code(index));
   }
 
   virtual void __pup__(serdes& s) {
@@ -202,7 +202,19 @@ struct locality_base : public virtual common_functions_ {
     if (search == std::end(this->entry_ports)) {
       port_queue[port].push_back(std::move(value));
     } else {
+      CkAssert(search->first->alive && "entry port must be alive");
       this->try_send(search->second, std::move(value));
+      this->try_collect(search);
+    }
+  }
+
+  using entry_port_iterator = typename decltype(entry_ports)::iterator;
+
+  void try_collect(entry_port_iterator& it) {
+    const auto& port = it->first;
+    port->alive = port->keep_alive();
+    if (!port->alive) {
+      this->entry_ports.erase(it);
     }
   }
 
@@ -231,23 +243,26 @@ struct locality_base : public virtual common_functions_ {
     this->try_collect(search->second);
   }
 
-  using entry_port_iterator = typename decltype(entry_ports)::iterator;
-
   // TODO take port liveness into consideration
-  void resync_port_queue(entry_port_iterator& port) {
-    auto search = port_queue.find(port->first);
+  void resync_port_queue(entry_port_iterator& it) {
+    const auto entry_port = it->first;
+    auto search = port_queue.find(entry_port);
     if (search != port_queue.end()) {
       auto& buffer = search->second;
-      while (!buffer.empty()) {
+      while (entry_port->alive && !buffer.empty()) {
         auto& msg = buffer.front();
-        this->try_send(port->second, std::move(msg));
+        this->try_send(it->second, std::move(msg));
+        this->try_collect(it);
         buffer.pop_front();
       }
-      port_queue.erase(search);
+      if (buffer.empty()) {
+        port_queue.erase(search);
+      }
     }
   }
 
   void open(const entry_port_ptr& ours, const component_port_t& theirs) {
+    ours->alive = true;
     auto pair = entry_ports.emplace(ours, theirs);
     CkAssert(pair.second && "entry port must be unique");
     this->resync_port_queue(pair.first);
