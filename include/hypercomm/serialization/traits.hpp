@@ -20,6 +20,11 @@ struct is_list_or_deque {
 };
 
 template <typename T>
+struct is_list_or_deque<std::vector<T>> {
+  enum { value = true };
+};
+
+template <typename T>
 struct is_list_or_deque<std::list<T>> {
   enum { value = true };
 };
@@ -44,6 +49,11 @@ struct built_in<std::string> {
   enum { value = 1 };
 };
 
+template <>
+struct built_in<CkArrayIndex> {
+  enum { value = 1 };
+};
+
 template <typename T>
 struct built_in<
     T, typename std::enable_if<std::is_base_of<CProxy, T>::value>::type> {
@@ -56,8 +66,43 @@ struct is_pupable {
 };
 
 template <class T, typename Enable = void>
+struct is_message {
+  enum { value = 0 };
+};
+
+template <class T>
+struct is_message<T, typename std::enable_if<std::is_base_of<CkMessage, T>::value>::type> {
+  enum { value = 1 };
+};
+
+template <class T>
+struct is_pupable<T, typename std::enable_if<is_message<T>::value>::type> {
+  enum { value = 1 };
+};
+
+template <class T, typename Enable = void>
 struct is_polymorphic {
   enum { value = 0 };
+};
+
+using serdes_state = serdes::state_t;
+
+template <serdes_state>
+struct puper_for;
+
+template <>
+struct puper_for<serdes_state::SIZING> {
+  using type = PUP::sizer;
+};
+
+template <>
+struct puper_for<serdes_state::PACKING> {
+  using type = PUP::toMem;
+};
+
+template <>
+struct puper_for<serdes_state::UNPACKING> {
+  using type = PUP::fromMem;
 };
 
 template <class T>

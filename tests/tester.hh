@@ -3,13 +3,18 @@
 
 #include <hypercomm/serialization/pup.hpp>
 #include <hypercomm/messaging/messaging.hpp>
+#include <hypercomm/core/immediate.hpp>
 #include <hypercomm/utilities.hpp>
 #include <hypercomm/components.hpp>
+
+#include "tester.decl.h"
 
 using namespace hypercomm;
 
 using proxy_ptr = std::shared_ptr<hypercomm::proxy>;
 using reduction_id_t = component_id_t;
+
+std::string port2str(const entry_port_ptr& port);
 
 template <typename Index>
 struct reduction_port : public virtual entry_port {
@@ -75,20 +80,25 @@ struct section : public virtual comparable {
 };
 
 template <typename Index>
-struct generic_section : public section<std::int64_t, Index> {
+struct generic_section : public section<std::int64_t, Index>, public polymorph {
   using indices_type = std::vector<Index>;
 
   indices_type indices;
 
+  generic_section(PUP::reconstruct) {}
   generic_section(indices_type&& _1) : indices(_1) {}
 
-  virtual const std::vector<Index>& members(void) const override {
+  virtual const indices_type& members(void) const override {
     return this->indices;
   }
 
   virtual bool equals(const std::shared_ptr<comparable>& other) const override {
     auto other_typed = std::dynamic_pointer_cast<generic_section<Index>>(other);
     return other_typed && (this->indices == other_typed->indices);
+  }
+
+  virtual void __pup__(serdes& s) override {
+    s | indices;
   }
 };
 
@@ -177,6 +187,14 @@ const T& reinterpret_index(const CkArrayIndex& idx) {
   return *(reinterpret_cast<const T*>(idx.data()));
 }
 
+template <typename Index, typename T>
+inline Index conv2idx(const T& ord) {
+  Index idx;
+  idx.dimension = 1;
+  reinterpret_index<T>(idx) = ord;
+  return idx;
+}
+
 struct common_functions_ {
   virtual proxy_ptr __proxy__(void) const = 0;
 
@@ -195,14 +213,33 @@ struct locality_base : public virtual common_functions_ {
     return reinterpret_index<Index>(this->__index_max__());
   }
 
+  using action_type = typename std::shared_ptr<immediate_action<void(locality_base<Index>*)>>;
+  using impl_index_type = array_proxy::index_type;
+  using array_proxy_ptr = std::shared_ptr<array_proxy>;
+
+  static void send_action(const array_proxy_ptr& p, const Index& i, action_type&& a) {
+    auto size = hypercomm::size(a);
+    auto msg = CkAllocateMarshallMsg(size);
+    auto packer = serdes::make_packer(msg->msgBuf);
+    pup(packer, a);
+    CProxyElement_locality_base_ peer(p->id(), conv2idx<impl_index_type>(i));
+    peer.execute(msg);
+  }
+
+  void receive_action(const action_type& ptr) {
+    ptr->action(this);
+  }
+
+  void broadcast(const section_ptr<Index>&, hypercomm_msg*);
+
   void receive_value(const entry_port_ptr& port,
                      std::shared_ptr<CkMessage>&& value) {
     auto search = this->entry_ports.find(port);
-
     if (search == std::end(this->entry_ports)) {
+      QdCreate(1);
       port_queue[port].push_back(std::move(value));
     } else {
-      CkAssert(search->first->alive && "entry port must be alive");
+      CkAssert(search->first && search->first->alive && "entry port must be alive");
       this->try_send(search->second, std::move(value));
       this->try_collect(search);
     }
@@ -243,7 +280,6 @@ struct locality_base : public virtual common_functions_ {
     this->try_collect(search->second);
   }
 
-  // TODO take port liveness into consideration
   void resync_port_queue(entry_port_iterator& it) {
     const auto entry_port = it->first;
     auto search = port_queue.find(entry_port);
@@ -254,6 +290,7 @@ struct locality_base : public virtual common_functions_ {
         this->try_send(it->second, std::move(msg));
         this->try_collect(it);
         buffer.pop_front();
+        QdProcess(1);
       }
       if (buffer.empty()) {
         port_queue.erase(search);
@@ -288,10 +325,8 @@ struct locality_base : public virtual common_functions_ {
     if (dstream.empty()) {
       rdcr->open_out_port(cb);
     } else {
-      using impl_index_type = array_proxy::index_type;
       auto collective =
-          std::dynamic_pointer_cast<collective_proxy<impl_index_type>>(
-              this->__proxy__());
+          std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
       CkAssert(collective && "locality must be a valid collective");
       auto theirs = std::make_shared<reduction_port<Index>>(next, ident.mine);
       for (const auto& down : dstream) {
@@ -341,5 +376,58 @@ struct locality_base : public virtual common_functions_ {
     }
   }
 };
+
+template<typename Index>
+struct broadcaster: public immediate_action<void(locality_base<Index>*)> {
+  using index_type = array_proxy::index_type;
+
+  section_ptr<Index> section;
+  std::shared_ptr<hypercomm_msg> msg;
+
+  broadcaster(PUP::reconstruct) {}
+
+  broadcaster(const section_ptr<Index>& _1, std::shared_ptr<hypercomm_msg>&& _2)
+  : section(_1), msg(_2) {}
+
+  virtual void action(locality_base<Index>* _1) override {
+    auto& locality = const_cast<locality_base<Index>&>(*_1);
+    auto collective =
+        std::dynamic_pointer_cast<array_proxy>(locality.__proxy__());
+    CkAssert(collective && "must be a valid collective");
+
+    const auto& identity = locality.identity_for(this->section);
+    auto ustream = identity->upstream();
+    for (const auto& up : ustream) {
+      auto copy = std::static_pointer_cast<hypercomm_msg>(utilities::copy_message(msg));
+      auto next = std::make_shared<broadcaster>(this->section, std::move(copy));
+      locality_base<Index>::send_action(collective, up, std::move(next));
+    }
+
+    const auto dest = msg->dst;
+    locality.receive_value(dest, std::move(msg));
+  }
+
+  virtual void __pup__(serdes& s) override {
+    s | section;
+    s | msg;
+  }
+};
+
+template<typename Index>
+void locality_base<Index>::broadcast(const section_ptr<Index>& section, hypercomm_msg* _msg) {
+  auto identity = this->identity_for(section);
+  auto root = section->index_at(0);
+  auto msg = std::static_pointer_cast<hypercomm_msg>(utilities::wrap_message(_msg));
+  auto action = std::make_shared<broadcaster<Index>>(section, std::move(msg));
+
+  using index_type = array_proxy::index_type;
+  if (root == this->__index__()) {
+    this->receive_action(action);
+  } else {
+    auto collective =
+        std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
+    send_action(collective, root, action);
+  }
+}
 
 #endif

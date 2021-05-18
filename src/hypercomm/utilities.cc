@@ -1,9 +1,28 @@
 #include <hypercomm/utilities.hpp>
+#include <hypercomm/messaging/messaging.hpp>
 
 #include <iomanip>
 
 namespace hypercomm {
 namespace utilities {
+
+char* get_message_buffer(const CkMessage* _1) {
+  auto msg = const_cast<CkMessage*>(_1);
+  auto env = UsrToEnv(msg);
+  auto idx = env->getMsgIdx();
+
+  if (idx == CMessage_hypercomm_msg::__idx) {
+    return static_cast<hypercomm_msg*>(msg)->payload;
+  } else if (idx == CMessage_CkMarshallMsg::__idx) {
+    return static_cast<CkMarshallMsg*>(msg)->msgBuf;
+  } else if (idx == CMessage_CkReductionMsg::__idx) {
+    return static_cast<char*>(static_cast<CkReductionMsg*>(msg)->getData());
+  } else if (idx == CMessage_CkDataMsg::__idx) {
+    return static_cast<char*>(static_cast<CkDataMsg*>(msg)->getData());
+  } else {
+    CkAbort("unsure how to handle msg of type %s.", _msgTable[idx]->name);
+  }
+}
 
 std::string buf2str(const char* data, const std::size_t& size) {
   std::stringstream ss;

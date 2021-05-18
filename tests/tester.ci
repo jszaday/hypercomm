@@ -6,11 +6,11 @@ mainmodule tester {
     array [Max] locality_base_ {
         entry locality_base_(void);
         entry void demux(hypercomm_msg *msg);
+        entry void execute(CkMessage*);
     };
 
     array [Max] locality : locality_base_ {
         entry locality(int);
-        entry void consensus(const CkArrayIndex&);
     };
 
     initproc void enroll_polymorphs(void);

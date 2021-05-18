@@ -78,9 +78,9 @@ struct puper<T, typename std::enable_if<is_list_or_deque<T>::value>::type> {
       s.copy(&size);
       ::new (&t) T();
       for (auto i = 0; i < size; i++) {
-        PUP::detail::TemporaryObjectHolder<value_type> h;
-        pup(s, h.t);
-        t.push_back(h.t);
+        temporary<value_type> tmp;
+        pup(s, tmp);
+        t.push_back(tmp.value());
       }
     } else {
       auto size = t.size();
@@ -110,33 +110,46 @@ struct puper<std::array<T, N>,
   }
 };
 
+inline std::shared_ptr<PUP::er> make_puper(const serdes& s) {
+  switch (s.state) {
+    case serdes_state::UNPACKING: {
+      using pup_type = typename puper_for<serdes_state::UNPACKING>::type;
+      return std::make_shared<pup_type>(s.current);
+    }
+    case serdes_state::PACKING: {
+      using pup_type = typename puper_for<serdes_state::PACKING>::type;
+      return std::make_shared<pup_type>(s.current);
+    }
+    case serdes_state::SIZING: {
+      using pup_type = typename puper_for<serdes_state::SIZING>::type;
+      return std::make_shared<pup_type>();
+    }
+    default: {
+      return {};
+    }
+  }
+}
+
 template <typename T>
 struct puper<T, typename std::enable_if<hypercomm::built_in<T>::value>::type> {
   static constexpr auto is_proxy = std::is_base_of<CProxy, T>::value;
 
-  inline static void impl(serdes& s, T& t) {
-    if (is_proxy && !s.unpacking()) {
+  inline static void undelegate(serdes& s, T& t, std::true_type) {
+    if (!s.unpacking()) {
       t.ckUndelegate();
     }
+  }
 
-    switch (s.state) {
-      case serdes::state_t::UNPACKING: {
-        PUP::fromMem p(s.current);
-        reconstruct(&t);
-        p | t;
-        s.advanceBytes(p.size());
-        break;
-      }
-      case serdes::state_t::PACKING: {
-        PUP::toMem p(s.current);
-        p | t;
-        s.advanceBytes(p.size());
-        break;
-      }
-      case serdes::state_t::SIZING:
-        s.advanceBytes(PUP::size(t));
-        break;
+  inline static void undelegate(serdes& s, T& t, std::false_type) {}
+
+  inline static void impl(serdes& s, T& t) {
+    undelegate(s, t, typename std::integral_constant<bool, is_proxy>::type());
+    auto p = make_puper(s);
+    if (s.unpacking()) {
+      reconstruct(&t);
     }
+    (*p) | t;
+    s.advanceBytes(p->size());
   }
 };
 
@@ -153,6 +166,33 @@ struct puper<
     } else {
       auto p = dynamic_cast<PUP::able*>(t.get());
       pup<PUP::able*>(s, p);
+    }
+  }
+};
+
+template <typename T>
+struct puper<
+    T*,
+    typename std::enable_if<is_message<T>::value>::type> {
+  inline static void impl(serdes& s, T*& t) {
+    auto p = make_puper(s);
+    CkPupMessage(*p, reinterpret_cast<void**>(&t), 1);
+    s.advanceBytes(p->size());
+  }
+};
+
+template <typename T>
+struct puper<
+    std::shared_ptr<T>,
+    typename std::enable_if<is_message<T>::value>::type> {
+  inline static void impl(serdes& s, std::shared_ptr<T>& t) {
+    if (s.unpacking()) {
+      T *msg = nullptr;
+      pup(s, msg);
+      ::new (&t) std::shared_ptr<T>(static_cast<T*>(msg), [](T *msg) { CkFreeMsg(msg); });
+    } else {
+      T *msg = t.get();
+      pup(s, msg);
     }
   }
 };
