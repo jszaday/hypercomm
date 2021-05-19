@@ -82,11 +82,15 @@ void component::receive_invalidation(const port_id_t& from) {
 void component::erase_incoming(const port_id_t& from) {
   auto search = std::find(this->incoming.begin(), this->incoming.end(), from);
   CkAssert(search != this->incoming.end() && "could not find in-port");
-  this->incoming.erase(search);
+  // TODO this should consider the liveness of the ports on a case-by-case basis
+  if (!this->keep_alive()) {
+    this->incoming.erase(search);
+  }
 }
 
 void component::send(value_t&& msg) {
-  CkAssert(!this->alive && "a living component cannot send values");
+  bool persistent = this->keep_alive();
+  CkAssert((persistent || !this->alive) && "a living component cannot send values");
 
   for (auto it = std::begin(this->outgoing); it != std::end(this->outgoing);
        it = std::next(it)) {
@@ -100,6 +104,7 @@ void component::send(value_t&& msg) {
     this->try_send(*it, std::forward<value_t>(ready));
   }
 
+  // TODO should this be cleared for persistent?
   this->outgoing.clear();
 }
 }

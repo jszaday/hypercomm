@@ -1,6 +1,7 @@
 mainmodule tester {
     mainchare main {
         entry main(CkArgMsg*);
+        entry [threaded] void run(CkArrayCreatedMsg*);
     };
 
     array [Max] locality_base_ {
@@ -11,6 +12,7 @@ mainmodule tester {
 
     array [Max] locality : locality_base_ {
         entry locality(int);
+        entry void run(const int&);
     };
 
     initproc void enroll_polymorphs(void);

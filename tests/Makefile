@@ -1,8 +1,11 @@
-CHARMC = charmc -g
+CHARMC = charmc
 BINARY = tester
 
 INCLUDES = -I../include
 LIBS = -L../lib -lhypercomm-components -lhypercomm-utilities -lhypercomm-serialization -lhypercomm-messaging 
+
+OPTS?=-g -O2
+TESTOPTS?=4
 
 CHARMCFLAGS = $(OPTS)
 CHARMCLINKFLAGS = -language charm++ $(OPTS) $(LIBS)
