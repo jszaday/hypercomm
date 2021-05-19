@@ -1,6 +1,7 @@
 <div align="center">
 
-  [Logo for hypercomm](logo.png)
+<!--   ![Logo for hypercomm](logo.png) -->
+  <img src="logo.png" width="320">
 </div>
 
 # A Foreword Regarding Status
