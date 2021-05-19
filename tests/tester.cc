@@ -99,14 +99,15 @@ struct my_redn_com : public hypercomm::component {
 };
 
 struct locality : public CBase_locality, public locality_base<int> {
-  entry_port_ptr redn_port;
+  entry_port_ptr bcast_port, redn_port;
   int n;
   section_ptr<int> section;
 
   locality(int _1)
-  : n(_1), redn_port(std::make_shared<reduction_port<int>>(0x42, 0x42)) {
-    auto bcast_port = std::make_shared<reduction_port<int>>(0x48, 0x48);
-    auto com1 = this->emplace_component<my_redn_com>(this);
+  : n(_1),
+    bcast_port(std::make_shared<reduction_port<int>>(21, 21)),
+    redn_port(std::make_shared<reduction_port<int>>(42, 42)) {
+    const auto& com1 = this->emplace_component<my_redn_com>(this);
     auto com1_in = com1->open_in_port();
     this->open(bcast_port, std::make_pair(com1->id, com1_in));
     this->activate_component(com1);
@@ -119,19 +120,23 @@ struct locality : public CBase_locality, public locality_base<int> {
     this->section = std::make_shared<generic_section<int>>(std::move(indices));
 
     if (this->__index__() == 0) {
-      auto com2 = this->emplace_component<say_hello>();
+      const auto& com2 = this->emplace_component<say_hello>();
       auto com2_in = com2->open_in_port();
       this->open(redn_port, std::make_pair(com2->id, com2_in));
       this->activate_component(com2);
 
-      auto idx = this->ckGetArrayIndex();
-      auto sz  = size(idx);
-      auto msg = hypercomm_msg::make_message(sz, bcast_port);
-      auto pkr = serdes::make_packer(msg->payload);
-      hypercomm::pup(pkr, idx);
-
-      this->broadcast(section, msg);
+      this->start_broadcast();
     }
+  }
+
+  void start_broadcast(void) {
+    auto idx = this->ckGetArrayIndex();
+    auto sz  = size(idx);
+    auto msg = hypercomm_msg::make_message(sz, bcast_port);
+    auto pkr = serdes::make_packer(msg->payload);
+    hypercomm::pup(pkr, idx);
+
+    this->broadcast(section, msg);
   }
 
   virtual void execute(CkMessage* msg) override {
