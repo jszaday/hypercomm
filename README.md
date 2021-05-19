@@ -32,7 +32,7 @@ Other work remaining before a release will be considered:
 - Add Support for Cross-Collective Sections (moderate difficulty)
 - Directly Offer a Counterpart for Entry Methods (low difficulty)
 
-## About the Components Model
+## About HYPERCOMM's Model
 
 Components are fine-grained, polymorphic objects that, effectively, encapsulate an action. Components have a common API that can represent and implement higher-level constructs, like futures, channels, mailboxes, reductions, multicasts, and tasks. Chares are recast as virtual localities, or _vils_, with entry ports that forward messages to their components&#39; input ports; these are, otherwise, encapsulated and remotely inaccessible.
 
