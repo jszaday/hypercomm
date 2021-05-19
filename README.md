@@ -47,3 +47,6 @@ Tying an entry port to a persistent action corresponds to the entry methods of c
 Virtual localities may also be sent _tasks_ that directly encapsulate actions. For example, a multicast may be implemented as a broadcaster task that delivers a message locally, then copies itself to its &quot;children&quot;; this information is derived from a section&#39;s spanning tree.
 
 Virtual localities may be as chares are to chare collectives, forming groups, nodegroups, or chare-arrays with generic indices.
+
+## Building Hypercomm
+Hypercomm utilizes the Cmake build system. Ensure that the environment variable CHARM_HOME is set, run cmake in the top-level directory (i.e., `cmake .`), then run the generated makefiles (i.e., `make -j`). The examples are built using a mix of conventional build tools and CMake, these serve as examples of how to use Hypercomm with other applications.
