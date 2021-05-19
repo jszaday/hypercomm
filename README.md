@@ -1,4 +1,4 @@
-# A Brief Foreword Regarding Status
+# A Foreword Regarding Status
 
 Hypercomm is a collection of libraries that aim to enhance various high-level abstractions in Charm++, both in terms of performance and generality (i.e., raising the abstraction level). Its components-centric model provides lightweight sections that do not require registration. Components form the basis of an abstraction for parallelism, with each having a common set of operations for producing and consuming values and dictating their lifecycle. This abstraction incorporates ideas and terms from various sources, like distributed tuple-spaces and SPECTRE/HPX (shared notions of components/actions), and applies them to Charm++, recasting some of its core features along the way.
 
