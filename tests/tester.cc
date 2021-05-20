@@ -42,13 +42,15 @@ void enroll_polymorphs(void) {
   }
 }
 
+static constexpr auto kMaxReps = 129;
+
 // NOTE this mirrors the "secdest" Charm++ benchmark at:
 //      https://github.com/Wingpad/charm-benchmarks/tree/main/secdest
 struct main : public CBase_main {
   int numIters, numReps;
 
   main(CkArgMsg* m): numIters((m->argc <= 1) ? 4 : atoi(m->argv[1])), numReps(numIters / 2 + 1) {
-    if (numReps > 129) numReps = 129;
+    if (numReps > kMaxReps) numReps = kMaxReps;
     auto n = kDecompFactor * CkNumPes();
 
     CkPrintf("main> kDecompFactor=%d, kNumPes=%d\n", kDecompFactor, CkNumPes());
@@ -216,10 +218,10 @@ struct locality : public CBase_locality, public locality_base<int> {
     this->broadcast(section, msg);
   }
 
-  virtual void execute(CkMessage* msg) override {
+  virtual void execute(CkMessage* _1) override {
     action_type action{};
-    auto unpack = serdes::make_unpacker(
-        utilities::wrap_message(msg), utilities::get_message_buffer(msg));
+    auto msg = utilities::wrap_message(_1);
+    auto unpack = serdes::make_unpacker(msg, utilities::get_message_buffer(msg));
     hypercomm::pup(unpack, action);
     this->receive_action(action);
   }

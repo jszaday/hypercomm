@@ -227,10 +227,12 @@ struct puper<polymorph> {
 
 template <>
 struct puper<ptr_record> {
+  using impl_type = typename std::underlying_type<ptr_record::type_t>::type;
+
   inline static void impl(serdes& s, ptr_record& t) {
-    auto ty = reinterpret_cast<std::uint8_t*>(&t.t);
-    s.copy(ty);
-    switch (*ty) {
+    auto& ty = *(reinterpret_cast<impl_type*>(&t.t));
+    s | ty;
+    switch (ty) {
       case ptr_record::REFERENCE:
         pup(s, t.d.reference.id);
         break;
@@ -241,7 +243,7 @@ struct puper<ptr_record> {
       case ptr_record::IGNORE:
         break;
       default:
-        CkAbort("unknown record type %d", static_cast<int>(*ty));
+        CkAbort("unknown record type %d", static_cast<int>(ty));
         break;
     }
   }
