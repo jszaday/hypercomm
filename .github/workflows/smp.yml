@@ -27,7 +27,7 @@ jobs:
       run: |
         git clone https://github.com/UIUC-PPL/charm.git
         cd charm
-        ./build charm++ netlrts-linux-x86_64 smp -g -j1 --with-production --enable-error-checking
+        ./build charm++ netlrts-linux-x86_64 smp -g -j2 --with-production --enable-error-checking
 
 
     # Build Hypercomm
