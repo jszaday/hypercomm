@@ -41,24 +41,6 @@ template <typename Key>
 using message_queue_t =
     comparable_map<Key, std::deque<std::shared_ptr<CkMessage>>>;
 
-template <typename T>
-T& reinterpret_index(CkArrayIndex& idx) {
-  return *(reinterpret_cast<T*>(idx.data()));
-}
-
-template <typename T>
-const T& reinterpret_index(const CkArrayIndex& idx) {
-  return *(reinterpret_cast<const T*>(idx.data()));
-}
-
-template <typename Index, typename T>
-inline Index conv2idx(const T& ord) {
-  Index idx;
-  idx.dimension = 1;
-  reinterpret_index<T>(idx) = ord;
-  return idx;
-}
-
 struct common_functions_ {
   virtual proxy_ptr __proxy__(void) const = 0;
 
