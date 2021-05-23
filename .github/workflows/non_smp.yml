@@ -1,0 +1,45 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Non-SMP
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the main branch
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v2
+
+    # Build Charm++
+    - name: build-charm++
+      run: |
+        git clone https://github.com/UIUC-PPL/charm.git
+        cd charm
+        ./build charm++ netlrts-linux-x86_64 -g3 -j2 --with-production --enable-error-checking
+
+    # Build Hypercomm
+    - name: prep-hypercomm
+      run: |
+        export CHARM_HOME=$GITHUB_WORKSPACE/charm
+        cmake .
+        make -j2
+
+    # Test Hypercomm
+    - name: test-hypercomm
+      run: |
+        export CHARM_HOME=$GITHUB_WORKSPACE/charm
+        cd tests
+        TESTOPTS="++local 65" make test
+        TESTOPTS="++local 129" make test
