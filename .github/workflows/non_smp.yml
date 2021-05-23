@@ -27,18 +27,18 @@ jobs:
       run: |
         git clone https://github.com/UIUC-PPL/charm.git
         cd charm
-        ./build charm++ netlrts-linux-x86_64 -g3 -j --with-production --enable-error-checking
+        ./build charm++ netlrts-linux-x86_64 -g3 -j2 --with-production --enable-error-checking
 
     # Build Hypercomm
     - name: prep-hypercomm
       run: |
         export CHARM_HOME=$GITHUB_WORKSPACE/charm
         cmake .
-        make -j
+        make -j2
 
     # Test Hypercomm
     - name: test-hypercomm
       run: |
         export CHARM_HOME=$GITHUB_WORKSPACE/charm
         cd tests
-        make test
+        TESTOPTS=++local make test

@@ -28,7 +28,7 @@ $(BINARY): $(patsubst %.cc,%.o,$(wildcard *.cc))
 	$(CHARMC) $(CHARMCFLAGS) $<
 
 test: $(BINARY)
-	$(CHARM_HOME)/bin/testrun +p4 ./$(BINARY) ++ppn 4 $(TESTOPTS)
+	$(CHARM_HOME)/bin/testrun +p2 ./$(BINARY) ++ppn 2 $(TESTOPTS)
 
 debug: $(BINARY)
 	gdb -args ./$(BINARY) ++local

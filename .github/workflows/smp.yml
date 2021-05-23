@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: Non-SMP
+name: SMP
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the main branch
@@ -27,7 +27,7 @@ jobs:
       run: |
         git clone https://github.com/UIUC-PPL/charm.git
         cd charm
-        ./build charm++ netlrts-linux-x86_64 smp -g -j --with-production --enable-error-checking
+        ./build charm++ netlrts-linux-x86_64 smp -g -j1 --with-production --enable-error-checking
 
 
     # Build Hypercomm
@@ -35,11 +35,11 @@ jobs:
       run: |
         export CHARM_HOME=$GITHUB_WORKSPACE/charm
         cmake .
-        make -j
+        make -j2
 
     # Test Hypercomm
     - name: test-hypercomm
       run: |
         export CHARM_HOME=$GITHUB_WORKSPACE/charm
         cd tests
-        make test
+        TESTOPTS=++local make test
