@@ -1,4 +1,4 @@
-CHARMC=$(CHARM_HOME)/charmc
+CHARMC=$(CHARM_HOME)/bin/charmc
 BINARY = tester
 
 INCLUDES = -I../include
