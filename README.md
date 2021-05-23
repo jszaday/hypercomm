@@ -37,6 +37,8 @@ Other work remaining before a release will be considered:
   - Allow wrapping conventional Charm++ sections as Hypercomm sections (low difficulty)
 - Add Support for Cross-Collective Sections (moderate difficulty)
 - Directly Offer a Counterpart for Entry Methods (low difficulty)
+- Add Range-Based Lightweight Sections
+- Enable Using a const ref& to an std::vector as a section.
 
 ## Regarding Hypercomm's Model
 

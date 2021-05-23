@@ -7,6 +7,7 @@
 #include <hypercomm/utilities.hpp>
 #include <hypercomm/components.hpp>
 #include <hypercomm/sections.hpp>
+#include <hypercomm/reductions.hpp>
 
 #include "tester.decl.h"
 
@@ -15,46 +16,6 @@ using namespace hypercomm;
 using proxy_ptr = std::shared_ptr<hypercomm::proxy>;
 
 std::string port2str(const entry_port_ptr& port);
-
-template <typename Index>
-struct reduction_port : public virtual entry_port {
-  reduction_id_t id;
-  Index index;
-
-  reduction_port(PUP::reconstruct) {}
-
-  reduction_port(const reduction_id_t& _1, const Index& _2)
-      : id(_1), index(_2) {}
-
-  virtual bool equals(const std::shared_ptr<comparable>& other) const override  {
-    auto theirs = std::dynamic_pointer_cast<reduction_port<Index>>(other);
-    return this->id == theirs->id && this->index == theirs->index;
-  }
-
-  virtual hash_code hash(void) const override  {
-    return hash_combine(hash_code(id), hash_code(index));
-  }
-
-  virtual void __pup__(serdes& s) override {
-    s | id;
-    s | index;
-  }
-};
-
-struct reducer : public hypercomm::component {
-  hypercomm::combiner_ptr combiner;
-
-  reducer(const reduction_id_t& _1, const hypercomm::combiner_ptr& _2,
-          value_t&& _3)
-      : component(_1), combiner(_2) {
-    QdCreate(1);
-    this->accepted.emplace_back(std::move(_3));
-  }
-
-  virtual value_t action(void) {
-    return this->combiner->send(std::move(this->accepted));
-  }
-};
 
 struct forwarding_callback : public hypercomm::callback {
   std::shared_ptr<hypercomm::array_element_proxy> proxy;

@@ -1,11 +1,9 @@
 #ifndef __HYPERCOMM_SECTIONS_IDENTITY_HPP__
 #define __HYPERCOMM_SECTIONS_IDENTITY_HPP__
 
-#include <cstdint>
+#include "../reductions/reducer.hpp"
 
 namespace hypercomm {
-
-using reduction_id_t = component_id_t;
 
 template <typename Index>
 class identity {
