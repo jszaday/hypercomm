@@ -3,12 +3,12 @@
 name: Non-SMP
 
 # Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
+# events but only for the main branch
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -27,7 +27,6 @@ jobs:
       run: |
         git clone https://github.com/UIUC-PPL/charm.git
         cd charm
-        git checkout v6.10.1
         ./build charm++ netlrts-linux-x86_64 smp -g -j --with-production --enable-error-checking
 
 
