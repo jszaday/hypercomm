@@ -24,6 +24,28 @@ inline char *get_message_buffer(const std::shared_ptr<CkMessage>& msg) {
 }
 
 }
+
+
+// TODO (offer versions for non-array index)
+template <typename T>
+T& reinterpret_index(CkArrayIndex& idx) {
+  return *(reinterpret_cast<T*>(idx.data()));
+}
+
+template <typename T>
+const T& reinterpret_index(const CkArrayIndex& idx) {
+  return *(reinterpret_cast<const T*>(idx.data()));
+}
+
+template <typename Index, typename T>
+inline Index conv2idx(const T& ord) {
+  Index idx;
+  // TODO (only enable for array index)
+  idx.dimension = 1;
+  reinterpret_index<T>(idx) = ord;
+  return idx;
+}
+
 }
 
 #endif

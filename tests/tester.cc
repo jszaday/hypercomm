@@ -178,7 +178,7 @@ struct my_redn_com : virtual public entry_method_like {
 struct locality : public CBase_locality, public locality_base<int> {
   entry_port_ptr bcast_port, redn_port;
   int n;
-  section_ptr<int> section;
+  section_ptr section;
 
   locality(int _1)
   : n(_1),
