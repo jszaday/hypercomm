@@ -6,13 +6,13 @@
 #include <hypercomm/core/immediate.hpp>
 #include <hypercomm/utilities.hpp>
 #include <hypercomm/components.hpp>
+#include <hypercomm/sections.hpp>
 
 #include "tester.decl.h"
 
 using namespace hypercomm;
 
 using proxy_ptr = std::shared_ptr<hypercomm::proxy>;
-using reduction_id_t = component_id_t;
 
 std::string port2str(const entry_port_ptr& port);
 
@@ -56,99 +56,6 @@ struct reducer : public hypercomm::component {
   }
 };
 
-template <typename Ordinal, typename Index>
-struct section : public virtual comparable {
-  virtual const std::vector<Index>& members(void) const = 0;
-
-  virtual bool is_valid_ordinal(const Ordinal& ord) const {
-    return (ord > -1) && (ord < this->num_members());
-  }
-
-  virtual std::size_t num_members() const { return (this->members()).size(); }
-
-  virtual Ordinal ordinal_for(const Index& idx) const {
-    const auto& indices = this->members();
-    const auto search = std::find(indices.begin(), indices.end(), idx);
-    return Ordinal((search == indices.end()) ? -1 : (search - indices.begin()));
-  }
-
-  virtual Index index_at(const Ordinal& ord) const {
-    return (this->members())[ord];
-  }
-
-  virtual hash_code hash(void) const override { return 0x0; }
-};
-
-template <typename Index>
-struct generic_section : public section<std::int64_t, Index>, public polymorph {
-  using indices_type = std::vector<Index>;
-
-  indices_type indices;
-
-  generic_section(PUP::reconstruct) {}
-  generic_section(indices_type&& _1) : indices(_1) {}
-
-  virtual const indices_type& members(void) const override {
-    return this->indices;
-  }
-
-  virtual bool equals(const std::shared_ptr<comparable>& other) const override {
-    auto other_typed = std::dynamic_pointer_cast<generic_section<Index>>(other);
-    return other_typed && (this->indices == other_typed->indices);
-  }
-
-  virtual void __pup__(serdes& s) override {
-    s | indices;
-  }
-};
-
-template <typename Index>
-using section_ptr = std::shared_ptr<section<std::int64_t, Index>>;
-
-template <typename Index>
-class identity {
-  reduction_id_t current_ = 0;
-
- public:
-  reduction_id_t next_reduction(void) { return current_++; }
-  virtual std::vector<Index> upstream(void) const = 0;
-  virtual std::vector<Index> downstream(void) const = 0;
-};
-
-template <typename Index>
-struct section_identity : public identity<Index> {
-  section_ptr<Index> sect;
-  Index mine;
-
-  section_identity(const section_ptr<Index>& _1, const Index& _2)
-      : sect(_1), mine(_2){};
-
-  virtual std::vector<Index> downstream(void) const override {
-    const auto ord = sect->ordinal_for(mine);
-    CkAssert((sect->is_valid_ordinal(ord)) &&
-             "identity> index must be member of section");
-    const auto parent = binary_tree::parent(ord);
-    auto rval = std::vector<Index>{};
-    if (sect->is_valid_ordinal(parent)) rval.push_back(sect->index_at(parent));
-    return rval;
-  }
-
-  virtual std::vector<Index> upstream(void) const override {
-    const auto ord = sect->ordinal_for(mine);
-    CkAssert((sect->is_valid_ordinal(ord)) &&
-             "identity> index must be member of section");
-    const auto left = binary_tree::left_child(ord);
-    const auto right = binary_tree::right_child(ord);
-    auto rval = std::vector<Index>{};
-    if (sect->is_valid_ordinal(left)) rval.push_back(sect->index_at(left));
-    if (sect->is_valid_ordinal(right)) rval.push_back(sect->index_at(right));
-#if CMK_DEBUG
-    CkPrintf("%d> has children %lu and %lu.\n", mine, left, right);
-#endif
-    return rval;
-  }
-};
-
 struct forwarding_callback : public hypercomm::callback {
   std::shared_ptr<hypercomm::array_element_proxy> proxy;
   entry_port_ptr port;
@@ -164,10 +71,6 @@ struct forwarding_callback : public hypercomm::callback {
     s | port;
   }
 };
-
-template <typename Index>
-using identity_map = comparable_map<section_ptr<Index>,
-                                    std::shared_ptr<section_identity<Index>>>;
 
 using component_port_t = std::pair<component_id_t, components::port_id_t>;
 using entry_port_map_t = comparable_map<entry_port_ptr, component_port_t>;
@@ -204,7 +107,6 @@ struct common_functions_ {
 template <typename Index>
 struct locality_base : public virtual common_functions_ {
   message_queue_t<entry_port_ptr> port_queue;
-  identity_map<Index> identities;
   entry_port_map_t entry_ports;
   component_map_t components;
   component_id_t component_authority = 0;
@@ -216,6 +118,13 @@ struct locality_base : public virtual common_functions_ {
   using action_type = typename std::shared_ptr<immediate_action<void(locality_base<Index>*)>>;
   using impl_index_type = array_proxy::index_type;
   using array_proxy_ptr = std::shared_ptr<array_proxy>;
+
+  using identity_t = section_identity<Index>;
+  using section_ptr = typename identity_t::section_ptr;
+
+  using identity_ptr = std::shared_ptr<identity_t>;
+  using identity_map_t = comparable_map<section_ptr, identity_ptr>;
+  identity_map_t identities;
 
   static void send_action(const array_proxy_ptr& p, const Index& i, action_type&& a) {
     auto size = hypercomm::size(a);
@@ -230,7 +139,7 @@ struct locality_base : public virtual common_functions_ {
     ptr->action(this);
   }
 
-  void broadcast(const section_ptr<Index>&, hypercomm_msg*);
+  void broadcast(const section_ptr&, hypercomm_msg*);
 
   void receive_value(const entry_port_ptr& port,
                      std::shared_ptr<CkMessage>&& value) {
@@ -307,7 +216,7 @@ struct locality_base : public virtual common_functions_ {
     this->resync_port_queue(pair.first);
   }
 
-  void local_contribution(const section_ptr<Index>& which,
+  void local_contribution(const section_ptr& which,
                           std::shared_ptr<CkMessage>&& value,
                           const combiner_ptr& fn, const callback_ptr& cb) {
     auto& ident = *(this->identity_for(which));
@@ -364,13 +273,12 @@ struct locality_base : public virtual common_functions_ {
     this->try_collect(which);
   }
 
-  const std::shared_ptr<section_identity<Index>>& identity_for(
-      const section_ptr<Index>& which) {
+  const identity_ptr& identity_for(const section_ptr& which) {
     auto search = identities.find(which);
     if (search == identities.end()) {
       auto mine = this->__index__();
       auto iter = identities.emplace(
-          which, std::make_shared<section_identity<Index>>(which, mine));
+          which, std::make_shared<typename identity_ptr::element_type>(which, mine));
       CkAssert(iter.second && "section should be unique!");
       return (iter.first)->second;
     } else {
@@ -382,13 +290,14 @@ struct locality_base : public virtual common_functions_ {
 template<typename Index>
 struct broadcaster: public immediate_action<void(locality_base<Index>*)> {
   using index_type = array_proxy::index_type;
+  using section_ptr = typename locality_base<Index>::section_ptr;
 
-  section_ptr<Index> section;
+  section_ptr section;
   std::shared_ptr<hypercomm_msg> msg;
 
   broadcaster(PUP::reconstruct) {}
 
-  broadcaster(const section_ptr<Index>& _1, std::shared_ptr<hypercomm_msg>&& _2)
+  broadcaster(const section_ptr& _1, std::shared_ptr<hypercomm_msg>&& _2)
   : section(_1), msg(_2) {}
 
   virtual void action(locality_base<Index>* _1) override {
@@ -416,7 +325,7 @@ struct broadcaster: public immediate_action<void(locality_base<Index>*)> {
 };
 
 template<typename Index>
-void locality_base<Index>::broadcast(const section_ptr<Index>& section, hypercomm_msg* _msg) {
+void locality_base<Index>::broadcast(const section_ptr& section, hypercomm_msg* _msg) {
   auto identity = this->identity_for(section);
   auto root = section->index_at(0);
   auto msg = std::static_pointer_cast<hypercomm_msg>(utilities::wrap_message(_msg));
