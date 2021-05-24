@@ -63,29 +63,6 @@ struct main : public CBase_main {
   }
 };
 
-struct locality_base_ : public CBase_locality_base_,
-                        public virtual common_functions_ {
-  using this_ptr = locality_base_*;
-
-  locality_base_(void) {}
-
-  virtual void demux(hypercomm_msg* msg) {
-    throw std::runtime_error("you should never see this!");
-  }
-
-  virtual void execute(CkMessage* msg) {
-    throw std::runtime_error("you should never see this!");
-  }
-
-  virtual const CkArrayIndex& __index_max__(void) const override {
-    return this->thisIndexMax;
-  }
-
-  virtual std::shared_ptr<hypercomm::proxy> __proxy__(void) const override {
-    return hypercomm::make_proxy(const_cast<this_ptr>(this)->thisProxy);
-  }
-};
-
 struct locality : public CBase_locality, public locality_base<int> {
   entry_port_ptr bcast_port, redn_port;
   int n;
