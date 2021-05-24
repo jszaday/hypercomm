@@ -1,6 +1,7 @@
 #ifndef __HYPERCOMM_SECTIONS_BASE_HPP__
 #define __HYPERCOMM_SECTIONS_BASE_HPP__
 
+#include <memory>
 #include <vector>
 #include <algorithm>
 
@@ -8,6 +9,12 @@ namespace hypercomm {
 
 template <typename Ordinal, typename Index>
 struct section : public virtual comparable {
+  using ordinal_type = Ordinal;
+  using this_type = section<Ordinal, Index>;
+  using section_ptr = std::shared_ptr<this_type>;
+
+  virtual section_ptr clone(void) const = 0;
+
   virtual const std::vector<Index>& members(void) const = 0;
 
   virtual bool is_valid_ordinal(const Ordinal& ord) const {

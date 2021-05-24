@@ -194,7 +194,7 @@ struct locality : public CBase_locality, public locality_base<int> {
     std::transform(std::begin(indices), std::end(indices), std::begin(indices), [](const int& i) {
       return i * 2;
     });
-    this->section = std::make_shared<generic_section<int>>(std::move(indices));
+    this->section = sectionify(std::move(indices));
 
     if (this->__index__() == 0) {
       const auto& com2 = this->emplace_component<say_hello>();

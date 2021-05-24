@@ -2,11 +2,12 @@ CHARMC=$(CHARM_HOME)/bin/charmc
 BINARY = tester
 
 INCLUDES = -I../include
-LIBS = -L../lib -lhypercomm-components -lhypercomm-utilities -lhypercomm-serialization -lhypercomm-messaging 
+LIBS = -L../lib -lhypercomm-components -lhypercomm-utilities -lhypercomm-serialization -lhypercomm-messaging -lSegFault
 
 OPTS?=-g -O2
 TESTOPTS?=4
 CMK_NUM_PES?=2
+CATCHSEGV?=$(shell which catchsegv)
 
 CHARMCFLAGS = $(OPTS)
 CHARMCLINKFLAGS = -language charm++ $(OPTS) $(LIBS)
@@ -29,7 +30,7 @@ $(BINARY): $(patsubst %.cc,%.o,$(wildcard *.cc))
 	$(CHARMC) $(CHARMCFLAGS) $<
 
 test: $(BINARY)
-	$(CHARM_HOME)/bin/testrun +p$(CMK_NUM_PES) ./$(BINARY) $(TESTOPTS)
+	$(CHARM_HOME)/bin/testrun +p$(CMK_NUM_PES) $(CATCHSEGV) ./$(BINARY) $(TESTOPTS)
 
 debug: $(BINARY)
 	gdb -args ./$(BINARY) ++local

@@ -8,20 +8,25 @@ namespace hypercomm {
 
 template <typename Index>
 struct section_identity : public identity<Index> {
+  // TODO this should be a more generic thing
+  //      (e.g., incorporate proxies for cross-array sections)
   using ordinal_type = typename generic_section<Index>::ordinal_type;
   using index_type = Index;
 
-  // TODO this should be a more generic thing
-  //      (e.g., incorporate proxies for cross-array sections)
-  using section_ptr = std::shared_ptr<section<ordinal_type, index_type>>;
+  using section_type = section<ordinal_type, index_type>;
+  using section_ptr = std::shared_ptr<section_type>;
 
   // TODO add const auto& for local reference too.
 
   section_ptr sect;
   Index mine;
 
+  // TODO when can we avoid this clone?
+  section_identity(const section_type& _1, const Index& _2)
+  : section_identity(_1.clone(), _2) {}
+
   section_identity(const section_ptr& _1, const Index& _2)
-      : sect(_1), mine(_2){};
+      : sect(_1), mine(_2) {};
 
   virtual std::vector<Index> downstream(void) const override {
     const auto ord = sect->ordinal_for(mine);

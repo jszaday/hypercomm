@@ -64,6 +64,7 @@ struct locality_base : public virtual common_functions_ {
 
   using identity_t = section_identity<Index>;
   using section_ptr = typename identity_t::section_ptr;
+  using section_type = typename section_ptr::element_type;
 
   using identity_ptr = std::shared_ptr<identity_t>;
   using identity_map_t = comparable_map<section_ptr, identity_ptr>;
@@ -159,13 +160,20 @@ struct locality_base : public virtual common_functions_ {
     this->resync_port_queue(pair.first);
   }
 
-  void local_contribution(const section_ptr& which,
+  template<typename T>
+  void local_contribution(const T& which,
                           std::shared_ptr<CkMessage>&& value,
                           const combiner_ptr& fn, const callback_ptr& cb) {
-    auto& ident = *(this->identity_for(which));
-    auto next = ident.next_reduction();
-    auto ustream = ident.upstream();
-    auto dstream = ident.downstream();
+    local_contribution(this->identity_for(which), std::move(value), fn, cb);
+  }
+
+protected:
+  void local_contribution(const identity_ptr& ident,
+                          std::shared_ptr<CkMessage>&& value,
+                          const combiner_ptr& fn, const callback_ptr& cb) {
+    auto next = ident->next_reduction();
+    auto ustream = ident->upstream();
+    auto dstream = ident->downstream();
 
     const auto& rdcr = this->emplace_component<reducer>(fn, std::move(value));
 
@@ -182,7 +190,7 @@ struct locality_base : public virtual common_functions_ {
       auto collective =
           std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
       CkAssert(collective && "locality must be a valid collective");
-      auto theirs = std::make_shared<reduction_port<Index>>(next, ident.mine);
+      auto theirs = std::make_shared<reduction_port<Index>>(next, ident->mine);
       for (const auto& down : dstream) {
         impl_index_type down_idx;
         down_idx.dimension = 1;
@@ -195,6 +203,7 @@ struct locality_base : public virtual common_functions_ {
     this->activate_component(rdcr);
   }
 
+public:
   const component_ptr& emplace_component(component_ptr&& which) {
     auto placed = this->components.emplace(which->id, std::move(which));
     CkAssert(placed.second && "component id must be unique");
@@ -227,6 +236,24 @@ struct locality_base : public virtual common_functions_ {
     } else {
       return search->second;
     }
+  }
+
+  const identity_ptr& identity_for(const section_type& _1) {
+    section_ptr which(const_cast<section_type*>(&_1), [](section_type*){});
+    auto search = identities.find(which);
+    if (search == identities.end()) {
+      auto mine = this->__index__();
+      auto ident = std::make_shared<typename identity_ptr::element_type>(*which, mine);
+      auto iter = identities.emplace(ident->sect, std::move(ident));
+      CkAssert(iter.second && "section should be unique!");
+      return (iter.first)->second;
+    } else {
+      return search->second;
+    }
+  }
+
+  inline const identity_ptr& identity_for(const std::vector<Index>& _1) {
+    return this->identity_for(vector_section<Index>(_1));
   }
 };
 
