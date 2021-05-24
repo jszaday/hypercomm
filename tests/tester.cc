@@ -6,30 +6,9 @@
 #define DECOMP_FACTOR 4
 #endif
 
+constexpr auto kMaxReps = 129;
 constexpr auto kDecompFactor = DECOMP_FACTOR;
 constexpr auto kVerbose = false;
-
-struct persistent_port : public virtual entry_port {
-  components::port_id_t id = 0;
-
-  persistent_port(PUP::reconstruct) {}
-  persistent_port(const decltype(id)& _1): id(_1) {}
-
-  virtual bool keep_alive(void) const override { return true; }
-
-  virtual bool equals(const std::shared_ptr<comparable>& other) const override {
-    auto theirs = std::dynamic_pointer_cast<persistent_port>(other);
-    return this->id == theirs->id;
-  }
-
-  virtual hash_code hash(void) const override  {
-    return hash_code(id);
-  }
-
-  virtual void __pup__(serdes& s) override  {
-    s | id;
-  }
-};
 
 void enroll_polymorphs(void) {
   hypercomm::init_polymorph_registry();
@@ -41,8 +20,6 @@ void enroll_polymorphs(void) {
     hypercomm::enroll<generic_section<int>>();
   }
 }
-
-static constexpr auto kMaxReps = 129;
 
 // NOTE this mirrors the "secdest" Charm++ benchmark at:
 //      https://github.com/Wingpad/charm-benchmarks/tree/main/secdest
@@ -86,36 +63,6 @@ struct main : public CBase_main {
   }
 };
 
-std::string port2str(const entry_port_ptr& port) {
-  if (!port) {
-    return "nullptr";
-  }
-  auto redn_port = std::dynamic_pointer_cast<reduction_port<int>>(port);
-  if (redn_port) {
-    std::stringstream ss;
-    ss << "reducer_port(id=" << redn_port->id << ",idx=" << redn_port->index << ")";
-    return ss.str();
-  }
-  auto persist_port = std::dynamic_pointer_cast<persistent_port>(port);
-  if (persist_port) {
-    std::stringstream ss;
-    ss << "persistent_port(id=" << persist_port->id << ")";
-    return ss.str();
-  }
-  return "unknown";
-}
-
-void forwarding_callback::send(callback::value_type&& value) {
-  auto index = this->proxy->index();
-#if CMK_DEBUG
-  CkPrintf("info> message being forwarded to port %s at %d\n",
-           port2str(this->port).c_str(), reinterpret_index<int>(index));
-#endif
-  auto msg = hypercomm_msg::make_message(0x0, this->port);
-  CProxyElement_locality_base_ base(this->proxy->id(), index);
-  base.demux(msg);
-}
-
 struct locality_base_ : public CBase_locality_base_,
                         public virtual common_functions_ {
   using this_ptr = locality_base_*;
@@ -137,42 +84,6 @@ struct locality_base_ : public CBase_locality_base_,
   virtual std::shared_ptr<hypercomm::proxy> __proxy__(void) const override {
     return hypercomm::make_proxy(const_cast<this_ptr>(this)->thisProxy);
   }
-};
-
-struct nil_combiner : public combiner {
-  virtual combiner::return_type send(combiner::argument_type&& args) override {
-    return args.empty() ? combiner::return_type{} : args[0];
-  }
-
-  virtual void __pup__(hypercomm::serdes&) override {}
-};
-
-struct entry_method_like : public hypercomm::component {
-  entry_method_like(const id_t& _1) : component(_1) {}
-
-  virtual bool keep_alive(void) const override { return true; }
-
-  virtual int num_expected(void) const override { return 1; }
-};
-
-struct say_hello : virtual public entry_method_like {
-  say_hello(const id_t& _1) : entry_method_like(_1) {}
-
-  virtual value_t action(void) override {
-    if (kVerbose) {
-      CkPrintf("com%lu> hi, hi!\n", id);
-    }
-
-    return {};
-  }
-};
-
-struct my_redn_com : virtual public entry_method_like {
-  locality* self;
-
-  my_redn_com(const id_t& _1, locality* _2) : entry_method_like(_1), self(_2) {}
-
-  virtual value_t action(void) override;
 };
 
 struct locality : public CBase_locality, public locality_base<int> {
@@ -227,14 +138,17 @@ struct locality : public CBase_locality, public locality_base<int> {
   }
 
   virtual void demux(hypercomm_msg* msg) override {
-#if CMK_DEBUG
-    CkPrintf("%d> received a value for %s\n", this->__index__(),
-             port2str(msg->dst).c_str());
-#endif
-
     this->receive_value(msg->dst, hypercomm::utilities::wrap_message(msg));
   }
 };
+
+typename say_hello::value_t say_hello::action(void) {
+  if (kVerbose) {
+    CkPrintf("com%lu> hi, hi!\n", id);
+  }
+
+  return {};
+}
 
 typename my_redn_com::value_t my_redn_com::action(void) {
   auto& head = this->accepted[0];
@@ -245,7 +159,7 @@ typename my_redn_com::value_t my_redn_com::action(void) {
   auto pkr = serdes::make_unpacker(head, utilities::get_message_buffer(head));
   hypercomm::pup(pkr, tmp);
 
-  auto fn = std::make_shared<nil_combiner>();
+  auto fn = std::make_shared<nop_combiner>();
   auto cb =
       std::make_shared<forwarding_callback>(make_proxy(self->thisProxy[idx]), self->redn_port);
 
