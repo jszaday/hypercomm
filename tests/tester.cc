@@ -75,17 +75,20 @@ struct locality : public CBase_locality, public locality_base<int> {
       : n(_1),
         bcast_port(std::make_shared<persistent_port>(0)),
         redn_port(std::make_shared<persistent_port>(1)) {
+    // places a my_redn_com on all elements, then opens an entry port to it
+    // so it can receive messages from other chares -- this is, effectively,
+    // a dynamic entry method
     const auto& com1 = this->emplace_component<my_redn_com>(this);
     auto com1_in = com1->open_in_port();
     this->open(bcast_port, std::make_pair(com1->id, com1_in));
     this->activate_component(com1);
-
+    // creates a (lightweight) section with only the even elements 
     std::vector<int> indices(n / 2);
     std::iota(std::begin(indices), std::end(indices), 0);
     std::transform(std::begin(indices), std::end(indices), std::begin(indices),
                    [](const int& i) { return i * 2; });
     this->section = sectionify(std::move(indices));
-
+    // NOTE the say_hello "entry method" is only created on idx 0
     if (this->__index__() == 0) {
       const auto& com2 = this->emplace_component<say_hello>();
       auto com2_in = com2->open_in_port();
@@ -157,6 +160,7 @@ typename my_redn_com::value_t my_redn_com::action(void) {
     CkPrintf("com%lu@%d> contributing a value\n", this->id, self->__index__());
 #endif
     auto msg = hypercomm_msg::make_message(0x0, {});
+    // NOTE ( this is equivalent to Charm++'s contribute but, sadly, we cannot overload it )
     self->local_contribution(self->section,
                              hypercomm::utilities::wrap_message(msg), fn, cb);
   }
