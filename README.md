@@ -21,14 +21,15 @@ In any case, its modules were developed as components of three projects. Some fe
   - Hashing – Pending, can be copied over with minimal changes.
   - Mailboxes &amp; Futures – Pending, to be reimplemented as components.
   - Callbacks &amp; Reductions – Replaced.
-  - Once these tasks are done, Ergoline will migrate to using the integrated library.
-    - It is still on an older, now historical branch.
+  - Ergoline is still on an older, now historical branch of this library. Once this integration is complete, it needs to be updated.
 - Hypercomm Components:
   - Components – Integrated, uses _ser//des_.
   - Vils, Sections, Multicasts and Reductions – Pending, but localized to example (need to be mainlined)
 
 Other work remaining before a release will be considered:
 
+- Use process-awareness to provide node-invariant reduction/multicast performance.
+- Add range-based and global sections (driving optimizations)
 - Enable using vils with groups and nodegroups (low difficulty)
 - Enforce a uniform module naming and layout scheme (refactoring)
 - Enable de/serialization of components to facilitate migratability (low difficulty)
