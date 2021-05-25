@@ -56,6 +56,10 @@ void locality_base<Index>::broadcast(const section_ptr& section, hypercomm_msg* 
 
 void forwarding_callback::send(callback::value_type&& value) {
   auto index = this->proxy->index();
+  // TODO actually convert the message we receive.
+  //      if it's not an appropriately sized hypercomm_msg...
+  //      copy and resize it >.>
+  //     (add a verbose warning about copying)
   auto msg = hypercomm_msg::make_message(0x0, this->port);
   CProxyElement_locality_base_ base(this->proxy->id(), index);
   base.demux(msg);
