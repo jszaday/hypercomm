@@ -103,22 +103,16 @@ struct locality : public CBase_locality, public locality_base<int> {
     idx = this->ckGetArrayIndex();
     std::get<1>(tmp) = numIters;
     // pack the root's address and the number of iters
-    // TODO ( make a helper function that does this )
-    auto sz = size(tmp);
-    auto msg = hypercomm_msg::make_message(sz, bcast_port);
-    auto pkr = serdes::make_packer(msg->payload);
-    hypercomm::pup(pkr, tmp);
+    // (specify the destination port as bcast_port)
+    auto msg = hypercomm::pack_to_port(bcast_port, tmp);
     // do a broadcast over the section to start the reductions
     this->broadcast(section, msg);
   }
 
   // NOTE ( this is a mechanism for remote task invocation )
-  virtual void execute(CkMessage* _1) override {
+  virtual void execute(CkMessage* msg) override {
     action_type action{};
-    auto msg = utilities::wrap_message(_1);
-    auto unpack =
-        serdes::make_unpacker(msg, utilities::get_message_buffer(msg));
-    hypercomm::pup(unpack, action);
+    hypercomm::unpack(msg, action);
     this->receive_action(action);
   }
 
@@ -144,12 +138,10 @@ typename my_redn_com::value_t my_redn_com::action(void) {
   // the accepted pool contains the first message received by this action
   auto& head = this->accepted[0];
   // unpack it to an index/int pair
-  // TODO ( make a helper method that hides this )
   std::tuple<array_proxy::index_type, int> tmp;
   auto& idx = std::get<0>(tmp);
   auto& numIters = std::get<1>(tmp);
-  auto pkr = serdes::make_unpacker(head, utilities::get_message_buffer(head));
-  hypercomm::pup(pkr, tmp);
+  hypercomm::unpack(std::move(head), tmp);
   // make the function and callback
   auto fn = std::make_shared<nop_combiner>();
   auto cb = std::make_shared<forwarding_callback>(

@@ -1,6 +1,7 @@
 #ifndef __HYPERCOMM_CORE_LOCALITY_HPP__
 #define __HYPERCOMM_CORE_LOCALITY_HPP__
 
+#include <hypercomm/messaging/packing.hpp>
 #include <hypercomm/core/broadcaster.hpp>
 
 #include "locality.decl.h"
@@ -31,10 +32,7 @@ struct locality_base_ : public CBase_locality_base_,
 namespace hypercomm {
 template<typename Index>
 void locality_base<Index>::send_action(const array_proxy_ptr& p, const Index& i, action_type&& a) {
-  auto size = hypercomm::size(a);
-  auto msg = CkAllocateMarshallMsg(size);
-  auto packer = serdes::make_packer(msg->msgBuf);
-  pup(packer, a);
+  auto msg = hypercomm::pack(a);
   CProxyElement_locality_base_ peer(p->id(), conv2idx<impl_index_type>(i));
   peer.execute(msg);
 }
