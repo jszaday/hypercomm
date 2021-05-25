@@ -29,7 +29,7 @@ In any case, its modules were developed as components of three projects. Some fe
 Other work remaining before a release will be considered:
 
 - Use process-awareness to provide node-invariant reduction/multicast performance.
-- Add range-based and global sections (driving optimizations)
+- Add range-based and global lightweight sections (driving optimizations)
 - Enable using vils with groups and nodegroups (low difficulty)
 - Enforce a uniform module naming and layout scheme (refactoring)
 - Enable de/serialization of components to facilitate migratability (low difficulty)
@@ -38,7 +38,6 @@ Other work remaining before a release will be considered:
   - Allow wrapping conventional Charm++ sections as Hypercomm sections (low difficulty)
 - Add Support for Cross-Collective Sections (moderate difficulty)
 - Directly Offer a Counterpart for Entry Methods (low difficulty)
-- Add Range-Based Lightweight Sections
 - Enable Using a const ref& to an std::vector as a section.
 
 ## Regarding Hypercomm's Model
