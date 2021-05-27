@@ -55,14 +55,20 @@ void locality_base<Index>::broadcast(const section_ptr& section, hypercomm_msg* 
 }
 
 void forwarding_callback::send(callback::value_type&& value) {
-  auto index = this->proxy->index();
-  // TODO actually convert the message we receive.
-  //      if it's not an appropriately sized hypercomm_msg...
-  //      copy and resize it >.>
-  //     (add a verbose warning about copying)
-  auto msg = hypercomm_msg::make_message(0x0, this->port);
-  CProxyElement_locality_base_ base(this->proxy->id(), index);
-  base.demux(msg);
+  // creates a proxy to the locality
+  auto dstIdx = this->proxy->index();
+  CProxyElement_locality_base_ base(this->proxy->id(), dstIdx);
+  auto env = UsrToEnv(value.get());
+  auto msgIdx = env->getMsgIdx();
+  if (msgIdx == message::__idx) {
+    auto msg = static_cast<message*>(utilities::unwrap_message(std::move(value)));
+    // TODO should this be a move?
+    msg->dst = this->port;
+    base.demux(msg);
+  } else {
+    // TODO repack to hypercomm in this case (when HYPERCOMM_NO_COPYING is undefined)
+    CkAbort("expected a hypercomm msg, but got %s instead\n", _msgTable[msgIdx]->name);
+  }
 }
 }
 
