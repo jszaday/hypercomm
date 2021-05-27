@@ -41,7 +41,7 @@ jobs:
     - name: test-hypercomm
       run: |
         export CHARM_HOME=$GITHUB_WORKSPACE/charm
-        cd tests
+        cd tests/redn_demo
         TESTOPTS="++local ++ppn 2 65" make test
         TESTOPTS="++local ++ppn 2 129" make test
         TESTOPTS="++local 65" make test
