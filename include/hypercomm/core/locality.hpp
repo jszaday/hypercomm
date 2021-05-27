@@ -1,6 +1,7 @@
 #ifndef __HYPERCOMM_CORE_LOCALITY_HPP__
 #define __HYPERCOMM_CORE_LOCALITY_HPP__
 
+#include <hypercomm/messaging/packing.hpp>
 #include <hypercomm/core/broadcaster.hpp>
 
 #include "locality.decl.h"
@@ -31,10 +32,7 @@ struct locality_base_ : public CBase_locality_base_,
 namespace hypercomm {
 template<typename Index>
 void locality_base<Index>::send_action(const array_proxy_ptr& p, const Index& i, action_type&& a) {
-  auto size = hypercomm::size(a);
-  auto msg = CkAllocateMarshallMsg(size);
-  auto packer = serdes::make_packer(msg->msgBuf);
-  pup(packer, a);
+  auto msg = hypercomm::pack(a);
   CProxyElement_locality_base_ peer(p->id(), conv2idx<impl_index_type>(i));
   peer.execute(msg);
 }
@@ -57,10 +55,20 @@ void locality_base<Index>::broadcast(const section_ptr& section, hypercomm_msg* 
 }
 
 void forwarding_callback::send(callback::value_type&& value) {
-  auto index = this->proxy->index();
-  auto msg = hypercomm_msg::make_message(0x0, this->port);
-  CProxyElement_locality_base_ base(this->proxy->id(), index);
-  base.demux(msg);
+  // creates a proxy to the locality
+  auto dstIdx = this->proxy->index();
+  CProxyElement_locality_base_ base(this->proxy->id(), dstIdx);
+  auto env = UsrToEnv(value.get());
+  auto msgIdx = env->getMsgIdx();
+  if (msgIdx == message::__idx) {
+    auto msg = static_cast<message*>(utilities::unwrap_message(std::move(value)));
+    // TODO should this be a move?
+    msg->dst = this->port;
+    base.demux(msg);
+  } else {
+    // TODO repack to hypercomm in this case (when HYPERCOMM_NO_COPYING is undefined)
+    CkAbort("expected a hypercomm msg, but got %s instead\n", _msgTable[msgIdx]->name);
+  }
 }
 }
 
