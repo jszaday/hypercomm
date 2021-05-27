@@ -1,8 +1,9 @@
 CHARMC=$(CHARM_HOME)/bin/charmc
 BINARY = tester
+HYPERCOMM_HOME=../..
 
-INCLUDES = -I../include -I../include/hypercomm/core
-LIBS = -L../lib -lhypercomm-components -lhypercomm-utilities -lhypercomm-serialization -lhypercomm-messaging -lSegFault
+INCLUDES = -I$(HYPERCOMM_HOME)/include -I$(HYPERCOMM_HOME)/include/hypercomm/core
+LIBS = -L$(HYPERCOMM_HOME)/lib -lhypercomm-components -lhypercomm-utilities -lhypercomm-serialization -lhypercomm-messaging -lSegFault
 
 OPTS?=-g -O2
 TESTOPTS?=4
