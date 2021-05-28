@@ -73,6 +73,33 @@ struct locality_base : public virtual common_functions_ {
     }
   }
 
+  // TODO this is a temporary solution
+  struct connector: public callback {
+    locality_base<Index>* self;
+    const component_port_t dst;
+
+    connector(locality_base<Index>* _1, const component_port_t& _2): self(_1), dst(_2) {}
+
+    virtual return_type send(argument_type&& value) override {
+      self->try_send(dst, std::move(value));
+    }
+
+    virtual void __pup__(serdes& s) override {
+      CkAbort("don't send me");
+    }
+  };
+
+  inline void connect(const component_ptr& src, const component_ptr& dst) {
+    auto in = dst->open_in_port();
+    auto conn = std::make_shared<connector>(this, std::make_pair(dst->id, in));
+    src->open_out_port(conn);
+  }
+
+  inline void connect(const entry_port_ptr& port, const component_ptr& dst) {
+    auto in = dst->open_in_port();
+    this->open(port, std::make_pair(dst->id, in));
+  }
+
   using entry_port_iterator = typename decltype(entry_ports)::iterator;
 
   void try_collect(entry_port_iterator& it) {
@@ -90,11 +117,13 @@ struct locality_base : public virtual common_functions_ {
   void try_collect(const component_ptr& ptr) {
     if (ptr && ptr->collectible()) {
       const auto& id = ptr->id;
+#if CMK_VERBOSE
       const auto& uses = ptr.use_count();
       if (uses > 1) {
         CkError("warning> component %lu replicated %lu time(s)!\n",
                 id, uses - 1);
       }
+#endif
       this->components.erase(id);
     }
   }
