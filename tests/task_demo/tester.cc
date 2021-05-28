@@ -45,7 +45,7 @@ struct locality : public CBase_locality, public locality_base<int> {
   // val sums = or::placeholder<float, 1>(n);
   //
   // for (i in 0 to n) {
-  //   values[i] = self@[i].gen_values();
+  //   values[i] = self@[i].gen_values();  // equivalent to charm++'s thisProxy[i]
   //   print_values(values[i]);
   //   sums[i] = self@[i].add_values(values[i], values[(i + 1) % n]);
   //   print_values(sums[i]);
@@ -54,6 +54,7 @@ struct locality : public CBase_locality, public locality_base<int> {
   locality(int _1)
       : selfIdx(this->__index__()),
         n(_1),
+        // this should probably be a temporary port
         recv_value(std::make_shared<persistent_port>(0)) {
     auto com0 = this->emplace_component<gen_values<value_type>>(selfIdx, n);
     auto com1 = this->emplace_component<print_values<value_type>>(selfIdx);
