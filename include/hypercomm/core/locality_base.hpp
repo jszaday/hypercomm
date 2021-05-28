@@ -90,11 +90,13 @@ struct locality_base : public virtual common_functions_ {
   void try_collect(const component_ptr& ptr) {
     if (ptr && ptr->collectible()) {
       const auto& id = ptr->id;
+#if CMK_VERBOSE
       const auto& uses = ptr.use_count();
       if (uses > 1) {
         CkError("warning> component %lu replicated %lu time(s)!\n",
                 id, uses - 1);
       }
+#endif
       this->components.erase(id);
     }
   }

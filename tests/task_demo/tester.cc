@@ -17,10 +17,7 @@ void enroll_polymorphs(void) {
   hypercomm::init_polymorph_registry();
 
   if (CkMyRank() == 0) {
-    // hypercomm::enroll<persistent_port>();
-    // hypercomm::enroll<reduction_port<int>>();
-    // hypercomm::enroll<broadcaster<int>>();
-    // hypercomm::enroll<generic_section<int>>();
+    hypercomm::enroll<persistent_port>();
   }
 }
 
@@ -39,14 +36,45 @@ struct main : public CBase_main {
 };
 
 struct locality : public CBase_locality, public locality_base<int> {
-  int n;
+  int n, selfIdx;
+  entry_port_ptr recv_value;
 
-  locality(int _1): n(_1) {
-    auto com0 = this->emplace_component<gen_random<value_type>>(n);
-    auto com1 = this->emplace_component<print_values<value_type>>();
+  // this implements the Charisma program:
+  //
+  // val values = or::placeholder<float, 1>(n); // creates a fixed-size (n) 1d channel
+  // val sums = or::placeholder<float, 1>(n);
+  //
+  // for (i in 0 to n) {
+  //   values[i] = self@[i].gen_values();
+  //   print_values(values[i]);
+  //   sums[i] = self@[i].add_values(values[i], values[(i + 1) % n]);
+  //   print_values(sums[i]);
+  // }
 
+  locality(int _1)
+      : selfIdx(this->__index__()),
+        n(_1),
+        recv_value(std::make_shared<persistent_port>(0)) {
+    auto com0 = this->emplace_component<gen_values<value_type>>(selfIdx, n);
+    auto com1 = this->emplace_component<print_values<value_type>>(selfIdx);
+    auto com2 = this->emplace_component<add_values<value_type>>();
+    auto com3 = this->emplace_component<print_values<value_type>>(selfIdx);
+
+    // gen random => print values 1
     connect(this, com0, com1);
+    // print values 1 => add values
+    connect(this, com1, com2);
+    // print values 1 => recv_value@neighbor
+    auto neighborIdx = conv2idx<CkArrayIndexMax>((selfIdx + 1) % n);
+    auto neighbor = make_proxy(thisProxy[neighborIdx]);
+    forward(this, com1, neighbor, recv_value);
+    // recv_value@here => add values
+    connect(this, recv_value, com2);
+    // add_values => print values 2
+    connect(this, com2, com3);
 
+    this->activate_component(com3);
+    this->activate_component(com2);
     this->activate_component(com1);
     this->activate_component(com0);
   }
@@ -66,35 +94,55 @@ struct locality : public CBase_locality, public locality_base<int> {
   }
 };
 
-template<typename T>
-typename gen_random<T>::value_t gen_random<T>::action(void) {
+template <typename T>
+typename gen_values<T>::value_t gen_values<T>::action(void) {
   auto msg_size = sizeof(T) * this->n + sizeof(this->n);
   auto msg = message::make_message(msg_size, {});
   *((decltype(this->n)*)msg->payload) = this->n;
   auto arr = (T*)(msg->payload + sizeof(this->n));
 
   for (auto i = 0; i < this->n; i += 1) {
-    arr[i] = (T)(rand() % this->n + 1);
+    arr[i] = (T)(i % this->n + this->selfIdx + 1);
   }
 
   return utilities::wrap_message(msg);
 }
 
-template<typename T>
-typename triple_values<T>::value_t triple_values<T>::action(void) {
-  return {};
+template <typename T>
+typename add_values<T>::value_t add_values<T>::action(void) {
+  auto& lhsMsg = this->accepted[0];
+  auto& rhsMsg = this->accepted[1];
+
+  std::size_t* m;
+  T* lhs;
+  unpack_array(lhsMsg, &m, &lhs);
+
+  std::size_t* n;
+  T* rhs;
+  unpack_array(rhsMsg, &n, &rhs);
+
+  if (*m != *n) {
+    CkAbort("add_values> array size mismatch");
+  }
+
+  for (auto i = 0; i < *n; i += 1) {
+    lhs[i] += rhs[i];
+  }
+
+  return lhsMsg;
 }
 
-template<typename T>
+template <typename T>
 typename print_values<T>::value_t print_values<T>::action(void) {
-  auto msg = std::static_pointer_cast<message>(this->accepted[0]);
-  auto& n = *((std::size_t*)msg->payload);
-  auto* arr = (T*)(msg->payload + sizeof(n));
+  std::size_t* n;
+  T* arr;
+  const auto& msg = this->accepted[0];
+  unpack_array(msg, &n, &arr);
 
   std::stringstream ss;
-  ss << "com" << this->id << "@loc?> ";
+  ss << "com" << this->id << "@vil" << selfIdx << "> ";
   ss << "[ ";
-  for (auto i = 0; i < n; i += 1) {
+  for (auto i = 0; i < *n; i += 1) {
     ss << arr[i] << " ";
   }
   ss << "]";

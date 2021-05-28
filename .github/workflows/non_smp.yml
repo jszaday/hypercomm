@@ -43,3 +43,5 @@ jobs:
         cd tests/redn_demo
         TESTOPTS="++local 65" make test
         TESTOPTS="++local 129" make test
+        cd ../task_demo
+        TESTOPTS="++local" make test
