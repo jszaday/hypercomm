@@ -8,37 +8,7 @@
 
 using namespace hypercomm;
 
-template<typename T>
-struct connector: public callback {
-  const locality_base<T>* self;
-  const component_port_t dst;
-
-  connector(const locality_base<T>* _1, const component_port_t& _2): self(_1), dst(_2) {}
-
-  virtual return_type send(argument_type&& value) override {
-    const_cast<locality_base<T>*>(self)->try_send(dst, std::move(value));
-  }
-
-  virtual void __pup__(serdes& s) override {
-    CkAbort("don't send me");
-  }
-};
-
-template<typename T>
-void connect(const locality_base<T>* self, const component_ptr& src, const component_ptr& dst) {
-  auto in = dst->open_in_port();
-  auto conn = std::make_shared<connector<T>>(self, std::make_pair(dst->id, in));
-  auto out = src->open_out_port(conn);
-}
-
-template<typename T>
-void connect(const locality_base<T>* self, const entry_port_ptr& port, const component_ptr& dst) {
-  auto in = dst->open_in_port();
-  const_cast<locality_base<T>*>(self)->open(port, std::make_pair(dst->id, in));
-}
-
-template<typename T>
-void forward(const locality_base<T>* self, const component_ptr& src, const proxy_ptr& proxy, const entry_port_ptr& port) {
+void forward(const component_ptr& src, const proxy_ptr& proxy, const entry_port_ptr& port) {
   auto fwd = std::make_shared<forwarding_callback>(proxy, port);
   auto out = src->open_out_port(fwd);
 }

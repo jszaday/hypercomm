@@ -62,17 +62,17 @@ struct locality : public CBase_locality, public locality_base<int> {
     auto com3 = this->emplace_component<print_values<value_type>>(selfIdx);
 
     // gen random => print values 1
-    connect(this, com0, com1);
+    this->connect(com0, com1);
     // print values 1 => add values
-    connect(this, com1, com2);
+    this->connect(com1, com2);
     // print values 1 => recv_value@neighbor
     auto neighborIdx = conv2idx<CkArrayIndexMax>((selfIdx + 1) % n);
     auto neighbor = make_proxy(thisProxy[neighborIdx]);
-    forward(this, com1, neighbor, recv_value);
+    forward(com1, neighbor, recv_value);
     // recv_value@here => add values
-    connect(this, recv_value, com2);
+    this->connect(recv_value, com2);
     // add_values => print values 2
-    connect(this, com2, com3);
+    this->connect(com2, com3);
 
     this->activate_component(com3);
     this->activate_component(com2);
