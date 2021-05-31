@@ -1,13 +1,15 @@
 #ifndef __HYPERCOMM_CORE_LOCALITY_HPP__
 #define __HYPERCOMM_CORE_LOCALITY_HPP__
 
+#include "broadcaster.hpp"
+#include "port_opener.hpp"
+
 #include <hypercomm/messaging/packing.hpp>
-#include <hypercomm/core/broadcaster.hpp>
 
 #include "locality.decl.h"
 
 struct locality_base_ : public CBase_locality_base_,
-                        public virtual hypercomm::common_functions_ {
+                        public virtual hypercomm::common_functions_<CkArrayIndex> {
   using this_ptr = locality_base_*;
 
   locality_base_(void) {}
@@ -27,14 +29,44 @@ struct locality_base_ : public CBase_locality_base_,
   virtual std::shared_ptr<hypercomm::proxy> __proxy__(void) const override {
     return hypercomm::make_proxy(const_cast<this_ptr>(this)->thisProxy);
   }
+
+  virtual std::shared_ptr<hypercomm::element_proxy<CkArrayIndex>> __element__(void) const override {
+    return hypercomm::make_proxy((const_cast<this_ptr>(this)->thisProxy)[this->ckGetArrayIndex()]);
+  }
 };
 
 namespace hypercomm {
 template<typename Index>
-void locality_base<Index>::send_action(const array_proxy_ptr& p, const Index& i, action_type&& a) {
+/* static */ void locality_base<Index>::send_action(const array_proxy_ptr& p, const Index& i, action_type&& a) {
   auto msg = hypercomm::pack(a);
   CProxyElement_locality_base_ peer(p->id(), conv2idx<impl_index_type>(i));
   peer.execute(msg);
+}
+
+// TODO make this more generic
+template<typename Index>
+void send2port(const element_ptr<Index>& proxy, const entry_port_ptr& port, std::shared_ptr<CkMessage>&& value) {
+  auto msg = static_cast<message*>(utilities::unwrap_message(std::move(value)));
+  auto env = UsrToEnv(msg);
+  auto msgIdx = env->getMsgIdx();
+  if (msgIdx == message::__idx) {
+    const auto& base =
+        static_cast<const CProxyElement_locality_base_&>(proxy->c_proxy());
+    // TODO should this be a move?
+    msg->dst = port;
+    const_cast<CProxyElement_locality_base_&>(base).demux(msg);
+  } else {
+    // TODO repack to hypercomm in this case (when HYPERCOMM_NO_COPYING is undefined)
+    CkAbort("expected a hypercomm msg, but got %s instead\n", _msgTable[msgIdx]->name);
+  }
+}
+
+template<typename Index>
+/* static */ void locality_base<Index>::send_future(const future& f, std::shared_ptr<CkMessage>&& value) {
+  auto proxy =
+      std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(f.source);
+  auto port = std::make_shared<future_port>(f);
+  send2port(proxy, port, std::move(value));
 }
 
 template<typename Index>
@@ -54,21 +86,22 @@ void locality_base<Index>::broadcast(const section_ptr& section, hypercomm_msg* 
   }
 }
 
-void forwarding_callback::send(callback::value_type&& value) {
-  // creates a proxy to the locality
-  auto dstIdx = this->proxy->index();
-  CProxyElement_locality_base_ base(this->proxy->id(), dstIdx);
-  auto env = UsrToEnv(value.get());
-  auto msgIdx = env->getMsgIdx();
-  if (msgIdx == message::__idx) {
-    auto msg = static_cast<message*>(utilities::unwrap_message(std::move(value)));
-    // TODO should this be a move?
-    msg->dst = this->port;
-    base.demux(msg);
-  } else {
-    // TODO repack to hypercomm in this case (when HYPERCOMM_NO_COPYING is undefined)
-    CkAbort("expected a hypercomm msg, but got %s instead\n", _msgTable[msgIdx]->name);
+template<typename Index>
+void locality_base<Index>::request_future(const future& f, const callback_ptr& cb) {
+  auto port = std::make_shared<future_port>(f);
+  this->open(port, cb);
+  auto ourElement = this->__element__();
+  if (!f.source->equals(*ourElement)) {
+    auto fwd = std::make_shared<forwarding_callback>(ourElement, port);
+    auto element =
+        std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(f.source);
+    send_action(element->collective(), reinterpret_index<Index>(element->index()), fwd);
   }
+}
+
+void forwarding_callback::send(callback::value_type&& value) {
+  send2port(std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(this->proxy),
+            this->port, std::move(value));
 }
 }
 

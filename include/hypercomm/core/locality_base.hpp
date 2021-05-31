@@ -1,39 +1,65 @@
 #ifndef __HYPERCOMM_CORE_LOCALITY_BASE_HPP__
 #define __HYPERCOMM_CORE_LOCALITY_BASE_HPP__
 
-#include "forwarding_callback.hpp"
-#include "immediate.hpp"
-
-#include "../messaging/messaging.hpp"
+#include "future.hpp"
 
 #include "../sections.hpp"
 #include "../components.hpp"
 #include "../reductions.hpp"
 #include "../utilities.hpp"
 
+#include "../messaging/messaging.hpp"
+
 namespace hypercomm {
 
 using proxy_ptr = std::shared_ptr<hypercomm::proxy>;
 
+template<typename Index>
+using element_ptr = std::shared_ptr<hypercomm::element_proxy<Index>>;
+
 using component_port_t = std::pair<component_id_t, components::port_id_t>;
-using entry_port_map_t = comparable_map<entry_port_ptr, component_port_t>;
 using component_map_t = std::unordered_map<component_id_t, component_ptr>;
 
 template <typename Key>
 using message_queue_t =
     comparable_map<Key, std::deque<std::shared_ptr<CkMessage>>>;
 
+template<typename Index>
 struct common_functions_ {
   virtual proxy_ptr __proxy__(void) const = 0;
 
-  virtual const CkArrayIndex& __index_max__(void) const = 0;
+  virtual element_ptr<Index> __element__(void) const = 0;
+
+  // TODO this should probably be renamed "true_index"
+  virtual const Index& __index_max__(void) const = 0;
 };
 
+// TODO elevate this functionality to a more general purpose callback
+//      ensure that the reference counting on the callback port is elided when !kCallback
+struct destination_ {
+  enum type_ : uint8_t {
+    kInvalid,
+    kCallback,
+    kComponentPort
+  };
+
+  type_ type;
+  callback_ptr cb;
+  component_port_t port;
+
+  destination_(const component_port_t& _1) : type(kComponentPort), port(_1) {}
+  destination_(const callback_ptr& _2) : type(kCallback), cb(_2) {}
+};
+
+using entry_port_map_t = comparable_map<entry_port_ptr, destination_>;
+
 template <typename Index>
-struct locality_base : public virtual common_functions_ {
+struct locality_base : public virtual common_functions_<CkArrayIndex> {
   message_queue_t<entry_port_ptr> port_queue;
   entry_port_map_t entry_ports;
   component_map_t components;
+
+  future_id_t future_authority = 0;
   component_id_t component_authority = 0;
 
   const Index& __index__(void) const {
@@ -52,7 +78,16 @@ struct locality_base : public virtual common_functions_ {
   identity_map_t identities;
 
   using array_proxy_ptr = std::shared_ptr<array_proxy>;
+
   static void send_action(const array_proxy_ptr& p, const Index& i, action_type&& a);
+  static void send_future(const future& f, std::shared_ptr<CkMessage>&& value);
+
+  future make_future(void) {
+    const auto next = ++this->future_authority;
+    return future{ .source = this->__element__(), .id = next };
+  }
+
+  void request_future(const future& f, const callback_ptr& cb);
 
   void receive_action(const action_type& ptr) {
     ptr->action(this);
@@ -128,6 +163,23 @@ struct locality_base : public virtual common_functions_ {
     }
   }
 
+  void try_send(const destination_& dest,
+                std::shared_ptr<CkMessage>&& value) {
+    switch (dest.type) {
+      case destination_::type_::kCallback: {
+        const auto& cb = dest.cb;
+        CkAssert(cb && "callback must be valid!");
+        cb->send(std::move(value));
+        break;
+      }
+      case destination_::type_::kComponentPort:
+        this->try_send(dest.port, std::move(value));
+        break;
+      default:
+        CkAbort("unknown destination type");
+    }
+  }
+
   void try_send(const component_port_t& port,
                 std::shared_ptr<CkMessage>&& value) {
     auto search = components.find(port.first);
@@ -157,7 +209,8 @@ struct locality_base : public virtual common_functions_ {
     }
   }
 
-  void open(const entry_port_ptr& ours, const component_port_t& theirs) {
+  template <typename Destination>
+  void open(const entry_port_ptr& ours, const Destination& theirs) {
     ours->alive = true;
     auto pair = entry_ports.emplace(ours, theirs);
     CkAssert(pair.second && "entry port must be unique");

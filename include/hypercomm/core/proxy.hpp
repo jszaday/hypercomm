@@ -2,8 +2,10 @@
 #define __HYPERCOMM_PROXY_HPP__
 
 #include <ck.h>
+#include <charm++.h>
 #include <memory>
 #include <utility>
+#include "math.hpp"
 
 namespace hypercomm {
 using chare_t = ChareType;
@@ -17,7 +19,28 @@ struct proxy {
   virtual bool collective(void) const = 0;
   virtual std::string to_string(void) const = 0;
 
+  virtual const CProxy& c_proxy(void) const = 0;
+
+  virtual hash_code hash(void) const {
+    return 0;
+  }
+
   virtual bool equals(const hypercomm::proxy& other) const = 0;
+};
+
+template<typename Base>
+class typed_proxy : virtual public proxy {
+ public:
+  Base proxy_;
+
+  typed_proxy(void) {}
+  typed_proxy(const Base& _1) : proxy_(_1) {}
+
+  // TODO elevate id up to this level
+
+  virtual const CProxy& c_proxy(void) const {
+    return proxy_;
+  }
 };
 
 struct located_chare : virtual public proxy {
@@ -80,20 +103,18 @@ struct collective_proxy : virtual public proxy {
 
 template <typename Proxy>
 struct generic_collective_proxy
-    : virtual public collective_proxy<typename index_for<Proxy>::type> {
+    : public typed_proxy<Proxy>, public collective_proxy<typename index_for<Proxy>::type> {
   using base_type = collective_proxy<typename index_for<Proxy>::type>;
   using element_type = typename base_type::element_type;
   using index_type = typename base_type::index_type;
   using proxy_type = Proxy;
   using identifier_type = typename identifier_for<Proxy>::type;
 
-  Proxy proxy;
-
-  generic_collective_proxy(const Proxy& _1) : proxy(_1) {}
+  generic_collective_proxy(const Proxy& _1) : typed_proxy<Proxy>(_1) {}
 
   template <PUP::Requires<is_array_proxy<Proxy>()> = nullptr>
   identifier_type id(void) const {
-    return proxy.ckGetArrayID();
+    return this->proxy_.ckGetArrayID();
   }
 
   virtual element_type operator[](const index_type& idx) const;
@@ -104,10 +125,10 @@ struct generic_collective_proxy
     const auto* other =
         dynamic_cast<const generic_collective_proxy<Proxy>*>(&_1);
     return (other != nullptr) &&
-           (const_cast<proxy_type&>(proxy) == other->proxy);
+           (const_cast<proxy_type&>(this->proxy_) == other->proxy_);
   }
 
-  virtual void* local(void) const override { return proxy.ckLocalBranch(); }
+  virtual void* local(void) const override { return this->proxy_.ckLocalBranch(); }
 
   virtual std::string to_string(void) const override {
     std::stringstream ss;
@@ -122,13 +143,11 @@ struct non_migratable_proxy : virtual public located_chare {
   virtual int last_known(void) const override { return this->home(); }
 };
 
-struct chare_proxy : public non_migratable_proxy {
+struct chare_proxy : public typed_proxy<CProxy_Chare>, public non_migratable_proxy {
   using proxy_type = CProxy_Chare;
 
-  proxy_type proxy;
-
   chare_proxy(void) = default;
-  chare_proxy(const proxy_type& _1) : proxy(_1) {}
+  chare_proxy(const proxy_type& _1) : typed_proxy<CProxy_Chare>(_1) {}
 
   virtual bool equals(const hypercomm::proxy& _1) const override {
     const auto* _2 = dynamic_cast<const chare_proxy*>(&_1);
@@ -142,7 +161,7 @@ struct chare_proxy : public non_migratable_proxy {
     }
   }
 
-  inline const CkChareID& id(void) const { return proxy.ckGetChareID(); }
+  inline const CkChareID& id(void) const { return proxy_.ckGetChareID(); }
 
   virtual chare_t type(void) const override { return chare_t::TypeChare; }
 
@@ -172,22 +191,20 @@ struct chare_proxy : public non_migratable_proxy {
   }
 };
 
-struct array_element_proxy : public element_proxy<CkArrayIndex> {
+struct array_element_proxy : public element_proxy<CkArrayIndex>, public typed_proxy<CProxyElement_ArrayElement> {
   using proxy_type = CProxyElement_ArrayElement;
 
-  proxy_type proxy;
-
   array_element_proxy(void) = default;
-  array_element_proxy(const proxy_type& _1) : proxy(_1) {}
+  array_element_proxy(const proxy_type& _1) : typed_proxy<CProxyElement_ArrayElement>(_1) {}
 
   virtual bool equals(const hypercomm::proxy& _1) const override {
     const auto* other = dynamic_cast<const array_element_proxy*>(&_1);
     return (other != nullptr) &&
-           (const_cast<proxy_type&>(proxy) == other->proxy);
+           (const_cast<proxy_type&>(this->proxy_) == other->proxy_);
   }
 
-  inline CkArrayID id(void) const { return proxy.ckGetArrayID(); }
-  virtual CkArrayIndex index() const override { return proxy.ckGetIndex(); }
+  inline CkArrayID id(void) const { return proxy_.ckGetArrayID(); }
+  virtual CkArrayIndex index() const override { return proxy_.ckGetIndex(); }
 
   virtual chare_t type(void) const override { return chare_t::TypeArray; }
 
@@ -225,26 +242,25 @@ struct array_element_proxy : public element_proxy<CkArrayIndex> {
 
 template <typename T>
 struct grouplike_element_proxy : public element_proxy<int>,
+                                 public typed_proxy<T>, 
                                  public non_migratable_proxy {
   using proxy_type = T;
 
   static constexpr auto is_node =
       std::is_same<CProxyElement_NodeGroup, proxy_type>::value;
 
-  proxy_type proxy;
-
   grouplike_element_proxy(void) = default;
-  grouplike_element_proxy(const proxy_type& _1) : proxy(_1) {}
+  grouplike_element_proxy(const proxy_type& _1) : typed_proxy<T>(_1) {}
 
   virtual bool equals(const hypercomm::proxy& _1) const override {
     const auto* other = dynamic_cast<const grouplike_element_proxy<T>*>(&_1);
     return (other != nullptr) &&
-           (const_cast<proxy_type&>(proxy) == other->proxy);
+           (const_cast<proxy_type&>(this->proxy_) == other->proxy_);
   }
 
-  inline CkGroupID id(void) const { return proxy.ckGetGroupID(); }
+  inline CkGroupID id(void) const { return this->proxy_.ckGetGroupID(); }
 
-  virtual int index(void) const override { return proxy.ckGetGroupPe(); }
+  virtual int index(void) const override { return this->proxy_.ckGetGroupPe(); }
 
   virtual chare_t type(void) const override {
     return (is_node) ? (chare_t::TypeNodeGroup) : (chare_t::TypeGroup);
@@ -315,7 +331,8 @@ template <
                                   typename Proxy::proxy_type>::value> = nullptr>
 typename Proxy::element_type element_at(const Proxy* proxy, const Index& idx) {
   using element_proxy_type = array_element_proxy::proxy_type;
-  element_proxy_type element_proxy(proxy->proxy.ckGetArrayID(), idx);
+  const auto& element = reinterpret_cast<const element_proxy_type&>(proxy->c_proxy());
+  element_proxy_type element_proxy(element.ckGetArrayID(), idx);
   return make_proxy(element_proxy);
 }
 
