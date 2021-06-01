@@ -51,7 +51,12 @@ class vil: public Base, public locality_base<Index> {
    *        to the appropriate entry port )
    */
   virtual void demux(hypercomm_msg* msg) override {
-    this->receive_value(msg->dst, hypercomm::utilities::wrap_message(msg));
+    if (msg->is_null()) {
+      this->receive_invalidation(msg->dst);
+      CkFreeMsg(msg);
+    } else {
+      this->receive_value(msg->dst, hypercomm::utilities::wrap_message(msg));
+    }
   }
 };
 
