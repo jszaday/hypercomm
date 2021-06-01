@@ -46,5 +46,10 @@ jobs:
         TESTOPTS="++local ++ppn 2 129" make test
         TESTOPTS="++local 65" make test
         TESTOPTS="++local 129" make test
+        cd tests/future_demo
+        TESTOPTS="++local ++ppn 2 65" make test
+        TESTOPTS="++local ++ppn 2 129" make test
+        TESTOPTS="++local 65" make test
+        TESTOPTS="++local 129" make test
         cd ../task_demo
         TESTOPTS="++local" make test

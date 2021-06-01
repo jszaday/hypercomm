@@ -24,7 +24,7 @@ struct reduction_port : public virtual entry_port {
 
   virtual std::string to_string(void) const override {
     std::stringstream ss;
-    ss << "reduction_port(id=" << this->id << ",idx=" << this->idx << ")";
+    ss << "reduction_port(id=" << this->id << ",idx=" << this->index << ")";
     return ss.str();
   }
 

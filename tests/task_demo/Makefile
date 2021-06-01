@@ -6,7 +6,6 @@ INCLUDES = -I$(HYPERCOMM_HOME)/include -I$(HYPERCOMM_HOME)/include/hypercomm/cor
 LIBS = -L$(HYPERCOMM_HOME)/lib -lhypercomm-components -lhypercomm-utilities -lhypercomm-serialization -lhypercomm-messaging -lSegFault
 
 OPTS?=-g -O2
-TESTOPTS?=4
 CMK_NUM_PES?=2
 CATCHSEGV?=$(shell which catchsegv)
 
