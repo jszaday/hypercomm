@@ -36,6 +36,25 @@ struct locality_base_ : public CBase_locality_base_,
 };
 
 namespace hypercomm {
+
+template<typename Base, typename Index>
+class vil: public Base, public locality_base<Index> {
+ public:
+   // NOTE ( this is a mechanism for remote task invocation )
+  virtual void execute(CkMessage* msg) override {
+    typename locality_base<Index>::action_type action{};
+    hypercomm::unpack(msg, action);
+    this->receive_action(action);
+  }
+
+  /* NOTE ( this is a mechanism for demux'ing an incoming message
+   *        to the appropriate entry port )
+   */
+  virtual void demux(hypercomm_msg* msg) override {
+    this->receive_value(msg->dst, hypercomm::utilities::wrap_message(msg));
+  }
+};
+
 template<typename Index>
 /* static */ void locality_base<Index>::send_action(const collective_ptr<CkArrayIndex>& p, const CkArrayIndex& i, const action_type& a) {
   const auto& thisCollection = static_cast<const CProxy_locality_base_&>(p->c_proxy());
@@ -46,7 +65,8 @@ template<typename Index>
 // TODO make this more generic
 template<typename Index>
 void send2port(const element_ptr<Index>& proxy, const entry_port_ptr& port, std::shared_ptr<CkMessage>&& value) {
-  auto msg = static_cast<message*>(utilities::unwrap_message(std::move(value)));
+  auto msg = value ? static_cast<message*>(utilities::unwrap_message(std::move(value)))
+                   : hypercomm_msg::make_null_message(port);
   auto env = UsrToEnv(msg);
   auto msgIdx = env->getMsgIdx();
   if (msgIdx == message::__idx) {

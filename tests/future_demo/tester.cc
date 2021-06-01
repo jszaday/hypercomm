@@ -65,7 +65,7 @@ struct main : public CBase_main {
   }
 };
 
-struct locality : public CBase_locality, public locality_base<int> {
+struct locality : public vil<CBase_locality, int> {
   int n;
 
   locality(int _1) : n(_1) {}
@@ -94,20 +94,6 @@ struct locality : public CBase_locality, public locality_base<int> {
       // then suspend
       CthSuspend();
     }
-  }
-
-  // NOTE ( this is a mechanism for remote task invocation )
-  virtual void execute(CkMessage* msg) override {
-    action_type action{};
-    hypercomm::unpack(msg, action);
-    this->receive_action(action);
-  }
-
-  /* NOTE ( this is a mechanism for demux'ing an incoming message
-   *        to the appropriate entry port )
-   */
-  virtual void demux(hypercomm_msg* msg) override {
-    this->receive_value(msg->dst, hypercomm::utilities::wrap_message(msg));
   }
 };
 
