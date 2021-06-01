@@ -5,12 +5,13 @@
 #include <charm++.h>
 #include <memory>
 #include <utility>
-#include "math.hpp"
+
+#include "../utilities/hash.hpp"
 
 namespace hypercomm {
 using chare_t = ChareType;
 
-struct proxy {
+struct proxy /* : virtual public hashable */ {
  public:
   inline bool node_level(void) const;
 
@@ -19,11 +20,8 @@ struct proxy {
   virtual bool collective(void) const = 0;
   virtual std::string to_string(void) const = 0;
 
+  virtual hash_code hash(void) const = 0;
   virtual const CProxy& c_proxy(void) const = 0;
-
-  virtual hash_code hash(void) const {
-    return 0;
-  }
 
   virtual bool equals(const hypercomm::proxy& other) const = 0;
 };
@@ -38,8 +36,12 @@ class typed_proxy : virtual public proxy {
 
   // TODO elevate id up to this level
 
-  virtual const CProxy& c_proxy(void) const {
-    return proxy_;
+  virtual hash_code hash(void) const override {
+    return utilities::hash<Base>()(this->proxy_);
+  }
+
+  virtual const CProxy& c_proxy(void) const override {
+    return this->proxy_;
   }
 };
 

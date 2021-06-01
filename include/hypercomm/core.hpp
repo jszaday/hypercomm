@@ -3,6 +3,7 @@
 
 #include "core/proxy.hpp"
 #include "core/callback.hpp"
+#include "core/comparable.hpp"
 #include "core/immediate.hpp"
 #include "core/forwarding_callback.hpp"
 
