@@ -26,7 +26,7 @@ struct locality_base_ : public CBase_locality_base_,
     return this->thisIndexMax;
   }
 
-  virtual std::shared_ptr<hypercomm::proxy> __proxy__(void) const override {
+  virtual std::shared_ptr<hypercomm::collective_proxy<CkArrayIndex>> __proxy__(void) const override {
     return hypercomm::make_proxy(const_cast<this_ptr>(this)->thisProxy);
   }
 
@@ -37,10 +37,10 @@ struct locality_base_ : public CBase_locality_base_,
 
 namespace hypercomm {
 template<typename Index>
-/* static */ void locality_base<Index>::send_action(const array_proxy_ptr& p, const Index& i, action_type&& a) {
+/* static */ void locality_base<Index>::send_action(const collective_ptr<CkArrayIndex>& p, const CkArrayIndex& i, const action_type& a) {
+  const auto& thisCollection = static_cast<const CProxy_locality_base_&>(p->c_proxy());
   auto msg = hypercomm::pack(a);
-  CProxyElement_locality_base_ peer(p->id(), conv2idx<impl_index_type>(i));
-  peer.execute(msg);
+  (const_cast<CProxy_locality_base_&>(thisCollection))[i].execute(msg);
 }
 
 // TODO make this more generic
@@ -82,20 +82,25 @@ void locality_base<Index>::broadcast(const section_ptr& section, hypercomm_msg* 
   } else {
     auto collective =
         std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
-    send_action(collective, root, action);
+    send_action(collective, conv2idx<CkArrayIndex>(root), action);
   }
 }
 
 template<typename Index>
 void locality_base<Index>::request_future(const future& f, const callback_ptr& cb) {
-  auto port = std::make_shared<future_port>(f);
-  this->open(port, cb);
+  auto ourPort = std::make_shared<future_port>(f);
   auto ourElement = this->__element__();
-  if (!f.source->equals(*ourElement)) {
-    auto fwd = std::make_shared<forwarding_callback>(ourElement, port);
-    auto element =
-        std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(f.source);
-    send_action(element->collective(), reinterpret_index<Index>(element->index()), fwd);
+
+  this->open(ourPort, cb);
+
+  auto& source = *f.source;
+  if (!ourElement->equals(source)) {
+    auto theirElement =
+        dynamic_cast<element_proxy<CkArrayIndex>*>(&source);
+    // CkPrintf("%s> remotely requesting %s\n", ourElement->to_string().c_str(), f.to_string().c_str());
+    auto fwd = std::make_shared<forwarding_callback>(ourElement, ourPort);
+    auto opener = std::make_shared<port_opener<Index>>(ourPort, fwd);
+    send_action(theirElement->collection(), theirElement->index(), opener);
   }
 }
 

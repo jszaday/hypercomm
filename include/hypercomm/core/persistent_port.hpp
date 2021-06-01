@@ -11,6 +11,12 @@ struct persistent_port : public virtual entry_port {
   persistent_port(PUP::reconstruct) {}
   persistent_port(const decltype(id)& _1): id(_1) {}
 
+  virtual std::string to_string(void) const override {
+    std::stringstream ss;
+    ss << "persistent_port(id=" << this->id << ")";
+    return ss.str();
+  }
+
   virtual bool keep_alive(void) const override { return true; }
 
   virtual bool equals(const std::shared_ptr<comparable>& other) const override {

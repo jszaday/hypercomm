@@ -7,7 +7,9 @@
 namespace hypercomm {
 struct entry_port : public virtual polymorph,
                     public virtual comparable,
-                    public virtual impermanent {};
+                    public virtual impermanent {
+  virtual std::string to_string(void) const = 0;
+};
 
 using entry_port_ptr = std::shared_ptr<entry_port>;
 }

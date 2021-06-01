@@ -17,6 +17,9 @@ using proxy_ptr = std::shared_ptr<hypercomm::proxy>;
 template<typename Index>
 using element_ptr = std::shared_ptr<hypercomm::element_proxy<Index>>;
 
+template<typename Index>
+using collective_ptr = std::shared_ptr<hypercomm::collective_proxy<Index>>;
+
 using component_port_t = std::pair<component_id_t, components::port_id_t>;
 using component_map_t = std::unordered_map<component_id_t, component_ptr>;
 
@@ -26,9 +29,9 @@ using message_queue_t =
 
 template<typename Index>
 struct common_functions_ {
-  virtual proxy_ptr __proxy__(void) const = 0;
 
   virtual element_ptr<Index> __element__(void) const = 0;
+  virtual collective_ptr<Index> __proxy__(void) const = 0;
 
   // TODO this should probably be renamed "true_index"
   virtual const Index& __index_max__(void) const = 0;
@@ -79,7 +82,8 @@ struct locality_base : public virtual common_functions_<CkArrayIndex> {
 
   using array_proxy_ptr = std::shared_ptr<array_proxy>;
 
-  static void send_action(const array_proxy_ptr& p, const Index& i, action_type&& a);
+  // TODO make this more generic
+  static void send_action(const collective_ptr<CkArrayIndex>& p, const CkArrayIndex& i, const action_type& a);
   static void send_future(const future& f, std::shared_ptr<CkMessage>&& value);
 
   future make_future(void) {
@@ -212,8 +216,24 @@ struct locality_base : public virtual common_functions_<CkArrayIndex> {
   template <typename Destination>
   void open(const entry_port_ptr& ours, const Destination& theirs) {
     ours->alive = true;
-    auto pair = entry_ports.emplace(ours, theirs);
-    CkAssert(pair.second && "entry port must be unique");
+    auto pair = this->entry_ports.emplace(ours, theirs);
+#if CMK_ERROR_CHECKING
+    if (!pair.second) {
+      std::stringstream ss;
+      ss << "[";
+      for (const auto& epp : this->entry_ports) {
+        const auto& other_port = epp.first;
+        if (comparable_comparator()(ours, other_port)) {
+          ss << "{" << other_port->to_string() << "}, ";
+        } else {
+          ss << other_port->to_string() << ", ";
+        }
+      }
+      ss << "]";
+
+      CkAbort("fatal> adding non-unique port %s to:\n\t%s\n", ours->to_string().c_str(), ss.str().c_str());
+    }
+#endif
     this->resync_port_queue(pair.first);
   }
 

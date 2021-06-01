@@ -22,6 +22,12 @@ struct reduction_port : public virtual entry_port {
     return this->id == theirs->id && this->index == theirs->index;
   }
 
+  virtual std::string to_string(void) const override {
+    std::stringstream ss;
+    ss << "reduction_port(id=" << this->id << ",idx=" << this->idx << ")";
+    return ss.str();
+  }
+
   virtual hash_code hash(void) const override  {
     return hash_combine(hash_code(id), hash_code(index));
   }

@@ -87,9 +87,13 @@ struct chare_type_for<T, typename std::enable_if<is_array_proxy<T>()>::type> {
 };
 
 template <typename Index>
+struct collective_proxy;
+
+template <typename Index>
 struct element_proxy : virtual public located_chare {
   virtual Index index() const = 0;
   virtual bool collective(void) const override { return false; }
+  virtual std::shared_ptr<collective_proxy<Index>> collection(void) const = 0;
 };
 
 template <typename Index>
@@ -199,8 +203,21 @@ struct array_element_proxy : public element_proxy<CkArrayIndex>, public typed_pr
 
   virtual bool equals(const hypercomm::proxy& _1) const override {
     const auto* other = dynamic_cast<const array_element_proxy*>(&_1);
-    return (other != nullptr) &&
-           (const_cast<proxy_type&>(this->proxy_) == other->proxy_);
+    auto result = other && other->id() == this->id();
+    const auto& ourIdx = this->proxy_.ckGetIndex();
+    const auto& theirIdx = other->proxy_.ckGetIndex();
+    const auto* ourData = ourIdx.data();
+    const auto* theirData = theirIdx.data();
+    // TODO determine when/if this is ever necessary
+    // result = result && ourIdx.dimension == theirIdx.dimension;
+    for (auto i = 0; result && i < CK_ARRAYINDEX_MAXLEN; i += 1) {
+      result = result && (ourData[i] == theirData[i]);
+    }
+    return result;
+  }
+
+  virtual std::shared_ptr<collective_proxy<CkArrayIndex>> collection(void) const override {
+    return std::make_shared<array_proxy>(CProxy_ArrayBase(this->id()));
   }
 
   inline CkArrayID id(void) const { return proxy_.ckGetArrayID(); }
@@ -251,6 +268,10 @@ struct grouplike_element_proxy : public element_proxy<int>,
 
   grouplike_element_proxy(void) = default;
   grouplike_element_proxy(const proxy_type& _1) : typed_proxy<T>(_1) {}
+
+  virtual std::shared_ptr<collective_proxy<int>> collection(void) const override {
+    throw std::runtime_error("not yet implemented!");
+  }
 
   virtual bool equals(const hypercomm::proxy& _1) const override {
     const auto* other = dynamic_cast<const grouplike_element_proxy<T>*>(&_1);

@@ -57,6 +57,12 @@ struct future_port: public virtual entry_port {
   virtual void __pup__(serdes& s) override  {
     s | f;
   }
+
+  virtual std::string to_string(void) const override {
+    std::stringstream ss;
+    ss << "port2" << f.to_string();
+    return ss.str();
+  }
 };
 
 }

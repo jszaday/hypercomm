@@ -19,6 +19,7 @@ struct port_opener: public immediate_action<void(locality_base<Index>*)> {
 
   virtual void action(locality_base<Index>* _1) override {
     auto& locality = const_cast<locality_base<Index>&>(*_1);
+    auto& fport = *(dynamic_cast<future_port*>(port.get()));
     locality.open(port, cb);
   }
 
