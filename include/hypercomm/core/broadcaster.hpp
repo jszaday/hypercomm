@@ -28,7 +28,7 @@ struct broadcaster: public immediate_action<void(locality_base<Index>*)> {
     for (const auto& up : ustream) {
       auto copy = std::static_pointer_cast<hypercomm_msg>(utilities::copy_message(msg));
       auto next = std::make_shared<broadcaster>(this->section, std::move(copy));
-      locality_base<Index>::send_action(collective, up, std::move(next));
+      locality_base<Index>::send_action(collective, conv2idx<CkArrayIndex>(up), std::move(next));
     }
 
     const auto dest = msg->dst;

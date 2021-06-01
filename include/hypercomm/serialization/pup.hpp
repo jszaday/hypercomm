@@ -294,7 +294,7 @@ class puper<std::shared_ptr<T>, typename std::enable_if<std::is_base_of<
       ::new (&t) std::shared_ptr<proxy>(new A());
     }
 
-    auto& proxy = dynamic_cast<A*>(t.get())->proxy;
+    auto& proxy = dynamic_cast<A*>(t.get())->proxy_;
     s | proxy;
   }
 

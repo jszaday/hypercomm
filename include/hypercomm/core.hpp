@@ -1,8 +1,10 @@
 #ifndef __HYPERCOMM_CORE_HPP__
 #define __HYPERCOMM_CORE_HPP__
 
-#include "core/callback.hpp"
 #include "core/proxy.hpp"
+#include "core/callback.hpp"
+#include "core/immediate.hpp"
+#include "core/forwarding_callback.hpp"
 
 namespace hypercomm {
 using callback = core::callback;
