@@ -11,6 +11,21 @@ inline hash_code hash_combine(const hash_code &lhs, const hash_code &rhs) {
   return lhs + 0x9e3779b9 + (rhs << 6) + (rhs >> 2);
 }
 
+namespace utilities {
+template <class, typename Enable = void>
+struct hash;
+}
+
+template <class T>
+inline std::size_t hash_iterable(const T& t) {
+  hash_code seed = 0x0;
+  for (const auto& i : t) {
+    using element_type = typename std::decay<decltype(i)>::type;
+    seed = hash_combine(seed, utilities::hash<element_type>()(i));
+  }
+  return seed;
+}
+
 namespace binary_tree {
 template <typename T>
 inline T left_child(const T &i) {
