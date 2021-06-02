@@ -79,8 +79,6 @@ struct locality : public vil<CBase_locality, int> {
     this->activate_component(com1);
     this->activate_component(com0);
   }
-
-
 };
 
 template <typename T>
@@ -94,7 +92,7 @@ typename gen_values<T>::value_type gen_values<T>::action(void) {
     arr[i] = (T)(i % this->n + this->selfIdx + 1);
   }
 
-  return utilities::wrap_message(msg);
+  return msg2value(msg);
 }
 
 template <typename T>
