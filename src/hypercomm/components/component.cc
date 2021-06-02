@@ -20,6 +20,11 @@ namespace components {
 // }
 
 void component::receive_value(const port_id_t& from, value_t&& msg) {
+  if (!msg) {
+    this->receive_invalidation(from);
+    return;
+  }
+
   // TODO unsure whether this should be enforced
   // CkAssert(this->alive && "only living components can accept values");
   QdCreate(1);

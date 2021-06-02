@@ -66,7 +66,7 @@ struct main : public CBase_main {
   }
 };
 
-struct locality : public CBase_locality, public locality_base<int> {
+struct locality : public vil<CBase_locality, int> {
   entry_port_ptr bcast_port, redn_port;
   int n;
   section_ptr section;
@@ -107,20 +107,6 @@ struct locality : public CBase_locality, public locality_base<int> {
     auto msg = hypercomm::pack_to_port(bcast_port, tmp);
     // do a broadcast over the section to start the reductions
     this->broadcast(section, msg);
-  }
-
-  // NOTE ( this is a mechanism for remote task invocation )
-  virtual void execute(CkMessage* msg) override {
-    action_type action{};
-    hypercomm::unpack(msg, action);
-    this->receive_action(action);
-  }
-
-  /* NOTE ( this is a mechanism for demux'ing an incoming message
-   *        to the appropriate entry port )
-   */
-  virtual void demux(hypercomm_msg* msg) override {
-    this->receive_value(msg->dst, hypercomm::utilities::wrap_message(msg));
   }
 };
 

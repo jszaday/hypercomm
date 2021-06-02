@@ -51,6 +51,12 @@ __msg__ *__msg__::make_message(const std::size_t &user_size,
   msg->payload = (char *)msg + hdr_size + port_size;
   return msg;
 }
+
+__msg__ *__msg__::make_null_message(const entry_port_ptr &dst) {
+  auto msg = make_message(0x0, dst);
+  UsrToEnv(msg)->setRef(__null_msg__);
+  return msg;
+}
 }
 }
 
