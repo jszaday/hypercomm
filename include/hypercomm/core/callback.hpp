@@ -1,12 +1,12 @@
 #ifndef __HYPERCOMM_CORE_CALLBACK_HPP__
 #define __HYPERCOMM_CORE_CALLBACK_HPP__
 
-#include "../serialization/polymorph.hpp"
+#include "value.hpp"
 
 namespace hypercomm {
 namespace core {
 
-using value_ptr = std::shared_ptr<CkMessage>;
+using value_ptr = std::shared_ptr<hyper_value>;
 
 template<bool MultiMsg, bool Returns>
 struct action : virtual public polymorph {

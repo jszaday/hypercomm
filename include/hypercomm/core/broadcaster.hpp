@@ -10,11 +10,11 @@ struct broadcaster: public immediate_action<void(locality_base<Index>*)> {
   using section_ptr = typename locality_base<Index>::section_ptr;
 
   section_ptr section;
-  std::shared_ptr<hypercomm_msg> msg;
+  std::shared_ptr<hypercomm::message> msg;
 
   broadcaster(PUP::reconstruct) {}
 
-  broadcaster(const section_ptr& _1, std::shared_ptr<hypercomm_msg>&& _2)
+  broadcaster(const section_ptr& _1, decltype(msg) &&_2)
   : section(_1), msg(_2) {}
 
   virtual void action(locality_base<Index>* _1) override {
@@ -32,7 +32,7 @@ struct broadcaster: public immediate_action<void(locality_base<Index>*)> {
     }
 
     const auto dest = msg->dst;
-    locality.receive_value(dest, std::move(msg));
+    locality.receive_value(dest, std::move(msg2value(std::move(msg))));
   }
 
   virtual void __pup__(serdes& s) override {

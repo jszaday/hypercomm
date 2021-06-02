@@ -7,6 +7,8 @@ set ( UTILITIES_SOURCES utilities.cc )
 
 add_library(hypercomm-utilities "${UTILITIES_SOURCES}")
 
+add_dependencies(hypercomm-utilities hypercomm-messaging)
+
 target_include_directories(
     hypercomm-utilities PUBLIC
     "${PROJECT_SOURCE_DIR}/include"

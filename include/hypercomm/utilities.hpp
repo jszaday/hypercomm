@@ -15,6 +15,7 @@ void unpack_message(CkMessage*);
 
 CkMessage* unwrap_message(std::shared_ptr<CkMessage>&&);
 std::shared_ptr<CkMessage> wrap_message(CkMessage*);
+CkMessage* copy_message(const CkMessage*);
 std::shared_ptr<CkMessage> copy_message(const std::shared_ptr<CkMessage>&);
 
 char *get_message_buffer(const CkMessage* msg);

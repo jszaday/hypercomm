@@ -14,8 +14,8 @@ void forward(const component_ptr& src, const proxy_ptr& proxy, const entry_port_
 }
 
 template<typename T>
-void unpack_array(const std::shared_ptr<CkMessage>& _1, std::size_t** n, T** arr) {
-  auto msg = std::static_pointer_cast<message>(_1);
+void unpack_array(const component::value_type& _1, std::size_t** n, T** arr) {
+  auto msg = (message*)std::dynamic_pointer_cast<plain_value>(_1)->msg;
   *n = (std::size_t*)msg->payload;
   *arr = (T*)(msg->payload + sizeof(n));
 }

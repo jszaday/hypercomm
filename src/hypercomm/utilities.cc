@@ -46,9 +46,13 @@ std::shared_ptr<CkMessage> wrap_message(CkMessage* msg) {
   return std::shared_ptr<CkMessage>(msg, [](CkMessage* msg) { CkFreeMsg(msg); });
 }
 
+CkMessage* copy_message(const CkMessage* msg) {
+  auto msg_raw = const_cast<CkMessage*>(msg);
+  return (CkMessage*)CkCopyMsg((void**)&msg_raw);
+}
+
 std::shared_ptr<CkMessage> copy_message(const std::shared_ptr<CkMessage>& msg) {
-  auto msg_raw = msg.get();
-  return wrap_message((CkMessage*)CkCopyMsg((void**)&msg_raw));
+  return wrap_message(copy_message(msg.get()));
 }
 
 CkMessage* unwrap_message(std::shared_ptr<CkMessage>&& msg) {

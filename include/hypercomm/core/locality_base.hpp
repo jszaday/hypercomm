@@ -25,7 +25,7 @@ using component_map_t = std::unordered_map<component_id_t, component_ptr>;
 
 template <typename Key>
 using message_queue_t =
-    comparable_map<Key, std::deque<std::shared_ptr<CkMessage>>>;
+    comparable_map<Key, std::deque<component::value_type>>;
 
 template<typename Index>
 struct common_functions_ {
@@ -84,7 +84,7 @@ struct locality_base : public virtual common_functions_<CkArrayIndex> {
 
   // TODO make this more generic
   static void send_action(const collective_ptr<CkArrayIndex>& p, const CkArrayIndex& i, const action_type& a);
-  static void send_future(const future& f, std::shared_ptr<CkMessage>&& value);
+  static void send_future(const future& f, component::value_type&& value);
 
   future make_future(void) {
     const auto next = ++this->future_authority;
@@ -100,7 +100,7 @@ struct locality_base : public virtual common_functions_<CkArrayIndex> {
   void broadcast(const section_ptr&, hypercomm_msg*);
 
   void receive_value(const entry_port_ptr& port,
-                     std::shared_ptr<CkMessage>&& value) {
+                     component::value_type&& value) {
     auto search = this->entry_ports.find(port);
     if (search == std::end(this->entry_ports)) {
       QdCreate(1);
@@ -168,7 +168,7 @@ struct locality_base : public virtual common_functions_<CkArrayIndex> {
   }
 
   void try_send(const destination_& dest,
-                std::shared_ptr<CkMessage>&& value) {
+                component::value_type&& value) {
     switch (dest.type) {
       case destination_::type_::kCallback: {
         const auto& cb = dest.cb;
@@ -185,7 +185,7 @@ struct locality_base : public virtual common_functions_<CkArrayIndex> {
   }
 
   void try_send(const component_port_t& port,
-                std::shared_ptr<CkMessage>&& value) {
+                component::value_type&& value) {
     auto search = components.find(port.first);
     CkAssert((search != components.end()) &&
              "message received for nonexistent component");
@@ -252,7 +252,7 @@ protected:
     auto ustream = ident->upstream();
     auto dstream = ident->downstream();
 
-    const auto& rdcr = this->emplace_component<reducer>(fn, std::move(value));
+    const auto& rdcr = this->emplace_component<reducer>(fn, msg2value(std::move(value)));
 
     for (const auto& up : ustream) {
       auto ours = std::make_shared<reduction_port<Index>>(next, up);

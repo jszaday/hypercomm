@@ -122,12 +122,15 @@ typename say_hello::value_type say_hello::action(void) {
 // NOTE ( this is effectively the body for the my_redn_com entry method )
 typename my_redn_com::value_type my_redn_com::action(void) {
   // the accepted pool contains the first message received by this action
+  // TODO <- fix this up once consume is added ->
+  using tuple_type = std::tuple<array_proxy::index_type, int>;
   auto& head = this->accepted[0];
+  head = value2typed<tuple_type>(std::move(head));
+  auto& tmp =
+    std::static_pointer_cast<typed_value<tuple_type>>(head)->value();
   // unpack it to an index/int pair
-  std::tuple<array_proxy::index_type, int> tmp;
   auto& idx = std::get<0>(tmp);
   auto& numIters = std::get<1>(tmp);
-  hypercomm::unpack(std::move(head), tmp);
   // make the function and callback
   auto fn = std::make_shared<nop_combiner>();
   auto cb = std::make_shared<forwarding_callback>(

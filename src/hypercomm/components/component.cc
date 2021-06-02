@@ -93,20 +93,21 @@ void component::erase_incoming(const port_id_t& from) {
   }
 }
 
-void component::send(value_type&& msg) {
+void component::send(value_type&& value) {
   bool persistent = this->keep_alive();
+  auto msg = value ? value->release() : nullptr;
   CkAssert((persistent || !this->alive) && "a living component cannot send values");
 
   for (auto it = std::begin(this->outgoing); it != std::end(this->outgoing);
        it = std::next(it)) {
-    value_type&& ready{};
+    decltype(msg) ready = nullptr;
     if (it == std::prev(std::end(this->outgoing))) {
-      ready = std::move(msg);
+      ready = msg;
     } else {
-      ready = std::move(utilities::copy_message(msg));
+      ready = utilities::copy_message(msg);
     }
 
-    this->try_send(*it, std::forward<value_type>(ready));
+    this->try_send(*it, msg2value(ready));
   }
 
   // TODO should this be cleared for persistent?

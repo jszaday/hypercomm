@@ -55,9 +55,9 @@ public:
    *        to the appropriate entry port )
    */
   virtual void demux(hypercomm_msg *_1) override {
-    auto msg = _1->is_null() ? std::shared_ptr<CkMessage>(
+    auto msg = _1->is_null() ? std::shared_ptr<hyper_value>(
                                    nullptr, [_1](void *) { CkFreeMsg(_1); })
-                             : hypercomm::utilities::wrap_message(_1);
+                             : msg2value(_1);
     this->receive_value(_1->dst, std::move(msg));
   }
 };
@@ -76,10 +76,10 @@ locality_base<Index>::send_action(const collective_ptr<CkArrayIndex> &p,
 // NOTE this should always be used for invalidations
 template <typename Index>
 void send2port(const element_ptr<Index> &proxy, const entry_port_ptr &port,
-               std::shared_ptr<CkMessage> &&value) {
+               component::value_type &&value) {
   auto msg =
       value
-          ? static_cast<message *>(utilities::unwrap_message(std::move(value)))
+          ? static_cast<message *>(value->release())
           : hypercomm_msg::make_null_message(port);
   auto env = UsrToEnv(msg);
   auto msgIdx = env->getMsgIdx();
@@ -100,7 +100,7 @@ void send2port(const element_ptr<Index> &proxy, const entry_port_ptr &port,
 template <typename Index>
 /* static */ void
 locality_base<Index>::send_future(const future &f,
-                                  std::shared_ptr<CkMessage> &&value) {
+                                  component::value_type &&value) {
   auto proxy = std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(f.source);
   auto port = std::make_shared<future_port>(f);
   send2port(proxy, port, std::move(value));
