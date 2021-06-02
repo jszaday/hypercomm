@@ -112,10 +112,6 @@ struct locality_base : public virtual common_functions_<CkArrayIndex> {
     }
   }
 
-  void receive_invalidation(const entry_port_ptr& port) {
-    throw std::runtime_error("not yet implemented");
-  }
-
   // TODO this is a temporary solution
   struct connector: public callback {
     locality_base<Index>* self;
