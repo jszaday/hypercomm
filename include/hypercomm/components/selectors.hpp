@@ -7,9 +7,9 @@ namespace hypercomm {
 namespace components {
 
 struct mux_component : public virtual passthru_component {
-  virtual bool select(const std::shared_ptr<CkMessage>&) const = 0;
+  virtual bool select(const value_type&) const = 0;
 
-  virtual void receive_value(const port_id_t& dst, value_t&& msg) override {
+  virtual void receive_value(const port_id_t& dst, value_type&& msg) override {
     if (this->select(msg)) {
       component::receive_value(dst, std::move(msg));
     }
@@ -17,17 +17,17 @@ struct mux_component : public virtual passthru_component {
 };
 
 struct demux_component : public virtual passthru_component {
-  virtual port_id_t select(const std::shared_ptr<CkMessage>&) const = 0;
+  virtual port_id_t select(const value_type&) const = 0;
 
-  virtual void send(value_t&& msg) override {
+  virtual void send(value_type&& msg) override {
     auto chosen = this->select(msg);
     bool found = false;
 
     for (const auto& dst : this->outgoing) {
       if (dst.first == chosen) {
-        this->try_send(dst, std::forward<value_t>(msg));
+        this->try_send(dst, std::move(msg));
       } else {
-        this->try_send(dst, std::move(value_t{}));
+        this->try_send(dst, std::move(value_type{}));
       }
     }
 

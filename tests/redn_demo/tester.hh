@@ -17,13 +17,13 @@ struct entry_method_like : public hypercomm::component {
 
 struct say_hello : virtual public entry_method_like {
   say_hello(const id_t& _1) : entry_method_like(_1) {}
-  virtual value_t action(void) override;
+  virtual value_type action(void) override;
 };
 
 struct my_redn_com : virtual public entry_method_like {
   locality* self;
   my_redn_com(const id_t& _1, locality* _2) : entry_method_like(_1), self(_2) {}
-  virtual value_t action(void) override;
+  virtual value_type action(void) override;
 };
 
 struct nop_combiner : public combiner {

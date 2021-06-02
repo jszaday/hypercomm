@@ -19,7 +19,7 @@ namespace components {
 //   id = pe | (++CkpvAccess(counter_));
 // }
 
-void component::receive_value(const port_id_t& from, value_t&& msg) {
+void component::receive_value(const port_id_t& from, value_type&& msg) {
   if (!msg) {
     this->receive_invalidation(from);
     return;
@@ -77,7 +77,7 @@ void component::receive_invalidation(const port_id_t& from) {
 
   if (!this->alive) {
     for (const auto& dst : this->outgoing) {
-      this->try_send(dst, std::move(value_t{}));
+      this->try_send(dst, std::move(value_type{}));
     }
 
     this->outgoing.clear();
@@ -93,20 +93,20 @@ void component::erase_incoming(const port_id_t& from) {
   }
 }
 
-void component::send(value_t&& msg) {
+void component::send(value_type&& msg) {
   bool persistent = this->keep_alive();
   CkAssert((persistent || !this->alive) && "a living component cannot send values");
 
   for (auto it = std::begin(this->outgoing); it != std::end(this->outgoing);
        it = std::next(it)) {
-    value_t&& ready{};
+    value_type&& ready{};
     if (it == std::prev(std::end(this->outgoing))) {
       ready = std::move(msg);
     } else {
       ready = std::move(utilities::copy_message(msg));
     }
 
-    this->try_send(*it, std::forward<value_t>(ready));
+    this->try_send(*it, std::forward<value_type>(ready));
   }
 
   // TODO should this be cleared for persistent?

@@ -14,10 +14,8 @@ struct n_input_component : public virtual component {
 };
 
 struct passthru_component : public virtual n_input_component<1> {
-  virtual std::shared_ptr<CkMessage> action(void) override {
-    std::shared_ptr<CkMessage> msg = std::move(this->accepted[0]);
-    this->accepted.clear();
-    return msg;
+  virtual value_type action(void) override {
+    return std::move(this->accepted[0]);
   }
 };
 

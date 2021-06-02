@@ -27,14 +27,14 @@ struct gen_values : public hypercomm::component {
 
   gen_values(const id_t& _1, const int& _2, const std::size_t& _3) : component(_1), selfIdx(_2), n(_3) {}
   virtual int num_expected(void) const override { return 0; }
-  virtual value_t action(void) override;
+  virtual value_type action(void) override;
 };
 
 template<typename T>
 struct add_values : public hypercomm::component {
   add_values(const id_t& _1) : component(_1) {}
   virtual int num_expected(void) const override { return 2; }
-  virtual value_t action(void) override;
+  virtual value_type action(void) override;
 };
 
 template<typename T>
@@ -43,7 +43,7 @@ struct print_values : public hypercomm::component {
 
   print_values(const id_t& _1, const int& _2) : component(_1), selfIdx(_2) {}
   virtual int num_expected(void) const override { return 1; }
-  virtual value_t action(void) override;
+  virtual value_type action(void) override;
 };
 
 #endif

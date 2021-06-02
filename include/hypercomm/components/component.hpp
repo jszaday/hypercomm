@@ -17,16 +17,16 @@ namespace components {
 class manager;
 
 struct component: virtual public impermanent {
-  using value_t = std::shared_ptr<CkMessage>;
+  using value_type = core::value_ptr;
   using id_t = component_id_t;
 
  protected:
   std::vector<port_id_t> incoming;
   std::map<port_id_t, callback_ptr> outgoing;
 
-  std::vector<value_t> accepted;
-  std::map<port_id_t, value_t> inbox;
-  std::map<port_id_t, value_t> outbox;
+  std::vector<value_type> accepted;
+  std::map<port_id_t, value_type> inbox;
+  std::map<port_id_t, value_type> outbox;
 
   port_id_t port_authority = 0;
 
@@ -37,12 +37,12 @@ struct component: virtual public impermanent {
 
   friend class manager;
 
-  virtual value_t action(void) = 0;
+  virtual value_type action(void) = 0;
 
   // NOTE -- for correct status updates, overrides should
   //         call the parent
   virtual void receive_invalidation(const port_id_t&);
-  virtual void receive_value(const port_id_t&, value_t&&);
+  virtual void receive_value(const port_id_t&, value_type&&);
 
   int num_available(void) const;
   virtual int num_expected(void) const;
@@ -99,15 +99,15 @@ struct component: virtual public impermanent {
   }
 
  protected:
-  virtual void send(value_t&& msg);
+  virtual void send(value_type&& msg);
 
   void erase_incoming(const port_id_t&);
 
-  void try_send(const decltype(outgoing)::value_type& dst, value_t&& msg) {
+  void try_send(const decltype(outgoing)::value_type& dst, value_type&& msg) {
     if (dst.second) {
-      dst.second->send(std::forward<value_t>(msg));
+      dst.second->send(std::forward<value_type>(msg));
     } else {
-      this->outbox.emplace(dst.first, std::forward<value_t>(msg));
+      this->outbox.emplace(dst.first, std::forward<value_type>(msg));
     }
   }
 };

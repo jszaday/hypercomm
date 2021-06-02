@@ -84,7 +84,7 @@ struct locality : public vil<CBase_locality, int> {
 };
 
 template <typename T>
-typename gen_values<T>::value_t gen_values<T>::action(void) {
+typename gen_values<T>::value_type gen_values<T>::action(void) {
   auto msg_size = sizeof(T) * this->n + sizeof(this->n);
   auto msg = message::make_message(msg_size, {});
   *((decltype(this->n)*)msg->payload) = this->n;
@@ -98,7 +98,7 @@ typename gen_values<T>::value_t gen_values<T>::action(void) {
 }
 
 template <typename T>
-typename add_values<T>::value_t add_values<T>::action(void) {
+typename add_values<T>::value_type add_values<T>::action(void) {
   auto& lhsMsg = this->accepted[0];
   auto& rhsMsg = this->accepted[1];
 
@@ -122,7 +122,7 @@ typename add_values<T>::value_t add_values<T>::action(void) {
 }
 
 template <typename T>
-typename print_values<T>::value_t print_values<T>::action(void) {
+typename print_values<T>::value_type print_values<T>::action(void) {
   std::size_t* n;
   T* arr;
   const auto& msg = this->accepted[0];

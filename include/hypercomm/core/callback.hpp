@@ -6,9 +6,11 @@
 namespace hypercomm {
 namespace core {
 
+using value_ptr = std::shared_ptr<CkMessage>;
+
 template<bool MultiMsg, bool Returns>
 struct action : virtual public polymorph {
-  using value_type = std::shared_ptr<CkMessage>;
+  using value_type = value_ptr;
 
   using return_type = typename std::conditional<Returns, value_type, void>::type;
   using argument_type = typename std::conditional<MultiMsg, std::vector<value_type>, value_type>::type;

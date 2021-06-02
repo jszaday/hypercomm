@@ -111,7 +111,7 @@ struct locality : public vil<CBase_locality, int> {
 };
 
 // NOTE ( this is effectively the body for the say_hello entry method )
-typename say_hello::value_t say_hello::action(void) {
+typename say_hello::value_type say_hello::action(void) {
   if (kVerbose) {
     CkPrintf("com%lu> hi, hi!\n", id);
   }
@@ -120,7 +120,7 @@ typename say_hello::value_t say_hello::action(void) {
 }
 
 // NOTE ( this is effectively the body for the my_redn_com entry method )
-typename my_redn_com::value_t my_redn_com::action(void) {
+typename my_redn_com::value_type my_redn_com::action(void) {
   // the accepted pool contains the first message received by this action
   auto& head = this->accepted[0];
   // unpack it to an index/int pair
