@@ -30,10 +30,10 @@ void component::activate(void) {
 
 using incoming_type = std::deque<component::value_set>;
 
-inline incoming_type::iterator find_without(incoming_type& incoming,
+inline incoming_type::reverse_iterator find_gap(incoming_type& incoming,
                                             const component::port_type& which) {
-  auto search = incoming.begin();
-  for (; search != incoming.end(); search++) {
+  auto search = incoming.rbegin();
+  for (; search != incoming.rend(); search++) {
     if (search->find(which) == search->end()) {
       return search;
     }
@@ -81,26 +81,21 @@ void component::update_destination(const port_type& port,
 void component::receive_value(const port_type& port, value_type&& value) {
   CkAssert(port < this->n_inputs() && "port must be within range");
 
-  auto search = find_without(this->incoming, port);
-
   if (!value && !this->permissive()) {
-    // NOTE this is probably unnecessary
-    // if (search != this->incoming.end()) {
-    //   this->incoming.erase(search);
-    // }
-
     this->alive = this->keep_alive();
   } else {
-    if (search == this->incoming.end()) {
-      search = this->incoming.insert(search,
-                                     {std::make_pair(port, std::move(value))});
+    auto search = find_gap(this->incoming, port);
+
+    if (search == this->incoming.rend()) {
+      this->incoming.push_front({std::make_pair(port, std::move(value))});
+      search = this->incoming.rbegin();
     } else {
       (*search)[port] = value;
     }
 
     if (search->size() == this->n_inputs()) {
       this->stage_action(std::move(*search));
-      this->incoming.erase(search);
+      this->incoming.erase(search.base());
     }
   }
 }
