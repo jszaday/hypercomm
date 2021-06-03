@@ -18,16 +18,19 @@ In any case, its modules were developed as components of three projects. Some fe
   - Aggregators – Pending, to be reimplemented as components.
 - Ergoline:
   - De/serialization (a.k.a. _ser//des_) – Nearly Integrated, rename ergoline::array to hypercomm::span.
-  - Hashing – Pending, can be copied over with minimal changes.
-  - Mailboxes &amp; Futures – Pending, to be reimplemented as components.
+  - Hashing – Integrated.
+  - Mailboxes – Pending, (recently) reworked components to support requests.
+  - Futures – Integrated (without is_ready).
   - Callbacks &amp; Reductions – Replaced.
   - Ergoline is still on an older, now historical branch of this library. Once this integration is complete, it needs to be updated.
 - Hypercomm Components:
   - Components – Integrated, uses _ser//des_.
-  - Vils, Sections, Multicasts and Reductions – Pending, but localized to example (need to be mainlined)
+  - Vils, Sections, Multicasts and Reductions – Integrated.
 
 Other work remaining before a release will be considered:
 
+- Correct QD-Component Interaction.
+- Add a simplified connection API?
 - Use process-awareness to provide node-invariant reduction/multicast performance.
 - Add range-based and global lightweight sections (driving optimizations)
 - Enable using vils with groups and nodegroups (low difficulty)
