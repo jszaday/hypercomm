@@ -259,32 +259,37 @@ protected:
     auto ustream = ident->upstream();
     auto dstream = ident->downstream();
 
-    const auto& rdcr = this->emplace_component<reducer>(fn, msg2value(std::move(value)));
+    const auto& rdcr = this->emplace_component<reducer>(fn,
+        ustream.size() + 1,
+        dstream.empty() ? 1 : dstream.size());
 
+    auto count = 0;
     for (const auto& up : ustream) {
       auto ours = std::make_shared<reduction_port<Index>>(next, up);
-      auto theirs = rdcr->open_in_port();
-
-      this->open(ours, std::make_pair(rdcr->id, theirs));
+      this->connect(ours, rdcr, ++count);
     }
 
     if (dstream.empty()) {
-      rdcr->open_out_port(cb);
+      this->connect(rdcr, 0, cb);
     } else {
       auto collective =
           std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
       CkAssert(collective && "locality must be a valid collective");
       auto theirs = std::make_shared<reduction_port<Index>>(next, ident->mine);
+      
+      count = 0;
       for (const auto& down : dstream) {
         impl_index_type down_idx;
         down_idx.dimension = 1;
         reinterpret_index<Index>(down_idx) = down;
-        rdcr->open_out_port(std::make_shared<forwarding_callback>(
-            (*collective)[down_idx], theirs));
+        this->connect(rdcr, count++,
+          std::make_shared<forwarding_callback>((*collective)[down_idx], theirs)
+        );
       }
     }
 
     this->activate_component(rdcr);
+    rdcr->receive_value(0, msg2value(std::move(value)));
   }
 
 public:

@@ -79,8 +79,7 @@ struct locality : public vil<CBase_locality, int> {
     // so it can receive messages from other chares -- this is, effectively,
     // a dynamic entry method
     const auto& com1 = this->emplace_component<my_redn_com>(this);
-    auto com1_in = com1->open_in_port();
-    this->open(bcast_port, std::make_pair(com1->id, com1_in));
+    this->connect(bcast_port, com1, 0);
     this->activate_component(com1);
     // creates a (lightweight) section with only the even elements 
     std::vector<int> indices(n / 2);
@@ -91,8 +90,7 @@ struct locality : public vil<CBase_locality, int> {
     // NOTE the say_hello "entry method" is only created on idx 0
     if (this->__index__() == 0) {
       const auto& com2 = this->emplace_component<say_hello>();
-      auto com2_in = com2->open_in_port();
-      this->open(redn_port, std::make_pair(com2->id, com2_in));
+      this->connect(redn_port, com2, 0);
       this->activate_component(com2);
     }
   }
@@ -111,7 +109,7 @@ struct locality : public vil<CBase_locality, int> {
 };
 
 // NOTE ( this is effectively the body for the say_hello entry method )
-typename say_hello::value_type say_hello::action(void) {
+typename say_hello::value_set say_hello::action(value_set&& accepted) {
   if (kVerbose) {
     CkPrintf("com%lu> hi, hi!\n", id);
   }
@@ -120,17 +118,14 @@ typename say_hello::value_type say_hello::action(void) {
 }
 
 // NOTE ( this is effectively the body for the my_redn_com entry method )
-typename my_redn_com::value_type my_redn_com::action(void) {
+typename my_redn_com::value_set my_redn_com::action(value_set&& accepted) {
   // the accepted pool contains the first message received by this action
   // TODO <- fix this up once consume is added ->
   using tuple_type = std::tuple<array_proxy::index_type, int>;
-  auto& head = this->accepted[0];
-  head = value2typed<tuple_type>(std::move(head));
-  auto& tmp =
-    std::static_pointer_cast<typed_value<tuple_type>>(head)->value();
   // unpack it to an index/int pair
-  auto& idx = std::get<0>(tmp);
-  auto& numIters = std::get<1>(tmp);
+  auto tmp = value2typed<tuple_type>(std::move(accepted[0]));
+  auto& idx = std::get<0>(tmp->value());
+  auto& numIters = std::get<1>(tmp->value());
   // make the function and callback
   auto fn = std::make_shared<nop_combiner>();
   auto cb = std::make_shared<forwarding_callback>(
