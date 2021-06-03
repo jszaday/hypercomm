@@ -1,120 +1,69 @@
 #ifndef __HYPERCOMM_COMPONENTS_COMPONENT_HPP__
 #define __HYPERCOMM_COMPONENTS_COMPONENT_HPP__
 
-#include <charm++.h>
-
-#include <map>
-#include <memory>
-#include <vector>
-
-#include "../core.hpp"
-#include "../core/impermanent.hpp"
-
 #include "identifiers.hpp"
+#include "../core.hpp"
 
 namespace hypercomm {
-namespace components {
-class manager;
 
-struct component: virtual public impermanent {
+class component : virtual public impermanent {
+ public:
+  using port_type = components::port_id_t;
   using value_type = core::value_ptr;
+  using value_set = std::map<port_type, value_type>;
   using id_t = component_id_t;
 
- protected:
-  std::vector<port_id_t> incoming;
-  std::map<port_id_t, callback_ptr> outgoing;
-
-  std::vector<value_type> accepted;
-  std::map<port_id_t, value_type> inbox;
-  std::map<port_id_t, value_type> outbox;
-
-  port_id_t port_authority = 0;
+  const id_t id;
 
   component(const id_t& _1): id(_1) {}
 
- public:
-  id_t id;
+  // determeines whether the component should stay
+  // "alive" after its acted
+  virtual bool keep_alive(void) const override;
 
-  friend class manager;
+  // determines how components respond to invalidations
+  // => true -- tolerates invalidations
+  // => false -- invalidations are destructive
+  // (note: it is false by default)
+  virtual bool permissive(void) const;
 
-  virtual value_type action(void) = 0;
+  // used by the RTS to determine when to GC a component
+  // (typically, after all staged values have been sent)
+  virtual bool collectible(void) const;
 
-  // NOTE -- for correct status updates, overrides should
-  //         call the parent
-  virtual void receive_invalidation(const port_id_t&);
-  virtual void receive_value(const port_id_t&, value_type&&);
+  // the component's number of input ports
+  virtual std::size_t n_inputs(void) const = 0;
 
-  int num_available(void) const;
-  virtual int num_expected(void) const;
+  // the component's number of output ports
+  virtual std::size_t n_outputs(void) const = 0;
 
-  bool ready(void) const;
-  bool collectible(void) const;
+  // action called when a value set is ready
+  virtual value_set action(value_set&& values) = 0;
 
-  port_id_t open_in_port(void) {
-    auto id = this->port_authority++;
-    this->incoming.push_back(id);
-    return id;
-  }
+  // used to send a value to a component
+  // null values are treated as invalidations
+  void receive_value(const port_type& port, value_type&& value);
 
-  port_id_t open_out_port(const callback_ptr& cb) {
-    auto id = ++this->port_authority;
-    this->outgoing.emplace(id, cb);
-    return id;
-  }
+  // updates the cb that a port's value is sent to
+  void update_destination(const port_type& port, const callback_ptr& cb);
 
-  void update_destination(const port_id_t& port, const callback_ptr& cb) {
-    auto s1 = this->outgoing.find(port);
-    if (s1 == this->outgoing.end()) {
-      auto s2 = this->outbox.find(port);
-      CkAssert((s2 != this->outbox.end()) &&
-               "cannot update cb of non-existent port");
-      cb->send(std::move(s2->second));
-      this->outbox.erase(s2);
-    } else {
-      s1->second = cb;
-    }
-  }
-
-  // TODO decide whether to sync outbox?
-  void resync_queues(void) {
-    for (auto& in : this->inbox) {
-      auto search = std::find(std::begin(this->incoming),
-                              std::end(this->incoming), in.first);
-      if (search != std::end(this->incoming)) {
-        QdProcess(1);
-        this->receive_value(in.first, std::move(in.second));
-        this->inbox.erase(in.first);
-      }
-    }
-  }
-
-  // TODO take threading into consideration when launching
-  void resync_status(void) {
-    if (this->ready()) {
-      QdProcess(this->accepted.size());
-      auto msg = this->action();
-      this->alive = this->keep_alive();
-      this->send(std::move(msg));
-    }
-  }
+  // called when a component is first "activated" in the RTS
+  void activate(void);
 
  protected:
-  virtual void send(value_type&& msg);
+  // staging area for incomplete value sets
+  std::deque<value_set> incoming;
+  // buffer of yet-unsent values
+  std::map<port_type, std::deque<value_type>> outgoing;
+  // buffer of unfulfilled callbacks
+  std::map<port_type, std::deque<callback_ptr>> routes;
 
-  void erase_incoming(const port_id_t&);
-
-  void try_send(const decltype(outgoing)::value_type& dst, value_type&& msg) {
-    if (dst.second) {
-      dst.second->send(std::forward<value_type>(msg));
-    } else {
-      this->outbox.emplace(dst.first, std::forward<value_type>(msg));
-    }
-  }
+ private:
+  void stage_action(value_set&&);
+  void unspool_values(value_set&&);
 };
-}
 
-using component = components::component;
-using component_ptr = std::shared_ptr<components::component>;
+using component_ptr = std::shared_ptr<component>;
 }
 
 #endif

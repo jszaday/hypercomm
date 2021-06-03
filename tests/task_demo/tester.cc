@@ -61,18 +61,19 @@ struct locality : public vil<CBase_locality, int> {
     auto com2 = this->emplace_component<add_values<value_type>>();
     auto com3 = this->emplace_component<print_values<value_type>>(selfIdx);
 
-    // gen random => print values 1
-    this->connect(com0, com1);
-    // print values 1 => add values
-    this->connect(com1, com2);
-    // print values 1 => recv_value@neighbor
+    // gen_values.(0) => print values 1
+    this->connect(com0, 0, com1, 0);
+    // gen_values.(1) => add values
+    this->connect(com0, 1, com2, 0);
+    // gen_values.(2) => recv_value@neighbor
     auto neighborIdx = conv2idx<CkArrayIndexMax>((selfIdx + 1) % n);
     auto neighbor = make_proxy(thisProxy[neighborIdx]);
-    forward(com1, neighbor, recv_value);
+    auto fwd = std::make_shared<forwarding_callback>(neighbor, recv_value);
+    this->connect(com0, 2, fwd);
     // recv_value@here => add values
-    this->connect(recv_value, com2);
+    this->connect(recv_value, com2, 1);
     // add_values => print values 2
-    this->connect(com2, com3);
+    this->connect(com2, 0, com3, 0);
 
     this->activate_component(com3);
     this->activate_component(com2);
@@ -82,7 +83,7 @@ struct locality : public vil<CBase_locality, int> {
 };
 
 template <typename T>
-typename gen_values<T>::value_type gen_values<T>::action(void) {
+typename gen_values<T>::value_set gen_values<T>::action(value_set&&) {
   auto msg_size = sizeof(T) * this->n + sizeof(this->n);
   auto msg = message::make_message(msg_size, {});
   *((decltype(this->n)*)msg->payload) = this->n;
@@ -92,13 +93,19 @@ typename gen_values<T>::value_type gen_values<T>::action(void) {
     arr[i] = (T)(i % this->n + this->selfIdx + 1);
   }
 
-  return msg2value(msg);
+  auto copy0 = utilities::copy_message(msg);
+  auto copy1 = utilities::copy_message(msg);
+  return {
+    std::make_pair(0, msg2value(msg)),
+    std::make_pair(1, msg2value(copy0)),
+    std::make_pair(2, msg2value(copy1))
+  };
 }
 
 template <typename T>
-typename add_values<T>::value_type add_values<T>::action(void) {
-  auto& lhsMsg = this->accepted[0];
-  auto& rhsMsg = this->accepted[1];
+typename add_values<T>::value_set add_values<T>::action(value_set&& accepted) {
+  auto& lhsMsg = accepted[0];
+  auto& rhsMsg = accepted[1];
 
   std::size_t* m;
   T* lhs;
@@ -116,14 +123,17 @@ typename add_values<T>::value_type add_values<T>::action(void) {
     lhs[i] += rhs[i];
   }
 
-  return lhsMsg;
+  return {
+    std::make_pair(0, lhsMsg)
+  };
 }
 
 template <typename T>
-typename print_values<T>::value_type print_values<T>::action(void) {
+typename print_values<T>::value_set print_values<T>::action(value_set&& accepted) {
+  const auto& msg = accepted[0];
+
   std::size_t* n;
   T* arr;
-  const auto& msg = this->accepted[0];
   unpack_array(msg, &n, &arr);
 
   std::stringstream ss;
@@ -136,7 +146,7 @@ typename print_values<T>::value_type print_values<T>::action(void) {
 
   ckout << ss.str().c_str() << endl;
 
-  return msg;
+  return {};
 }
 
 #define CK_TEMPLATES_ONLY
