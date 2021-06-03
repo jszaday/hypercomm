@@ -8,10 +8,11 @@ namespace hypercomm {
 
 class component : virtual public impermanent {
  public:
-  using port_type = components::port_id_t;
-  using value_type = core::value_ptr;
-  using value_set = std::map<port_type, value_type>;
   using id_t = component_id_t;
+  using value_type = core::value_ptr;
+  using port_type = components::port_id_t;
+  using value_set = std::map<port_type, value_type>;
+  using incoming_type = std::deque<value_set>;
 
   const id_t id;
 
@@ -52,14 +53,15 @@ class component : virtual public impermanent {
 
  protected:
   // staging area for incomplete value sets
-  std::deque<value_set> incoming;
+  incoming_type incoming;
   // buffer of yet-unsent values
   std::map<port_type, std::deque<value_type>> outgoing;
   // buffer of unfulfilled callbacks
   std::map<port_type, std::deque<callback_ptr>> routes;
 
  private:
-  void stage_action(value_set&&);
+  void stage_action(incoming_type::reverse_iterator*);
+
   void unspool_values(value_set&&);
 };
 

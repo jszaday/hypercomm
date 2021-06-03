@@ -3,13 +3,9 @@
 
 namespace hypercomm {
 
-bool component::keep_alive(void) const {
-  return false;
-}
+bool component::keep_alive(void) const { return false; }
 
-bool component::permissive(void) const {
-  return false;
-}
+bool component::permissive(void) const { return false; }
 
 bool component::collectible(void) const {
   return !this->alive &&
@@ -20,18 +16,34 @@ bool component::collectible(void) const {
              });
 }
 
+using incoming_type = component::incoming_type;
+
+inline incoming_type::reverse_iterator find_ready(incoming_type& incoming,
+                                                  const int& n_needed) {
+  auto search = incoming.rbegin();
+  for (; search != incoming.rend(); search++) {
+    if (n_needed == search->size()) {
+      return search;
+    }
+  }
+  return search;
+}
+
 void component::activate(void) {
   this->alive = true;
-
-  if (this->n_inputs() == 0) {
-    this->stage_action({});
+  auto n_in = this->n_inputs();
+  if (n_in == 0) {
+    this->stage_action(nullptr);
+  } else {
+    auto search = find_ready(this->incoming, n_in);
+    if (search != this->incoming.rend()) {
+      this->stage_action(&search);
+    }
   }
 }
 
-using incoming_type = std::deque<component::value_set>;
-
-inline incoming_type::reverse_iterator find_gap(incoming_type& incoming,
-                                            const component::port_type& which) {
+inline incoming_type::reverse_iterator find_gap(
+    incoming_type& incoming, const component::port_type& which) {
   auto search = incoming.rbegin();
   for (; search != incoming.rend(); search++) {
     if (search->find(which) == search->end()) {
@@ -41,14 +53,12 @@ inline incoming_type::reverse_iterator find_gap(incoming_type& incoming,
   return search;
 }
 
-void component::stage_action(value_set&& values) {
+void component::stage_action(incoming_type::reverse_iterator* search) {
   if (this->alive) {
-    this->unspool_values(this->action(std::move(values)));
-
+    auto values = search ? this->action(std::move(**search)) : this->action({});
+    if (search) this->incoming.erase(search->base());
+    this->unspool_values(std::move(values));
     this->alive = this->keep_alive();
-  } else {
-    // buffer values in precond
-    CkAbort("not yet implemented");
   }
 }
 
@@ -94,8 +104,7 @@ void component::receive_value(const port_type& port, value_type&& value) {
     }
 
     if (search->size() == this->n_inputs()) {
-      this->stage_action(std::move(*search));
-      this->incoming.erase(search.base());
+      this->stage_action(&search);
     }
   }
 }
