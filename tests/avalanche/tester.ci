@@ -1,0 +1,23 @@
+mainmodule tester {
+
+    readonly int numElements;
+
+    mainchare main {
+        entry main(CkArgMsg*);
+        entry [threaded] void run(void);
+    };
+
+    extern module locality;
+
+    array [Max] receiver : locality_base_ {
+        entry receiver(const int&);
+        entry void run(void);
+    };
+
+    array [Max] sender : locality_base_ {
+        entry sender(const int&, const CProxy_receiver&);
+        entry void run(void);
+    };
+
+    initproc void enroll_polymorphs(void);
+}

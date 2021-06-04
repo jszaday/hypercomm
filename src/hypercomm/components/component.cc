@@ -1,4 +1,4 @@
-#include <hypercomm/components/component.hpp>
+#include <hypercomm/components.hpp>
 #include <algorithm>
 
 namespace hypercomm {
@@ -31,11 +31,11 @@ inline incoming_type::reverse_iterator find_ready(incoming_type& incoming,
 
 void component::activate(void) {
   this->alive = true;
-  auto n_in = this->n_inputs();
-  if (n_in == 0) {
+  auto n_expt = this->n_expected();
+  if (n_expt == 0) {
     this->stage_action(nullptr);
   } else {
-    auto search = find_ready(this->incoming, n_in);
+    auto search = find_ready(this->incoming, n_expt);
     if (search != this->incoming.rend()) {
       this->stage_action(&search);
     }
@@ -103,7 +103,7 @@ void component::receive_value(const port_type& port, value_type&& value) {
       (*search)[port] = value;
     }
 
-    if (search->size() == this->n_inputs()) {
+    if (search->size() == this->n_expected()) {
       this->stage_action(&search);
     }
   }

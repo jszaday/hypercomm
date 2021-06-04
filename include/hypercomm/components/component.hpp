@@ -38,6 +38,11 @@ class component : virtual public impermanent {
   // the component's number of output ports
   virtual std::size_t n_outputs(void) const = 0;
 
+  // number of expected values (typically #inputs)
+  virtual std::size_t n_expected(void) const {
+    return this->n_inputs();
+  }
+
   // action called when a value set is ready
   virtual value_set action(value_set&& values) = 0;
 

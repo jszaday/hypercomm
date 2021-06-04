@@ -75,8 +75,8 @@ locality_base<Index>::send_action(const collective_ptr<CkArrayIndex> &p,
 // TODO make this more generic
 // NOTE this should always be used for invalidations
 template <typename Index>
-void send2port(const element_ptr<Index> &proxy, const entry_port_ptr &port,
-               component::value_type &&value) {
+inline void send2port(const element_ptr<Index> &proxy, const entry_port_ptr &port,
+                      component::value_type &&value) {
   auto msg =
       value
           ? static_cast<message *>(value->release())
