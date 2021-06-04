@@ -57,7 +57,7 @@ void component::stage_action(incoming_type::reverse_iterator* search) {
   if (this->alive) {
     auto values = search ? this->action(std::move(**search)) : this->action({});
     if (search) this->incoming.erase(search->base());
-    this->unspool_values(std::move(values));
+    this->unspool_values(values);
     this->alive = this->keep_alive();
   }
 }
