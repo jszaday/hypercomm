@@ -57,12 +57,12 @@ void component::stage_action(incoming_type::reverse_iterator* search) {
   if (this->alive) {
     auto values = search ? this->action(std::move(**search)) : this->action({});
     if (search) this->incoming.erase(search->base());
-    this->unspool_values(std::move(values));
+    this->unspool_values(values);
     this->alive = this->keep_alive();
   }
 }
 
-void component::unspool_values(value_set&& pairs) {
+void component::unspool_values(value_set& pairs) {
   CkAssert(pairs.size() == this->n_outputs() && "invalid nbr of outputs");
   for (auto& pair : pairs) {
     auto& port = pair.first;
