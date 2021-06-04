@@ -54,5 +54,5 @@ jobs:
         cd ../task_demo
         TESTOPTS="++local" make test
         cd ../avalanche
+        TESTOPTS="++local 65" DEBUG=1 make test
         TESTOPTS="++local ++ppn 2 65" make test
-        TESTOPTS="++local 65" make test
