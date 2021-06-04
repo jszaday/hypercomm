@@ -67,7 +67,7 @@ class component : virtual public impermanent {
  private:
   void stage_action(incoming_type::reverse_iterator*);
 
-  void unspool_values(value_set&&);
+  void unspool_values(value_set&);
 };
 
 using component_ptr = std::shared_ptr<component>;

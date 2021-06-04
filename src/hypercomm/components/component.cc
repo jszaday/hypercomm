@@ -62,7 +62,7 @@ void component::stage_action(incoming_type::reverse_iterator* search) {
   }
 }
 
-void component::unspool_values(value_set&& pairs) {
+void component::unspool_values(value_set& pairs) {
   CkAssert(pairs.size() == this->n_outputs() && "invalid nbr of outputs");
   for (auto& pair : pairs) {
     auto& port = pair.first;
