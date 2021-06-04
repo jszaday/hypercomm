@@ -35,6 +35,10 @@ struct temporary {
 
   temporary(void) { reconstruct(&(this->value())); }
 
+  temporary(const T& value) : temporary() {
+    this->value() = value;
+  }
+
   ~temporary() { value().~T(); }
 
   const T& value(void) const { return *(reinterpret_cast<const T*>(&data)); }
