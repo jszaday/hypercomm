@@ -55,10 +55,15 @@ inline incoming_type::reverse_iterator find_gap(
 
 void component::stage_action(incoming_type::reverse_iterator* search) {
   if (this->alive) {
+    // act using available values, consuming them
     auto values = search ? this->action(std::move(**search)) : this->action({});
     if (search) this->incoming.erase(search->base());
+    // send the results downstream
     this->unspool_values(values);
+    // determine whether we persist after acting
     this->alive = this->keep_alive();
+    // then notify our listeners if we expired
+    if (!this->alive) this->notify_listeners<false>();
   }
 }
 
@@ -102,8 +107,10 @@ void component::receive_value(const port_type& port, value_type&& value) {
       for (auto i = 0; i < this->n_outputs(); i += 1) {
         values[i] = {};
       }
-      // propagates them downstream
+      // propagates them downstream, and:
       this->unspool_values(values);
+      // notifies its listeners
+      this->notify_listeners<true>();
     }
   } else {
     auto search = find_gap(this->incoming, port);

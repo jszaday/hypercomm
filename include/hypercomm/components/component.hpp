@@ -14,9 +14,17 @@ class component : virtual public impermanent {
   using value_set = std::map<port_type, value_type>;
   using incoming_type = std::deque<value_set>;
 
+  class status_listener : virtual public polymorph::trait {
+   public:
+    virtual void on_completion(const component&) = 0;
+    virtual void on_invalidation(const component&) = 0;
+  };
+
+  using listener_ptr = std::shared_ptr<status_listener>;
+
   const id_t id;
 
-  component(const id_t& _1): id(_1) {}
+  component(const id_t& _1) : id(_1) {}
 
   // determeines whether the component should stay
   // "alive" after its acted
@@ -39,9 +47,7 @@ class component : virtual public impermanent {
   virtual std::size_t n_outputs(void) const = 0;
 
   // number of expected values (typically #inputs)
-  virtual std::size_t n_expected(void) const {
-    return this->n_inputs();
-  }
+  virtual std::size_t n_expected(void) const { return this->n_inputs(); }
 
   // action called when a value set is ready
   virtual value_set action(value_set&& values) = 0;
@@ -56,7 +62,37 @@ class component : virtual public impermanent {
   // called when a component is first "activated" in the RTS
   void activate(void);
 
+  // subscribes a status listener
+  inline void add_listener(const listener_ptr& l) {
+    this->listeners_.emplace_back(l);
+  }
+
+  // unsubscribes a status listener
+  inline void remove_listener(const listener_ptr& l) {
+    auto end = std::end(this->listeners_);
+    auto search = std::find(std::begin(this->listeners_), end, l);
+    if (search != end) {
+      this->listeners_.erase(search);
+    }
+  }
+
+  // sends invalidation or completion notifications
+  template<bool Invalidation>
+  inline void notify_listeners(void) {
+    for (const auto& l : this->listeners_) {
+      if (Invalidation) {
+        l->on_invalidation(*this);
+      } else {
+        l->on_completion(*this);
+      }
+    }
+
+    this->listeners_.clear();
+  }
+
  protected:
+  std::vector<listener_ptr> listeners_;
+
   // staging area for incomplete value sets
   incoming_type incoming;
   // buffer of yet-unsent values
