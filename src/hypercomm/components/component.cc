@@ -91,8 +91,20 @@ void component::update_destination(const port_type& port,
 void component::receive_value(const port_type& port, value_type&& value) {
   CkAssert(port < this->n_inputs() && "port must be within range");
 
+  // if a component receives an unpermitted invalidation
   if (!value && !this->permissive()) {
-    this->alive = this->keep_alive();
+    // it expires when it is not resilient, and:
+    this->alive = this->alive && this->keep_alive();
+    // when it expires, it:
+    if (!this->alive) {
+      // generates invalidations for each output, and:
+      value_set values{};
+      for (auto i = 0; i < this->n_outputs(); i += 1) {
+        values[i] = {};
+      }
+      // propagates them downstream
+      this->unspool_values(values);
+    }
   } else {
     auto search = find_gap(this->incoming, port);
 
