@@ -7,7 +7,9 @@
 namespace hypercomm {
 
 template<typename T>
-class mailbox: public virtual component {
+class mailbox: public virtual component,
+               public virtual value_source,
+               public std::enable_shared_from_this<mailbox<T>> {
  public:
   using predicate_type = std::shared_ptr<immediate_action<bool(const T&)>>;
   using request_type = std::pair<predicate_type, callback_ptr>;
@@ -34,15 +36,21 @@ public:
     }
   }
 
+  virtual void take_back(value_type&& value) override {
+    this->receive_value(0, std::move(value));
+  }
+
   virtual value_set action(value_set&& accepted) override {
     auto value = value2typed<T>(std::move(accepted[0]));
     auto search = this->find_matching(value);
+    value->source = this->shared_from_this();
 
     if (search == std::end(this->requests_)) {
       QdCreate(1);
       this->buffer_.emplace_back(std::move(value));
     } else {
       search->second->send(std::move(value));
+      this->requests_.erase(search);
     }
 
     return {};
@@ -54,7 +62,7 @@ public:
   inline buffer_iterator find_in_buffer(const predicate_type& pred) {
     buffer_iterator search = std::begin(this->buffer_);
     for (; search != std::end(this->buffer_); search++) {
-      if (pred->action((*search)->value())) {
+      if (!pred || pred->action((*search)->value())) {
         break;
       }
     }
@@ -67,7 +75,7 @@ public:
     const auto& value = _1->value();
     request_iterator search = std::begin(this->requests_);
     for (; search != std::end(this->requests_); search++) {
-      if (search->first->action(value)) {
+      if (!search->first || search->first->action(value)) {
         break;
       }
     }
