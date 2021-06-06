@@ -22,12 +22,11 @@ struct sentinel: public component::status_listener,
   }
 
   virtual void on_invalidation(const component&) override {
-
+    // TODO implement this
   }
 
   void suspend(void) {
     if (this->n_expected_ > 0) {
-      CkPrintf("suspending while expecting %lu values\n", this->n_expected_);
       this->sleeper_ = CthSelf();
       CthSuspend();
     }
@@ -35,7 +34,7 @@ struct sentinel: public component::status_listener,
 
  private:
   template<typename T>
-  void helper(const T& t) {
+  inline void helper(const T& t) {
     this->n_expected_ += 1;
 
     t->add_listener(this->shared_from_this());
@@ -47,6 +46,8 @@ struct sentinel: public component::status_listener,
     using dummy = int[];
     (void)dummy { 0, (helper(ts), 0)... };
   }
+
+  // TODO add expect any
 };
 
 }

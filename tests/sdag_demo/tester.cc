@@ -15,9 +15,6 @@ void enroll_polymorphs(void) {
 
   if (CkMyRank() == 0) {
     hypercomm::enroll<persistent_port>();
-    hypercomm::enroll<reduction_port<int>>();
-    hypercomm::enroll<broadcaster<int>>();
-    hypercomm::enroll<generic_section<int>>();
   }
 }
 
@@ -96,7 +93,10 @@ struct locality : public vil<CBase_locality, int> {
     auto rightIdx = (mine + 1) % this->n;
     auto right = make_proxy(thisProxy[conv2idx<CkArrayIndex>(rightIdx)]);
 
-    CkPrintf("vil%d> splitting %d values between %d and %d.\n", mine, numIters, leftIdx, rightIdx);
+#if CMK_VERBOSE
+    CkPrintf("vil%d> splitting %d values between %d and %d.\n", mine, numIters,
+             leftIdx, rightIdx);
+#endif
 
     for (auto i = 0; i < numIters; i += 1) {
       // foo foo bar bar ... foo foo bar bar ...
@@ -116,8 +116,8 @@ struct locality : public vil<CBase_locality, int> {
       const auto& mbox = (i % 2 == 0) ? this->foo_mailbox : this->bar_mailbox;
       auto com = this->emplace_component<test_component>(1);
 
-      mbox->put_request({},
-        std::make_shared<connector>(this, std::make_pair(com->id, 0)));
+      mbox->put_request(
+          {}, std::make_shared<connector>(this, std::make_pair(com->id, 0)));
 
       senti->expect_all(com);
 
