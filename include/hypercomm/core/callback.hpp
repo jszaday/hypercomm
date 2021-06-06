@@ -6,8 +6,6 @@
 namespace hypercomm {
 namespace core {
 
-using value_ptr = std::shared_ptr<hyper_value>;
-
 template<bool MultiMsg, bool Returns>
 struct action : virtual public polymorph {
   using value_type = value_ptr;

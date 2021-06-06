@@ -93,6 +93,28 @@ void component::update_destination(const port_type& port,
   }
 }
 
+// when a component expires, it:
+void component::on_invalidation(void) {
+  // dumps its values:
+  for (auto& set : this->incoming) {
+    for (auto& pair : set) {
+      auto& source = pair.second->source;
+      if (source) {
+        source->take_back(std::move(pair.second));
+      }
+    }
+  }
+  // then generates invalidations for each output
+  value_set values{};
+  for (auto i = 0; i < this->n_outputs(); i += 1) {
+    values[i] = {};
+  }
+  // then propagates them downstream, and:
+  this->unspool_values(values);
+  // notifies its listeners
+  this->notify_listeners<true>();
+}
+
 void component::receive_value(const port_type& port, value_type&& value) {
   CkAssert(port < this->n_inputs() && "port must be within range");
 
@@ -100,18 +122,8 @@ void component::receive_value(const port_type& port, value_type&& value) {
   if (!value && !this->permissive()) {
     // it expires when it is not resilient, and:
     this->alive = this->alive && this->keep_alive();
-    // when it expires, it:
-    if (!this->alive) {
-      // generates invalidations for each output, and:
-      value_set values{};
-      for (auto i = 0; i < this->n_outputs(); i += 1) {
-        values[i] = {};
-      }
-      // propagates them downstream, and:
-      this->unspool_values(values);
-      // notifies its listeners
-      this->notify_listeners<true>();
-    }
+    // if it expires, it goes through a routine:
+    if (!this->alive) this->on_invalidation();
   } else {
     auto search = find_gap(this->incoming, port);
 

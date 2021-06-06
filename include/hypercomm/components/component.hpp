@@ -9,7 +9,7 @@ namespace hypercomm {
 class component : virtual public impermanent {
  public:
   using id_t = component_id_t;
-  using value_type = core::value_ptr;
+  using value_type = value_ptr;
   using port_type = components::port_id_t;
   using value_set = std::map<port_type, value_type>;
   using incoming_type = std::deque<value_set>;
@@ -102,6 +102,8 @@ class component : virtual public impermanent {
 
  private:
   void stage_action(incoming_type::reverse_iterator*);
+
+  void on_invalidation(void);
 
   void unspool_values(value_set&);
 };

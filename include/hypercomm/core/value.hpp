@@ -5,13 +5,26 @@
 
 namespace hypercomm {
 
+class hyper_value;
+
+class value_source {
+ public:
+  virtual void take_back(std::shared_ptr<hyper_value>&&) = 0;
+};
+
 class hyper_value {
  public:
   using message_type = CkMessage*;
+  using source_type = std::shared_ptr<value_source>;
+
+  source_type source;
+
   virtual ~hyper_value() = default;
   virtual bool recastable(void) const = 0;
   virtual message_type release(void) = 0;
 };
+
+using value_ptr = std::shared_ptr<hyper_value>;
 
 class plain_value : public hyper_value {
  public:
