@@ -9,6 +9,8 @@ namespace hypercomm {
 
 class component : virtual public impermanent {
  public:
+  friend class generic_locality_;
+
   using id_t = component_id_t;
   using value_type = value_ptr;
   using port_type = components::port_id_t;
@@ -24,8 +26,9 @@ class component : virtual public impermanent {
   using listener_ptr = std::shared_ptr<status_listener>;
 
   const id_t id;
+  bool activated;
 
-  component(const id_t& _1) : id(_1) {}
+  component(const id_t& _1) : id(_1), activated(false) {}
 
   // determeines whether the component should stay
   // "alive" after its acted
@@ -78,8 +81,13 @@ class component : virtual public impermanent {
   }
 
   // sends invalidation or completion notifications
-  template<bool Invalidation>
+  template <bool Invalidation>
   inline void notify_listeners(void) {
+#if CMK_VERBOSE
+    CkPrintf("com%lu> notifying %lu listener(s) of status change to %s.\n",
+             this->id, this->listeners_.size(),
+             Invalidation ? "invalid" : "complete");
+#endif
     for (const auto& l : this->listeners_) {
       if (Invalidation) {
         l->on_invalidation(*this);

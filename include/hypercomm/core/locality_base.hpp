@@ -11,6 +11,7 @@
 #include "../core/forwarding_callback.hpp"
 
 #include "future.hpp"
+#include "generic_locality.hpp"
 
 namespace hypercomm {
 
@@ -21,9 +22,6 @@ using element_ptr = std::shared_ptr<hypercomm::element_proxy<Index>>;
 
 template <typename Index>
 using collective_ptr = std::shared_ptr<hypercomm::collective_proxy<Index>>;
-
-using component_port_t = std::pair<component_id_t, components::port_id_t>;
-using component_map_t = std::unordered_map<component_id_t, component_ptr>;
 
 template <typename Key>
 using message_queue_t = comparable_map<Key, std::deque<component::value_type>>;
@@ -37,27 +35,9 @@ struct common_functions_ {
   virtual const Index& __index_max__(void) const = 0;
 };
 
-// TODO elevate this functionality to a more general purpose callback
-//      ensure that the reference counting on the callback port is elided when
-//      !kCallback
-struct destination_ {
-  enum type_ : uint8_t { kInvalid, kCallback, kComponentPort };
-
-  type_ type;
-  callback_ptr cb;
-  component_port_t port;
-
-  destination_(const component_port_t& _1) : type(kComponentPort), port(_1) {}
-  destination_(const callback_ptr& _2) : type(kCallback), cb(_2) {}
-};
-
-using entry_port_map_t = comparable_map<entry_port_ptr, destination_>;
-
 template <typename Index>
-struct locality_base : public virtual common_functions_<CkArrayIndex> {
+struct locality_base : public generic_locality_, public virtual common_functions_<CkArrayIndex> {
   message_queue_t<entry_port_ptr> port_queue;
-  entry_port_map_t entry_ports;
-  component_map_t components;
 
   future_id_t future_authority = 0;
   component_id_t component_authority = 0;
@@ -106,7 +86,7 @@ struct locality_base : public virtual common_functions_<CkArrayIndex> {
       CkAssert(search->first && search->first->alive &&
                "entry port must be alive");
       this->try_send(search->second, std::move(value));
-      this->try_collect(search);
+      // this->try_collect(search);
     }
   }
 
@@ -147,18 +127,20 @@ struct locality_base : public virtual common_functions_<CkArrayIndex> {
 
   inline void connect(const entry_port_ptr& srcPort, const component_ptr& dst,
                       const components::port_id_t& dstPort) {
+    dst->add_listener(srcPort);
+
     this->open(srcPort, std::make_pair(dst->id, dstPort));
   }
 
   using entry_port_iterator = typename decltype(entry_ports)::iterator;
 
-  void try_collect(entry_port_iterator& it) {
-    const auto& port = it->first;
-    port->alive = port->keep_alive();
-    if (!port->alive) {
-      this->entry_ports.erase(it);
-    }
-  }
+  // void try_collect(entry_port_iterator& it) {
+  //   const auto& port = it->first;
+  //   port->alive = port->keep_alive();
+  //   if (!port->alive) {
+  //     this->entry_ports.erase(it);
+  //   }
+  // }
 
   void try_collect(const component_id_t& which) {
     this->try_collect(this->components[which]);
@@ -219,7 +201,7 @@ struct locality_base : public virtual common_functions_<CkArrayIndex> {
       while (entry_port->alive && !buffer.empty()) {
         auto& msg = buffer.front();
         this->try_send(it->second, std::move(msg));
-        this->try_collect(it);
+        // this->try_collect(it);
         buffer.pop_front();
         QdProcess(1);
       }

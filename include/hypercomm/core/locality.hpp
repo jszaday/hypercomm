@@ -46,6 +46,7 @@ class vil : public Base, public locality_base<Index> {
 public:
   // NOTE ( this is a mechanism for remote task invocation )
   virtual void execute(CkMessage *msg) override {
+    this->update_context();
     typename locality_base<Index>::action_type action{};
     hypercomm::unpack(msg, action);
     this->receive_action(action);
@@ -55,6 +56,7 @@ public:
    *        to the appropriate entry port )
    */
   virtual void demux(hypercomm_msg *_1) override {
+    this->update_context();
     auto msg = _1->is_null() ? std::shared_ptr<hyper_value>(
                                    nullptr, [_1](void *) { CkFreeMsg(_1); })
                              : msg2value(_1);

@@ -8,7 +8,7 @@ bool component::keep_alive(void) const { return false; }
 bool component::permissive(void) const { return false; }
 
 bool component::collectible(void) const {
-  return !this->alive &&
+  return this->activated && !this->alive &&
          std::all_of(
              std::begin(this->outgoing), std::end(this->outgoing),
              [](const typename decltype(this->outgoing)::value_type& value) {
@@ -30,7 +30,7 @@ inline incoming_type::reverse_iterator find_ready(incoming_type& incoming,
 }
 
 void component::activate(void) {
-  this->alive = true;
+  this->activated = this->alive = true;
   auto n_expt = this->n_expected();
   if (n_expt == 0) {
     this->stage_action(nullptr);
