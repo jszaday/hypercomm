@@ -54,7 +54,7 @@ struct generic_locality_ {
 };
 
 namespace {
-CtvDeclare(generic_locality_*, locality_);
+CtvStaticDeclare(generic_locality_*, locality_);
 }
 
 inline void generic_locality_::update_context(void) {
