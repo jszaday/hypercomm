@@ -27,6 +27,8 @@ struct generic_locality_ {
   entry_port_map entry_ports;
   component_map components;
 
+  generic_locality_(void) { this->update_context(); }
+
   inline void invalidate_port(entry_port& port) {
     port.alive = port.alive && port.keep_alive();
     if (!port.alive) {
