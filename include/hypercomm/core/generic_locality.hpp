@@ -75,11 +75,11 @@ inline generic_locality_* access_context(void) {
   return locality;
 }
 
-inline void locally_invalidate_(entry_port& which) {
+void locally_invalidate_(entry_port& which) {
   access_context()->invalidate_port(which);
 }
 
-inline void locally_invalidate_(const component::id_t& which) {
+void locally_invalidate_(const component::id_t& which) {
   access_context()->invalidate_component(which);
 }
 

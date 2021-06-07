@@ -5,8 +5,10 @@
 
 namespace hypercomm {
 
-inline void locally_invalidate_(const component::id_t&);
+extern void locally_invalidate_(const component::id_t&);
 
+// NOTE this could be made into a component if it makes sense to
+//      do so, but it doesn't really have i/o so i'm hesitant
 class sentinel : public component::status_listener,
                  public std::enable_shared_from_this<sentinel> {
  public:
@@ -14,10 +16,14 @@ class sentinel : public component::status_listener,
 
  private:
   std::map<component::id_t, group_type> groups_;
+  CthThread sleeper_ = nullptr;
   std::size_t n_expected_ = 0;
-  CthThread sleeper_;
+  component::id_t id_;
 
  public:
+
+  sentinel(const component::id_t& _1) : id_(_1) {}
+
   virtual void on_completion(const component& com) override {
     const auto& id = com.id;
     auto search = this->groups_.find(id);

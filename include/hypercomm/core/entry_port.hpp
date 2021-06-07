@@ -7,7 +7,7 @@ namespace hypercomm {
 
 struct entry_port;
 
-inline void locally_invalidate_(entry_port&);
+extern void locally_invalidate_(entry_port&);
 
 struct entry_port : public virtual polymorph,
                     public virtual comparable,

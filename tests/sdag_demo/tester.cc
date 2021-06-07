@@ -26,6 +26,7 @@ struct main : public CBase_main {
   main(CkArgMsg* m)
       : numIters((m->argc <= 1) ? 4 : atoi(m->argv[1])),
         numReps(numIters / 2 + 1) {
+    numIters = (numIters % 2) ? numIters - 1 : numIters;
     if (numReps > kMaxReps) numReps = kMaxReps;
     auto n = kDecompFactor * CkNumPes();
 
@@ -63,29 +64,37 @@ struct main : public CBase_main {
 };
 
 struct locality : public vil<CBase_locality, int> {
-  entry_port_ptr foo_port, bar_port;
-  std::shared_ptr<mailbox<int>> foo_mailbox, bar_mailbox;
-  int n;
+  entry_port_ptr foo_port, bar_port, baz_port;
+  std::shared_ptr<mailbox<int>> foo_mailbox, bar_mailbox, baz_mailbox;
+  int n, repNo;
   section_ptr section;
 
   locality(int _1)
       : n(_1),
+        repNo(0),
         foo_port(std::make_shared<persistent_port>(0)),
-        bar_port(std::make_shared<persistent_port>(1)) {
+        bar_port(std::make_shared<persistent_port>(1)),
+        baz_port(std::make_shared<persistent_port>(2)) {
     this->foo_mailbox = std::dynamic_pointer_cast<mailbox<int>>(
         this->emplace_component<mailbox<int>>());
     this->bar_mailbox = std::dynamic_pointer_cast<mailbox<int>>(
         this->emplace_component<mailbox<int>>());
+    this->baz_mailbox = std::dynamic_pointer_cast<mailbox<int>>(
+        this->emplace_component<mailbox<int>>());
 
     this->connect(this->foo_port, this->foo_mailbox, 0);
     this->connect(this->bar_port, this->bar_mailbox, 0);
+    this->connect(this->baz_port, this->baz_mailbox, 0);
 
     this->activate_component(this->foo_mailbox);
     this->activate_component(this->bar_mailbox);
+    this->activate_component(this->baz_mailbox);
   }
 
   void run(const int& numIters) {
     const auto& mine = this->__index__();
+
+    this->update_context();
 
     auto leftIdx = (mine + this->n - 1) % this->n;
     auto left = make_proxy(thisProxy[conv2idx<CkArrayIndex>(leftIdx)]);
@@ -94,11 +103,11 @@ struct locality : public vil<CBase_locality, int> {
     auto right = make_proxy(thisProxy[conv2idx<CkArrayIndex>(rightIdx)]);
 
 #if CMK_VERBOSE
-    CkPrintf("vil%d> splitting %d values between %d and %d.\n", mine, numIters,
-             leftIdx, rightIdx);
+    CkPrintf("vil%d> splitting %d values between %d and %d.\n", mine,
+             numIters * 2, leftIdx, rightIdx);
 #endif
 
-    for (auto i = 0; i < numIters; i += 1) {
+    for (auto i = 0; i < (numIters * 2); i += 1) {
       // foo foo bar bar ... foo foo bar bar ...
       const auto& port = ((i % 4) >= 2) ? this->bar_port : this->foo_port;
       // if even send to left, else right
@@ -111,17 +120,41 @@ struct locality : public vil<CBase_locality, int> {
       }
     }
 
-    auto senti = std::make_shared<sentinel>();
+    /* This implements SDAG-like logic along the following lines:
+     *
+     *  forall [i] (0:(numIters - 1),1) {
+     *    case {
+     *      when baz(...) { ... }            // com0
+     *      when foo(...), bar(...) { ... }  // com1
+     *    }
+     *  }
+     * 
+     * NOTE: This demo only sends messages to foo and bar; this
+     *       means the baz path is never taken and invalidated
+     *       when foo and bar are received.
+     */
+
+    this->repNo += 1;
+    auto senti = std::make_shared<sentinel>((component::id_t)this->repNo);
     for (auto i = 0; i < numIters; i += 1) {
-      const auto& mbox = (i % 2 == 0) ? this->foo_mailbox : this->bar_mailbox;
-      auto com = this->emplace_component<test_component>(1);
+      auto com0 = this->emplace_component<test_component>(1);
+      auto com1 = this->emplace_component<test_component>(2);
 
-      mbox->put_request(
-          {}, std::make_shared<connector>(this, std::make_pair(com->id, 0)));
+      // there is no pattern-matching, so the predicate is null ({})
+      this->foo_mailbox->put_request(
+          {}, std::make_shared<connector>(this, std::make_pair(com1->id, 0)));
+      
+      this->bar_mailbox->put_request(
+          {}, std::make_shared<connector>(this, std::make_pair(com1->id, 1)));
 
-      senti->expect_all(com);
+      this->baz_mailbox->put_request(
+          {}, std::make_shared<connector>(this, std::make_pair(com0->id, 0)));
 
-      this->activate_component(com);
+      // the sentinel requires only one of com0 or com1 to pass
+      senti->expect_any(com0, com1);
+
+      this->activate_component(com1);
+      this->activate_component(com0);
     }
     senti->suspend();
   }
