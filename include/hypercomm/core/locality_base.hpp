@@ -86,7 +86,7 @@ struct locality_base : public generic_locality_, public virtual common_functions
       CkAssert(search->first && search->first->alive &&
                "entry port must be alive");
       this->try_send(search->second, std::move(value));
-      this->try_collect(search);
+      // this->try_collect(search);
     }
   }
 
@@ -127,18 +127,20 @@ struct locality_base : public generic_locality_, public virtual common_functions
 
   inline void connect(const entry_port_ptr& srcPort, const component_ptr& dst,
                       const components::port_id_t& dstPort) {
+    dst->add_listener(srcPort);
+
     this->open(srcPort, std::make_pair(dst->id, dstPort));
   }
 
   using entry_port_iterator = typename decltype(entry_ports)::iterator;
 
-  void try_collect(entry_port_iterator& it) {
-    const auto& port = it->first;
-    port->alive = port->keep_alive();
-    if (!port->alive) {
-      this->entry_ports.erase(it);
-    }
-  }
+  // void try_collect(entry_port_iterator& it) {
+  //   const auto& port = it->first;
+  //   port->alive = port->keep_alive();
+  //   if (!port->alive) {
+  //     this->entry_ports.erase(it);
+  //   }
+  // }
 
   void try_collect(const component_id_t& which) {
     this->try_collect(this->components[which]);
@@ -199,7 +201,7 @@ struct locality_base : public generic_locality_, public virtual common_functions
       while (entry_port->alive && !buffer.empty()) {
         auto& msg = buffer.front();
         this->try_send(it->second, std::move(msg));
-        this->try_collect(it);
+        // this->try_collect(it);
         buffer.pop_front();
         QdProcess(1);
       }

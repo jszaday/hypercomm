@@ -23,14 +23,6 @@ struct destination_ {
 using entry_port_map = comparable_map<entry_port_ptr, destination_>;
 using component_map = std::unordered_map<component::id_t, component_ptr>;
 
-//  {
-//     access_context()->invalidate_port(*this);
-//   }
-
-//   virtual void on_invalidation(const component&) override {
-//     access_context()->invalidate_port(*this);
-//   }
-
 struct generic_locality_ {
   entry_port_map entry_ports;
   component_map components;
@@ -70,6 +62,11 @@ inline generic_locality_* access_context(void) {
   CkAssert(locality && "locality must be valid");
   return locality;
 }
+
+inline void locally_invalidate_(entry_port& which) {
+  access_context()->invalidate_port(which);
+}
+
 }
 
 #endif
