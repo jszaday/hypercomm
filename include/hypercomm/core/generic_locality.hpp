@@ -42,6 +42,16 @@ struct generic_locality_ {
     }
   }
 
+  // forces termination of component, regardless of resilience
+  inline void invalidate_component(const component::id_t& id) {
+    auto search = this->components.find(id);
+    if (search != std::end(this->components)) {
+      search->second->alive = false;
+      search->second->on_invalidation();
+      this->components.erase(search);
+    }
+  }
+
   inline void update_context(void);
 };
 
@@ -65,6 +75,10 @@ inline generic_locality_* access_context(void) {
 
 inline void locally_invalidate_(entry_port& which) {
   access_context()->invalidate_port(which);
+}
+
+inline void locally_invalidate_(const component::id_t& which) {
+  access_context()->invalidate_component(which);
 }
 
 }

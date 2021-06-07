@@ -9,6 +9,8 @@ namespace hypercomm {
 
 class component : virtual public impermanent {
  public:
+  friend class generic_locality_;
+
   using id_t = component_id_t;
   using value_type = value_ptr;
   using port_type = components::port_id_t;
