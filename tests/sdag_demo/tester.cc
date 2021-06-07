@@ -107,15 +107,15 @@ struct locality : public vil<CBase_locality, int> {
              numIters * 2, leftIdx, rightIdx);
 #endif
 
-    for (auto i = 0; i < (numIters * 2); i += 1) {
-      // foo foo bar bar ... foo foo bar bar ...
-      const auto& port = ((i % 4) >= 2) ? this->bar_port : this->foo_port;
-      // if even send to left, else right
+    for (auto i = 0; i < numIters; i += 1) {
       if (i % 2 == 0) {
-        send2port<CkArrayIndex>(left, port,
+        send2port<CkArrayIndex>(left, this->foo_port,
+                                std::make_shared<typed_value<int>>(mine));
+
+        send2port<CkArrayIndex>(left, this->bar_port,
                                 std::make_shared<typed_value<int>>(mine));
       } else {
-        send2port<CkArrayIndex>(right, port,
+        send2port<CkArrayIndex>(left, this->baz_port,
                                 std::make_shared<typed_value<int>>(mine));
       }
     }
@@ -129,9 +129,6 @@ struct locality : public vil<CBase_locality, int> {
      *    }
      *  }
      * 
-     * NOTE: This demo only sends messages to foo and bar; this
-     *       means the baz path is never taken and invalidated
-     *       when foo and bar are received.
      */
 
     this->repNo += 1;
@@ -141,14 +138,9 @@ struct locality : public vil<CBase_locality, int> {
       auto com1 = this->emplace_component<test_component>(2);
 
       // there is no pattern-matching, so the predicate is null ({})
-      this->foo_mailbox->put_request(
-          {}, std::make_shared<connector>(this, std::make_pair(com1->id, 0)));
-      
-      this->bar_mailbox->put_request(
-          {}, std::make_shared<connector>(this, std::make_pair(com1->id, 1)));
-
-      this->baz_mailbox->put_request(
-          {}, std::make_shared<connector>(this, std::make_pair(com0->id, 0)));
+      this->foo_mailbox->put_request_to({}, com1, 0);
+      this->bar_mailbox->put_request_to({}, com1, 1);
+      this->baz_mailbox->put_request_to({}, com0, 0);
 
       // the sentinel requires only one of com0 or com1 to pass
       senti->expect_any(com0, com1);

@@ -4,7 +4,8 @@
 #include "entry_port.hpp"
 
 namespace hypercomm {
-using component_port_t = std::pair<component::id_t, components::port_id_t>;
+
+using component_port_t = std::pair<component::id_t, component::port_type>;
 
 // TODO elevate this functionality to a more general purpose callback
 //      ensure that the reference counting on the callback port is elided when
@@ -55,7 +56,30 @@ struct generic_locality_ {
   }
 
   inline void update_context(void);
+
+  inline callback_ptr make_connector(const component_ptr& com, const component::port_type& port);
+
+  virtual void try_send(const component_port_t&, component::value_type&&) = 0;
 };
+
+// TODO this is a temporary solution
+struct connector_ : public callback {
+  generic_locality_* self;
+  const component_port_t dst;
+
+  connector_(generic_locality_* _1, const component_port_t& _2)
+      : self(_1), dst(_2) {}
+
+  virtual return_type send(argument_type&& value) override {
+    self->try_send(dst, std::move(value));
+  }
+
+  virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }
+};
+
+inline callback_ptr generic_locality_::make_connector(const component_ptr& com, const component::port_type& port) {
+  return std::make_shared<connector_>(this, std::make_pair(com->id, port));
+}
 
 namespace {
 CpvDeclare(generic_locality_*, locality_);
@@ -81,6 +105,10 @@ void locally_invalidate_(entry_port& which) {
 
 void locally_invalidate_(const component::id_t& which) {
   access_context()->invalidate_component(which);
+}
+
+callback_ptr local_connector_(const component_ptr& com, const component::port_type& port) {
+  return access_context()->make_connector(com, port);
 }
 
 }

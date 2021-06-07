@@ -90,21 +90,6 @@ struct locality_base : public generic_locality_, public virtual common_functions
     }
   }
 
-  // TODO this is a temporary solution
-  struct connector : public callback {
-    locality_base<Index>* self;
-    const component_port_t dst;
-
-    connector(locality_base<Index>* _1, const component_port_t& _2)
-        : self(_1), dst(_2) {}
-
-    virtual return_type send(argument_type&& value) override {
-      self->try_send(dst, std::move(value));
-    }
-
-    virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }
-  };
-
   /* TODO consider introducing a simplified connection API that
    *      utilizes "port authorities", aka port id counters, to
    *      remove src/dstPort for trivial, unordered connections
@@ -114,9 +99,7 @@ struct locality_base : public generic_locality_, public virtual common_functions
                       const components::port_id_t& srcPort,
                       const component_ptr& dst,
                       const components::port_id_t& dstPort) {
-    auto conn =
-        std::make_shared<connector>(this, std::make_pair(dst->id, dstPort));
-    src->update_destination(srcPort, conn);
+    src->update_destination(srcPort, this->make_connector(dst, dstPort));
   }
 
   inline void connect(const component_ptr& src,
@@ -176,7 +159,7 @@ struct locality_base : public generic_locality_, public virtual common_functions
     }
   }
 
-  void try_send(const component_port_t& port, component::value_type&& value) {
+  virtual void try_send(const component_port_t& port, component::value_type&& value) override {
     auto search = components.find(port.first);
 #if CMK_ERROR_CHECKING
     if (search == std::end(components)) {
