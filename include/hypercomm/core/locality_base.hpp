@@ -1,14 +1,16 @@
 #ifndef __HYPERCOMM_CORE_LOCALITY_BASE_HPP__
 #define __HYPERCOMM_CORE_LOCALITY_BASE_HPP__
 
-#include "future.hpp"
-
 #include "../sections.hpp"
 #include "../components.hpp"
 #include "../reductions.hpp"
 #include "../utilities.hpp"
 
 #include "../messaging/messaging.hpp"
+
+#include "../core/forwarding_callback.hpp"
+
+#include "future.hpp"
 
 namespace hypercomm {
 

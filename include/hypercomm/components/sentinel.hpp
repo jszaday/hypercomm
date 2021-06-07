@@ -5,15 +5,32 @@
 
 namespace hypercomm {
 
-struct sentinel: public component::status_listener,
+class sentinel: public component::status_listener,
                  public std::enable_shared_from_this<sentinel> {
 
+ public:
+  using group_type = std::shared_ptr<std::vector<component::id_t>>;
+
  private:
+  std::map<component::id_t, group_type> groups_;
   std::size_t n_expected_ = 0;
   CthThread sleeper_;
 
  public:
-  virtual void on_completion(const component&) override {
+  virtual void on_completion(const component& com) override {
+    const auto& id = com.id;
+    auto search = this->groups_.find(id);
+    if (search != std::end(this->groups_)) {
+      auto& group = *(search->second);
+      for (const auto& peer : group) {
+        if (peer != id) {
+          // TODO force invalidation
+        }
+      }
+
+      this->groups_.erase(id);
+    }
+
     this->n_expected_ -= 1;
 
     if (this->n_expected_ == 0 && this->sleeper_) {
@@ -21,8 +38,18 @@ struct sentinel: public component::status_listener,
     }
   }
 
-  virtual void on_invalidation(const component&) override {
-    // TODO implement this
+  virtual void on_invalidation(const component& com) override {
+    const auto& id = com.id;
+    auto search = this->groups_.find(id);
+    if (search == std::end(this->groups_)) {
+      // TODO enable on_failure?
+      CkAbort("unexpected invalidation of dependent");
+    } else {
+      auto& group = *(search->second);
+      auto within = std::find(std::begin(group), std::end(group), id);
+      group.erase(within);
+      this->groups_.erase(search);
+    }
   }
 
   void suspend(void) {

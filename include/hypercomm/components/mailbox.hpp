@@ -1,8 +1,9 @@
 #ifndef __HYPERCOMM_COMPONENTS_MAILBOX_HPP__
 #define __HYPERCOMM_COMPONENTS_MAILBOX_HPP__
 
+#include "../core/typed_value.hpp"
+
 #include "component.hpp"
-#include "../core/immediate.hpp"
 
 namespace hypercomm {
 

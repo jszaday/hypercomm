@@ -7,6 +7,7 @@
 namespace hypercomm {
 
 using component_id_t = std::uint64_t;
+using reduction_id_t = component_id_t;
 
 namespace components {
 using port_id_t = std::uint64_t;

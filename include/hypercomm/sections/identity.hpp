@@ -1,7 +1,7 @@
 #ifndef __HYPERCOMM_SECTIONS_IDENTITY_HPP__
 #define __HYPERCOMM_SECTIONS_IDENTITY_HPP__
 
-#include "../reductions/reducer.hpp"
+#include "../components/identifiers.hpp"
 
 namespace hypercomm {
 

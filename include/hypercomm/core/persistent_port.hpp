@@ -2,7 +2,6 @@
 #define __HYPERCOMM_PERSISTENT_PORT_HPP__
 
 #include "entry_port.hpp"
-#include "../components.hpp"
 
 namespace hypercomm {
 struct persistent_port : public virtual entry_port {

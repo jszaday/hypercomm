@@ -2,8 +2,9 @@
 #ifndef __HYPERCOMM_REDUCTIONS_REDN_PORT_HPP__
 #define __HYPERCOMM_REDUCTIONS_REDN_PORT_HPP__
 
-#include "reducer.hpp"
 #include "../core/entry_port.hpp"
+#include "../components/identifiers.hpp"
+#include "../serialization/pup.hpp"
 
 namespace hypercomm {
 

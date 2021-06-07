@@ -1,9 +1,6 @@
 #ifndef __HYPERCOMM_CORE_IMMEDIATE_HPP__
 #define __HYPERCOMM_CORE_IMMEDIATE_HPP__
 
-#include "../serialization/pup.hpp"
-#include "../messaging/messaging.hpp"
-#include "../utilities.hpp"
 #include "callback.hpp"
 
 namespace hypercomm {

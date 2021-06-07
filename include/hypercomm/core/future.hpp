@@ -1,13 +1,17 @@
 #ifndef __HYPERCOMM_CORE_FUTURE_HPP__
 #define __HYPERCOMM_CORE_FUTURE_HPP__
 
-#include "../core.hpp"
+#include "../core/math.hpp"
+#include "../core/proxy.hpp"
+#include "../core/entry_port.hpp"
+
+#include "../serialization/pup.hpp"
 
 namespace hypercomm {
 using future_id_t = std::uint32_t;
 
 struct future {
-  std::shared_ptr<hypercomm::proxy> source;
+  std::shared_ptr<proxy> source;
   future_id_t id;
 
   inline std::string to_string(void) const {

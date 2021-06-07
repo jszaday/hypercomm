@@ -5,6 +5,8 @@
 #include <vector>
 #include <algorithm>
 
+#include "../core/comparable.hpp"
+
 namespace hypercomm {
 
 template <typename Ordinal, typename Index>
