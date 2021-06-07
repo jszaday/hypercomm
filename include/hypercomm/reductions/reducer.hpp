@@ -1,12 +1,11 @@
 #ifndef __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 #define __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 
-#include "../core.hpp"
+#include "../core/callback.hpp"
 #include "../components.hpp"
+#include "../serialization/pup.hpp"
 
 namespace hypercomm {
-
-using reduction_id_t = component_id_t;
 
 struct reducer : public hypercomm::component {
   hypercomm::combiner_ptr combiner;

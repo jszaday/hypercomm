@@ -1,8 +1,9 @@
 #ifndef __HYPERCOMM_COMPONENTS_COMPONENT_HPP__
 #define __HYPERCOMM_COMPONENTS_COMPONENT_HPP__
 
-#include "identifiers.hpp"
 #include "../core.hpp"
+
+#include "identifiers.hpp"
 
 namespace hypercomm {
 
