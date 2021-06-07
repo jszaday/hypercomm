@@ -133,11 +133,15 @@ struct locality : public vil<CBase_locality, int> {
 
     this->repNo += 1;
     auto senti = std::make_shared<sentinel>((component::id_t)this->repNo);
+
     for (auto i = 0; i < numIters; i += 1) {
+      // the constructor argument represents the nbr of inputs
       auto com0 = this->emplace_component<test_component>(1);
       auto com1 = this->emplace_component<test_component>(2);
 
-      // there is no pattern-matching, so the predicate is null ({})
+      // no pattern-matching is necessary, so the predicate is
+      // null. additionally, each of these connect to a port
+      // of a component (usually formatted as, e.g., com1:0)
       this->foo_mailbox->put_request_to({}, com1, 0);
       this->bar_mailbox->put_request_to({}, com1, 1);
       this->baz_mailbox->put_request_to({}, com0, 0);
@@ -148,6 +152,8 @@ struct locality : public vil<CBase_locality, int> {
       this->activate_component(com1);
       this->activate_component(com0);
     }
+
+    // this forms the implicit barrier at the end of the forall
     senti->suspend();
   }
 };
