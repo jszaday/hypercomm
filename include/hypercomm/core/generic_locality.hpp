@@ -54,19 +54,19 @@ struct generic_locality_ {
 };
 
 namespace {
-CtvStaticDeclare(generic_locality_*, locality_);
+CpvDeclare(generic_locality_*, locality_);
 }
 
 inline void generic_locality_::update_context(void) {
-  if (!CtvInitialized(locality_)) {
-    CtvInitialize(generic_locality_*, locality_);
+  if (!CpvInitialized(locality_)) {
+    CpvInitialize(generic_locality_*, locality_);
   }
 
-  CtvAccess(locality_) = this;
+  CpvAccess(locality_) = this;
 }
 
 inline generic_locality_* access_context(void) {
-  auto& locality = *(&CtvAccess(locality_));
+  auto& locality = *(&CpvAccess(locality_));
   CkAssert(locality && "locality must be valid");
   return locality;
 }
