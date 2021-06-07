@@ -66,7 +66,7 @@ inline void generic_locality_::update_context(void) {
 }
 
 inline generic_locality_* access_context(void) {
-  auto& locality = CtvAccess(locality_);
+  auto& locality = *(&CtvAccess(locality_));
   CkAssert(locality && "locality must be valid");
   return locality;
 }
