@@ -5,12 +5,6 @@
 #include <ctime>
 #include <cstdlib>
 
-#ifndef DECOMP_FACTOR
-#define DECOMP_FACTOR 4
-#endif
-
-constexpr auto kDecompFactor = DECOMP_FACTOR;
-
 using value_type = float;
 
 void enroll_polymorphs(void) {
@@ -21,25 +15,51 @@ void enroll_polymorphs(void) {
   }
 }
 
-// NOTE this mirrors the "secdest" Charm++ benchmark at:
-//      https://github.com/Wingpad/charm-benchmarks/tree/main/secdest
+struct config_type {
+  using chare_type = ChareType;
+
+  chare_type ty;
+
+  int decompFactor;
+  int n;
+};
+
 struct main : public CBase_main {
   main(CkArgMsg* m) {
+    config_type cfg{.ty = TypeGroup, .decompFactor = 0, .n = CkNumPes()};
+
     for (auto i = 1; i < m->argc; i += 1) {
       if (strcmp("-nn", m->argv[i]) == 0) {
-
+        cfg = {.ty = TypeNodeGroup, .decompFactor = 0, .n = CkNumNodes()};
+        break;
       } else if (strcmp("-np", m->argv[i]) == 0) {
-
+        break;
       } else if (strcmp("-nd", m->argv[i]) == 0) {
-
+        cfg = {.ty = TypeArray,
+               .decompFactor = atoi(m->argv[++i]),
+               .n = CkNumPes()};
+        cfg.n *= cfg.decompFactor;
+        break;
       }
     }
 
-    auto n = kDecompFactor * CkNumPes();
-
-    CkPrintf("main> kDecompFactor=%d, kNumPes=%d\n", kDecompFactor, CkNumPes());
-
-    CProxy_locality::ckNew(n, n);
+    switch (cfg.ty) {
+      case config_type::chare_type::TypeGroup:
+        CkPrintf("main> group-like, numPes=%d\n", CkNumPes());
+        make_grouplike<CProxy_locality>(cfg.n);
+        break;
+      case config_type::chare_type::TypeNodeGroup:
+        CkPrintf("main> nodegroup-like, numPes=%d\n", CkNumPes());
+        make_nodegrouplike<CProxy_locality>(cfg.n);
+        break;
+      case config_type::chare_type::TypeArray:
+        CkPrintf("main> array-like, numElements=%d, numPes=%d\n", cfg.n,
+                 CkNumPes());
+        CProxy_locality::ckNew(cfg.n, cfg.n);
+        break;
+      default:
+        CkAbort("error> unexpected chare type!!");
+    }
 
     CkExitAfterQuiescence();
   }
@@ -51,11 +71,13 @@ struct locality : public vil<CBase_locality, int> {
 
   // this implements the Charisma program:
   //
-  // val values = or::placeholder<float, 1>(n); // creates a fixed-size (n) 1d channel
+  // val values = or::placeholder<float, 1>(n); // creates a fixed-size (n) 1d
+  // channel
   // val sums = or::placeholder<float, 1>(n);
   //
   // for (i in 0 to n) {
-  //   values[i] = self@[i].gen_values();  // equivalent to charm++'s thisProxy[i]
+  //   values[i] = self@[i].gen_values();  // equivalent to charm++'s
+  //   thisProxy[i]
   //   print_values(values[i]);
   //   sums[i] = self@[i].add_values(values[i], values[(i + 1) % n]);
   //   print_values(sums[i]);
@@ -105,11 +127,9 @@ typename gen_values<T>::value_set gen_values<T>::action(value_set&&) {
 
   auto copy0 = utilities::copy_message(msg);
   auto copy1 = utilities::copy_message(msg);
-  return {
-    std::make_pair(0, msg2value(msg)),
-    std::make_pair(1, msg2value(copy0)),
-    std::make_pair(2, msg2value(copy1))
-  };
+  return {std::make_pair(0, msg2value(msg)),
+          std::make_pair(1, msg2value(copy0)),
+          std::make_pair(2, msg2value(copy1))};
 }
 
 template <typename T>
@@ -133,13 +153,12 @@ typename add_values<T>::value_set add_values<T>::action(value_set&& accepted) {
     lhs[i] += rhs[i];
   }
 
-  return {
-    std::make_pair(0, lhsMsg)
-  };
+  return {std::make_pair(0, lhsMsg)};
 }
 
 template <typename T>
-typename print_values<T>::value_set print_values<T>::action(value_set&& accepted) {
+typename print_values<T>::value_set print_values<T>::action(
+    value_set&& accepted) {
   const auto& msg = accepted[0];
 
   std::size_t* n;

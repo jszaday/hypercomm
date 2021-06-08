@@ -7,6 +7,7 @@ LIBS = -L$(HYPERCOMM_HOME)/lib -lhypercomm-components -lhypercomm-utilities -lhy
 
 OPTS?=-g -O2
 CMK_NUM_PES?=2
+TESTOPTS?=-nd 4
 
 ifeq ($(DEBUG),1)
 	CATCHSEGV=$(which catchsegv)
