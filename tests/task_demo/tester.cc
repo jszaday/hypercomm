@@ -25,6 +25,16 @@ void enroll_polymorphs(void) {
 //      https://github.com/Wingpad/charm-benchmarks/tree/main/secdest
 struct main : public CBase_main {
   main(CkArgMsg* m) {
+    for (auto i = 1; i < m->argc; i += 1) {
+      if (strcmp("-nn", m->argv[i]) == 0) {
+
+      } else if (strcmp("-np", m->argv[i]) == 0) {
+
+      } else if (strcmp("-nd", m->argv[i]) == 0) {
+
+      }
+    }
+
     auto n = kDecompFactor * CkNumPes();
 
     CkPrintf("main> kDecompFactor=%d, kNumPes=%d\n", kDecompFactor, CkNumPes());
