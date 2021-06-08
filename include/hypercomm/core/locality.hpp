@@ -1,12 +1,11 @@
 #ifndef __HYPERCOMM_CORE_LOCALITY_HPP__
 #define __HYPERCOMM_CORE_LOCALITY_HPP__
 
+#include "../messaging/packing.hpp"
+
 #include "broadcaster.hpp"
 #include "port_opener.hpp"
-
-#include <hypercomm/messaging/packing.hpp>
-
-#include "locality.decl.h"
+#include "locality_map.hpp"
 
 struct locality_base_
     : public CBase_locality_base_,
