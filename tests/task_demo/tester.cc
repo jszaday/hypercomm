@@ -49,7 +49,7 @@ struct main : public CBase_main {
         make_grouplike<CProxy_locality>(cfg.n);
         break;
       case config_type::chare_type::TypeNodeGroup:
-        CkPrintf("main> nodegroup-like, numPes=%d\n", CkNumPes());
+        CkPrintf("main> nodegroup-like, numNodes=%d, numPes=%d\n", CkNumNodes(), CkNumPes());
         make_nodegrouplike<CProxy_locality>(cfg.n);
         break;
       case config_type::chare_type::TypeArray:
@@ -71,13 +71,11 @@ struct locality : public vil<CBase_locality, int> {
 
   // this implements the Charisma program:
   //
-  // val values = or::placeholder<float, 1>(n); // creates a fixed-size (n) 1d
-  // channel
+  // val values = or::placeholder<float, 1>(n); // creates a fixed-size (n) 1d channel
   // val sums = or::placeholder<float, 1>(n);
   //
   // for (i in 0 to n) {
-  //   values[i] = self@[i].gen_values();  // equivalent to charm++'s
-  //   thisProxy[i]
+  //   values[i] = self@[i].gen_values();  // equivalent to charm++'s thisProxy[i]
   //   print_values(values[i]);
   //   sums[i] = self@[i].add_values(values[i], values[(i + 1) % n]);
   //   print_values(sums[i]);
