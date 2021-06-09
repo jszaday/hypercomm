@@ -1,8 +1,10 @@
 #ifndef __HYPERCOMM_UTIL_HPP__
 #define __HYPERCOMM_UTIL_HPP__
 
-#include <charm++.h>
+#include <cmath>
 #include <memory>
+#include <charm++.h>
+#include <type_traits>
 
 namespace hypercomm {
 namespace utilities {
@@ -26,6 +28,23 @@ inline char *get_message_buffer(const std::shared_ptr<CkMessage>& msg) {
 
 }
 
+template < template <typename...> class Template, typename T >
+struct is_specialization_of : std::false_type {};
+
+template < template <typename...> class Template, typename... Args >
+struct is_specialization_of< Template, Template<Args...> > : std::true_type {};
+
+using dimension_type = decltype(CkArrayIndexBase::dimension);
+
+template <class T, typename Enable = void>
+struct dimensionality_of {
+  static constexpr dimension_type value = static_cast<dimension_type>(1);
+};
+
+template <class T>
+struct dimensionality_of<T, typename std::enable_if<is_specialization_of<std::tuple, T>::value>::type> {
+  static constexpr dimension_type value = static_cast<dimension_type>(std::tuple_size<T>::value);
+};
 
 // TODO (offer versions for non-array index)
 template <typename T>
@@ -42,7 +61,13 @@ template <typename Index, typename T>
 inline Index conv2idx(const T& ord) {
   Index idx;
   // TODO (only enable for array index)
-  idx.dimension = 1;
+  idx.nInts = (dimension_type)ceil(sizeof(T) / (float)sizeof(int));
+#if CMK_ERROR_CHECKING
+  if (idx.nInts > CK_ARRAYINDEX_MAXLEN) {
+    CkAbort("max array index size exceeded, please increase CK_ARRAYINDEX_MAXLEN to %d", (int)idx.nInts);
+  }
+#endif
+  idx.dimension = dimensionality_of<T>::value;
   reinterpret_index<T>(idx) = ord;
   return idx;
 }
