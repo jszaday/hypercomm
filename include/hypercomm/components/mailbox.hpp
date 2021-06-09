@@ -10,7 +10,7 @@ namespace hypercomm {
 extern callback_ptr local_connector_(const component_ptr&, const component::port_type&);
 
 template <typename T>
-class mailbox : public virtual component,
+class mailbox : public component,
                 public virtual value_source,
                 public std::enable_shared_from_this<mailbox<T>> {
  public:
