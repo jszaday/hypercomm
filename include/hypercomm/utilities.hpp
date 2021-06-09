@@ -1,6 +1,7 @@
 #ifndef __HYPERCOMM_UTIL_HPP__
 #define __HYPERCOMM_UTIL_HPP__
 
+#include <cmath>
 #include <memory>
 #include <charm++.h>
 #include <type_traits>
@@ -60,7 +61,13 @@ template <typename Index, typename T>
 inline Index conv2idx(const T& ord) {
   Index idx;
   // TODO (only enable for array index)
-  idx.dimension = dimensionality_of<Index>::value;
+  idx.nInts = (dimension_type)ceil(sizeof(T) / (float)sizeof(int));
+#if CMK_ERROR_CHECKING
+  if (idx.nInts > CK_ARRAYINDEX_MAXLEN) {
+    CkAbort("max array index size exceeded, please increase CK_ARRAYINDEX_MAXLEN to %d", (int)idx.nInts);
+  }
+#endif
+  idx.dimension = dimensionality_of<T>::value;
   reinterpret_index<T>(idx) = ord;
   return idx;
 }
