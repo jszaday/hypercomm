@@ -252,9 +252,7 @@ struct locality_base : public generic_locality_, public virtual common_functions
 
       count = 0;
       for (const auto& down : dstream) {
-        impl_index_type down_idx;
-        down_idx.dimension = 1;
-        reinterpret_index<Index>(down_idx) = down;
+        auto down_idx = conv2idx<impl_index_type>(down);
         this->connect(rdcr, count++, std::make_shared<forwarding_callback>(
                                          (*collective)[down_idx], theirs));
       }
