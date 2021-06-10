@@ -73,23 +73,25 @@ locality_base<Index>::send_action(const collective_ptr<CkArrayIndex> &p,
   (const_cast<CProxy_locality_base_ &>(thisCollection))[i].execute(msg);
 }
 
-// TODO make this more generic
-// NOTE this should always be used for invalidations
-template <typename Index>
-inline void send2port(const element_ptr<Index> &proxy, const entry_port_ptr &port,
-                      component::value_type &&value) {
-  auto msg =
+template<typename Index>
+void deliver(const element_proxy<Index>& proxy, message* msg) {
+  const auto &base =
+      static_cast<const CProxyElement_locality_base_ &>(proxy.c_proxy());
+  const_cast<CProxyElement_locality_base_ &>(base).demux(msg);
+}
+
+message *repack_to_port(const entry_port_ptr &port, component::value_type &&value) {
+ auto msg =
       value
           ? static_cast<message *>(value->release())
           : hypercomm_msg::make_null_message(port);
   auto env = UsrToEnv(msg);
   auto msgIdx = env->getMsgIdx();
   if (msgIdx == message::__idx) {
-    const auto &base =
-        static_cast<const CProxyElement_locality_base_ &>(proxy->c_proxy());
     // TODO should this be a move?
     msg->dst = port;
-    const_cast<CProxyElement_locality_base_ &>(base).demux(msg);
+
+    return msg;
   } else {
     // TODO repack to hypercomm in this case (when HYPERCOMM_NO_COPYING is
     // undefined)
@@ -98,13 +100,23 @@ inline void send2port(const element_ptr<Index> &proxy, const entry_port_ptr &por
   }
 }
 
+// NOTE this should always be used for invalidations
 template <typename Index>
-/* static */ void
-locality_base<Index>::send_future(const future &f,
-                                  component::value_type &&value) {
-  auto proxy = std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(f.source);
+inline void send2port(const element_ptr<Index> &proxy, const entry_port_ptr &port,
+                      component::value_type &&value) {
+  deliver(*proxy, repack_to_port(port, std::move(value)));
+}
+
+inline void send2port(const std::shared_ptr<generic_element_proxy> &proxy, const entry_port_ptr &port,
+                      component::value_type &&value) {
+  proxy->receive(repack_to_port(port, std::move(value)));
+}
+
+inline void send2future(const future& f, component::value_type &&value) {
+  auto src = std::dynamic_pointer_cast<generic_element_proxy>(f.source);
+  CkAssert(src && "future must be from a locality!");
   auto port = std::make_shared<future_port>(f);
-  send2port(proxy, port, std::move(value));
+  send2port(src, port, std::move(value));
 }
 
 template <typename Index>

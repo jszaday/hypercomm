@@ -4,10 +4,16 @@
 #include "../core/math.hpp"
 #include "../core/proxy.hpp"
 #include "../core/entry_port.hpp"
+#include "../core/value.hpp"
 
 #include "../serialization/pup.hpp"
 
 namespace hypercomm {
+
+struct future;
+
+inline void send2future(const future& f, value_ptr &&value);
+
 using future_id_t = std::uint32_t;
 
 struct future {
@@ -23,6 +29,10 @@ struct future {
       ss << "(nil))";
     return ss.str();
   }
+
+  inline void set(message* msg) { send2future(*this, msg2value(msg)); }
+
+  inline void set(value_ptr &&value) { send2future(*this, std::move(value)); }
 
   inline hash_code hash(void) const {
     return hash_combine(source->hash(), hash_code(id));
