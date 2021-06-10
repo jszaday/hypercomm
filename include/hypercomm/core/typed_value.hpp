@@ -7,6 +7,8 @@
 
 namespace hypercomm {
 
+using unit_type = std::tuple<>;
+
 template <typename T>
 class typed_value : public hyper_value {
  public:
@@ -14,7 +16,12 @@ class typed_value : public hyper_value {
 
   typed_value(const T& _1) : tmp(_1) {}
 
-  typed_value(message_type msg) { unpack(msg, tmp.value()); }
+  typed_value(message_type msg) {
+    if (msg) unpack(msg, tmp.value());
+    else if (!std::is_same<unit_type, T>::value) {
+      CkAbort("null pointer exception!");
+    }
+  }
 
   virtual bool recastable(void) const override { return false; }
 
