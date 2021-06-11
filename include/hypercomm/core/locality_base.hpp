@@ -23,9 +23,6 @@ using element_ptr = std::shared_ptr<hypercomm::element_proxy<Index>>;
 template <typename Index>
 using collective_ptr = std::shared_ptr<hypercomm::collective_proxy<Index>>;
 
-template <typename Key>
-using message_queue_t = comparable_map<Key, std::deque<component::value_type>>;
-
 template <typename Index>
 struct common_functions_ {
   virtual element_ptr<Index> __element__(void) const = 0;
@@ -37,8 +34,6 @@ struct common_functions_ {
 
 template <typename Index>
 struct locality_base : public generic_locality_, public virtual common_functions_<CkArrayIndex> {
-  message_queue_t<entry_port_ptr> port_queue;
-
   future_id_t future_authority = 0;
   component_id_t component_authority = 0;
 
@@ -48,6 +43,9 @@ struct locality_base : public generic_locality_, public virtual common_functions
 
   using action_type =
       typename std::shared_ptr<immediate_action<void(locality_base<Index>*)>>;
+  using generic_action_type =
+      typename std::shared_ptr<immediate_action<void(generic_locality_*)>>;
+
   using impl_index_type = array_proxy::index_type;
 
   using identity_t = section_identity<Index>;
@@ -63,6 +61,8 @@ struct locality_base : public generic_locality_, public virtual common_functions
   // TODO make this more generic
   static void send_action(const collective_ptr<CkArrayIndex>& p,
                           const CkArrayIndex& i, const action_type& a);
+  static void send_action(const collective_ptr<CkArrayIndex>& p,
+                          const CkArrayIndex& i, const generic_action_type& a);
 
   future make_future(void) {
     const auto next = ++this->future_authority;
@@ -71,7 +71,8 @@ struct locality_base : public generic_locality_, public virtual common_functions
 
   void request_future(const future& f, const callback_ptr& cb);
 
-  void receive_action(const action_type& ptr) { ptr->action(this); }
+  template<typename Action>
+  inline void receive_action(const Action& ptr) { ptr->action(this); }
 
   void broadcast(const section_ptr&, hypercomm_msg*);
 
@@ -114,8 +115,6 @@ struct locality_base : public generic_locality_, public virtual common_functions
     this->open(srcPort, std::make_pair(dst->id, dstPort));
   }
 
-  using entry_port_iterator = typename decltype(entry_ports)::iterator;
-
   // void try_collect(entry_port_iterator& it) {
   //   const auto& port = it->first;
   //   port->alive = port->keep_alive();
@@ -142,7 +141,7 @@ struct locality_base : public generic_locality_, public virtual common_functions
     }
   }
 
-  void try_send(const destination_& dest, component::value_type&& value) {
+  virtual void try_send(const destination_& dest, component::value_type&& value) override {
     switch (dest.type) {
       case destination_::type_::kCallback: {
         const auto& cb = dest.cb;
@@ -158,7 +157,7 @@ struct locality_base : public generic_locality_, public virtual common_functions
     }
   }
 
-  virtual void try_send(const component_port_t& port, component::value_type&& value) override {
+  void try_send(const component_port_t& port, component::value_type&& value) {
     auto search = components.find(port.first);
 #if CMK_ERROR_CHECKING
     if (search == std::end(components)) {
@@ -173,49 +172,6 @@ struct locality_base : public generic_locality_, public virtual common_functions
     search->second->receive_value(port.second, std::move(value));
 
     this->try_collect(search->second);
-  }
-
-  void resync_port_queue(entry_port_iterator& it) {
-    const auto entry_port = it->first;
-    auto search = port_queue.find(entry_port);
-    if (search != port_queue.end()) {
-      auto& buffer = search->second;
-      while (entry_port->alive && !buffer.empty()) {
-        auto& msg = buffer.front();
-        this->try_send(it->second, std::move(msg));
-        // this->try_collect(it);
-        buffer.pop_front();
-        QdProcess(1);
-      }
-      if (buffer.empty()) {
-        port_queue.erase(search);
-      }
-    }
-  }
-
-  template <typename Destination>
-  void open(const entry_port_ptr& ours, const Destination& theirs) {
-    ours->alive = true;
-    auto pair = this->entry_ports.emplace(ours, theirs);
-#if CMK_ERROR_CHECKING
-    if (!pair.second) {
-      std::stringstream ss;
-      ss << "[";
-      for (const auto& epp : this->entry_ports) {
-        const auto& other_port = epp.first;
-        if (comparable_comparator()(ours, other_port)) {
-          ss << "{" << other_port->to_string() << "}, ";
-        } else {
-          ss << other_port->to_string() << ", ";
-        }
-      }
-      ss << "]";
-
-      CkAbort("fatal> adding non-unique port %s to:\n\t%s\n",
-              ours->to_string().c_str(), ss.str().c_str());
-    }
-#endif
-    this->resync_port_queue(pair.first);
   }
 
   template <typename T>
