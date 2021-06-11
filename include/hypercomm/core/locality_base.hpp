@@ -63,7 +63,6 @@ struct locality_base : public generic_locality_, public virtual common_functions
   // TODO make this more generic
   static void send_action(const collective_ptr<CkArrayIndex>& p,
                           const CkArrayIndex& i, const action_type& a);
-  static void send_future(const future& f, component::value_type&& value);
 
   future make_future(void) {
     const auto next = ++this->future_authority;

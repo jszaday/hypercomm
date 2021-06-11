@@ -6,6 +6,7 @@
 #include <memory>
 #include <utility>
 
+#include "../messaging/messaging.hpp"
 #include "../utilities/hash.hpp"
 
 namespace hypercomm {
@@ -91,11 +92,19 @@ struct chare_type_for<T, typename std::enable_if<is_array_proxy<T>()>::type> {
 template <typename Index>
 struct collective_proxy;
 
-template <typename Index>
-struct element_proxy : virtual public located_chare {
-  virtual Index index() const = 0;
+struct generic_element_proxy: virtual public located_chare {
   virtual bool collective(void) const override { return false; }
+
+  virtual void receive(message *msg) = 0;
+};
+
+template <typename Index>
+struct element_proxy : virtual public generic_element_proxy {
+  virtual Index index() const = 0;
+
   virtual std::shared_ptr<collective_proxy<Index>> collection(void) const = 0;
+
+  virtual void receive(message*) override;
 };
 
 template <typename Index>
@@ -364,6 +373,15 @@ typename generic_collective_proxy<T>::element_type generic_collective_proxy<T>::
 operator[](const generic_collective_proxy<T>::index_type& idx) const {
   return element_at(this, idx);
 }
+}
+
+#include "../messaging/delivery.hpp"
+
+namespace hypercomm {
+
+template <typename Index>
+void element_proxy<Index>::receive(message *msg) { deliver(*this, msg); }
+
 }
 
 #endif

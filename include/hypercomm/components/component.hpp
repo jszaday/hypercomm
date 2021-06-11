@@ -4,6 +4,7 @@
 #include "../core.hpp"
 
 #include "identifiers.hpp"
+#include "status_listener.hpp"
 
 namespace hypercomm {
 
@@ -16,12 +17,7 @@ class component : virtual public impermanent {
   using port_type = components::port_id_t;
   using value_set = std::map<port_type, value_type>;
   using incoming_type = std::deque<value_set>;
-
-  class status_listener : virtual public polymorph::trait {
-   public:
-    virtual void on_completion(const component&) = 0;
-    virtual void on_invalidation(const component&) = 0;
-  };
+  using status_listener = components::status_listener;
 
   using listener_ptr = std::shared_ptr<status_listener>;
 
