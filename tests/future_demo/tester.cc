@@ -74,11 +74,6 @@ struct locality : public vil<CBase_locality, int> {
     const auto& mine = this->__index__();
     const auto right = (*this->__proxy__())[conv2idx<CkArrayIndex>((mine + 1) % n)];
 
-    // this sets up a callback that wakes up the current thread
-    // then sets the designated pointer to the received value
-    auto recvd = resuming_callback::value_type{};
-    const auto cb = std::make_shared<resuming_callback>(CthSelf(), &recvd);
-
     // for each iteration:
     for (auto i = 0; i < numIters; i += 1) {
       // make a future
@@ -90,9 +85,11 @@ struct locality : public vil<CBase_locality, int> {
       auto msg = msg2value(hypercomm_msg::make_message(0, {}));
       this->send_future(f, std::move(msg));
       // request the remote value -> our callback
+      auto cb = std::make_shared<resuming_callback<unit_type>>(CthSelf());
       this->request_future(g, cb);
-      // then suspend
-      CthSuspend();
+      // suspend if necessary
+      if (!cb->ready()) { CthSuspend(); }
+      this->update_context();
     }
   }
 };
