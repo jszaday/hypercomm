@@ -24,11 +24,61 @@ struct destination_ {
 using entry_port_map = comparable_map<entry_port_ptr, destination_>;
 using component_map = std::unordered_map<component::id_t, component_ptr>;
 
+template <typename Key>
+using message_queue = comparable_map<Key, std::deque<component::value_type>>;
+
 struct generic_locality_ {
   entry_port_map entry_ports;
   component_map components;
+  message_queue<entry_port_ptr> port_queue;
+
+
+  using entry_port_iterator = typename decltype(entry_ports)::iterator;
 
   generic_locality_(void) { this->update_context(); }
+
+  void resync_port_queue(entry_port_iterator& it) {
+    const auto entry_port = it->first;
+    auto search = port_queue.find(entry_port);
+    if (search != port_queue.end()) {
+      auto& buffer = search->second;
+      while (entry_port->alive && !buffer.empty()) {
+        auto& msg = buffer.front();
+        this->try_send(it->second, std::move(msg));
+        // this->try_collect(it);
+        buffer.pop_front();
+        QdProcess(1);
+      }
+      if (buffer.empty()) {
+        port_queue.erase(search);
+      }
+    }
+  }
+
+  template <typename Destination>
+  void open(const entry_port_ptr& ours, const Destination& theirs) {
+    ours->alive = true;
+    auto pair = this->entry_ports.emplace(ours, theirs);
+#if CMK_ERROR_CHECKING
+    if (!pair.second) {
+      std::stringstream ss;
+      ss << "[";
+      for (const auto& epp : this->entry_ports) {
+        const auto& other_port = epp.first;
+        if (comparable_comparator()(ours, other_port)) {
+          ss << "{" << other_port->to_string() << "}, ";
+        } else {
+          ss << other_port->to_string() << ", ";
+        }
+      }
+      ss << "]";
+
+      CkAbort("fatal> adding non-unique port %s to:\n\t%s\n",
+              ours->to_string().c_str(), ss.str().c_str());
+    }
+#endif
+    this->resync_port_queue(pair.first);
+  }
 
   inline void invalidate_port(entry_port& port) {
     port.alive = port.alive && port.keep_alive();
@@ -59,7 +109,7 @@ struct generic_locality_ {
 
   inline callback_ptr make_connector(const component_ptr& com, const component::port_type& port);
 
-  virtual void try_send(const component_port_t&, component::value_type&&) = 0;
+  virtual void try_send(const destination_& dest, component::value_type&& value) = 0;
 };
 
 // TODO this is a temporary solution
@@ -71,7 +121,7 @@ struct connector_ : public callback {
       : self(_1), dst(_2) {}
 
   virtual return_type send(argument_type&& value) override {
-    self->try_send(dst, std::move(value));
+    self->try_send(destination_(dst), std::move(value));
   }
 
   virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }

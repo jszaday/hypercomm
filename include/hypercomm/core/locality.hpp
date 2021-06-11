@@ -44,11 +44,24 @@ template <typename Base, typename Index>
 class vil : public Base, public locality_base<Index> {
 public:
   // NOTE ( this is a mechanism for remote task invocation )
-  virtual void execute(CkMessage *msg) override {
+  virtual void execute(CkMessage *_1) override {
     this->update_context();
-    typename locality_base<Index>::action_type action{};
-    hypercomm::unpack(msg, action);
-    this->receive_action(action);
+
+    auto msg = utilities::wrap_message(_1);
+    auto s = serdes::make_unpacker(msg, utilities::get_message_buffer(msg));
+
+    bool typed;
+    s | typed;
+
+    if (typed) {
+      typename locality_base<Index>::action_type action{};
+      s | action;
+      this->receive_action(action);
+    } else {
+      typename locality_base<Index>::generic_action_type action{};
+      s | action;
+      this->receive_action(action);
+    }
   }
 
   /* NOTE ( this is a mechanism for demux'ing an incoming message
@@ -69,7 +82,17 @@ locality_base<Index>::send_action(const collective_ptr<CkArrayIndex> &p,
                                   const CkArrayIndex &i, const action_type &a) {
   const auto &thisCollection =
       static_cast<const CProxy_locality_base_ &>(p->c_proxy());
-  auto msg = hypercomm::pack(a);
+  auto msg = hypercomm::pack(true, a);
+  (const_cast<CProxy_locality_base_ &>(thisCollection))[i].execute(msg);
+}
+
+template <typename Index>
+/* static */ void
+locality_base<Index>::send_action(const collective_ptr<CkArrayIndex> &p,
+                                  const CkArrayIndex &i, const generic_action_type &a) {
+  const auto &thisCollection =
+      static_cast<const CProxy_locality_base_ &>(p->c_proxy());
+  auto msg = hypercomm::pack(false, a);
   (const_cast<CProxy_locality_base_ &>(thisCollection))[i].execute(msg);
 }
 
@@ -149,7 +172,7 @@ void locality_base<Index>::request_future(const future &f,
   if (!ourElement->equals(source)) {
     auto theirElement = dynamic_cast<element_proxy<CkArrayIndex> *>(&source);
     auto fwd = std::make_shared<forwarding_callback>(ourElement, ourPort);
-    auto opener = std::make_shared<port_opener<Index>>(ourPort, fwd);
+    auto opener = std::make_shared<port_opener>(ourPort, fwd);
     send_action(theirElement->collection(), theirElement->index(), opener);
   }
 }
