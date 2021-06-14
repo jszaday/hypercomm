@@ -94,8 +94,6 @@ struct locality : public vil<CBase_locality, int> {
   void run(const int& numIters) {
     const auto& mine = this->__index__();
 
-    this->update_context();
-
     auto leftIdx = (mine + this->n - 1) % this->n;
     auto left = make_proxy(thisProxy[conv2idx<CkArrayIndex>(leftIdx)]);
 

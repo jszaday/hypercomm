@@ -88,7 +88,6 @@ struct locality : public vil<CBase_locality, int> {
       this->request_future(g, cb);
       // suspend if necessary
       if (!cb->ready()) { CthSuspend(); }
-      this->update_context();
     }
   }
 };

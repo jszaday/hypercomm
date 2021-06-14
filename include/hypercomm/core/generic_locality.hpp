@@ -1,6 +1,8 @@
 #ifndef __HYPERCOMM_CORE_GENLOC_HPP__
 #define __HYPERCOMM_CORE_GENLOC_HPP__
 
+#include <LBManager.h>
+
 #include "entry_port.hpp"
 
 namespace hypercomm {
@@ -35,7 +37,7 @@ struct generic_locality_ {
 
   using entry_port_iterator = typename decltype(entry_ports)::iterator;
 
-  generic_locality_(void) { this->update_context(); }
+  generic_locality_(void) = default;
 
   void resync_port_queue(entry_port_iterator& it) {
     const auto entry_port = it->first;
@@ -105,8 +107,6 @@ struct generic_locality_ {
     }
   }
 
-  inline void update_context(void);
-
   inline callback_ptr make_connector(const component_ptr& com, const component::port_type& port);
 
   virtual void try_send(const destination_& dest, component::value_type&& value) = 0;
@@ -131,21 +131,12 @@ inline callback_ptr generic_locality_::make_connector(const component_ptr& com, 
   return std::make_shared<connector_>(this, std::make_pair(com->id, port));
 }
 
-namespace {
-CpvDeclare(generic_locality_*, locality_);
-}
-
-inline void generic_locality_::update_context(void) {
-  if (!CpvInitialized(locality_)) {
-    CpvInitialize(generic_locality_*, locality_);
-  }
-
-  CpvAccess(locality_) = this;
-}
-
 inline generic_locality_* access_context(void) {
-  auto& locality = *(&CpvAccess(locality_));
-  CkAssert(locality && "locality must be valid");
+  auto* db  = LBManager::Object()->getLBDB();
+  auto* obj = db->LbObj(db->RunningObj());
+  auto* chare = static_cast<Chare*>(obj->getLocalUserData());
+  auto* locality = dynamic_cast<generic_locality_*>(chare);
+  CkAssert(locality && "unable to retrieve locality via lb-db");
   return locality;
 }
 
