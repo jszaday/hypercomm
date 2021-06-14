@@ -32,8 +32,16 @@ struct common_functions_ {
   virtual const Index& __index_max__(void) const = 0;
 };
 
+struct future_manager_ {
+  virtual future make_future(void) = 0;
+
+  virtual void request_future(const future& f, const callback_ptr& cb) = 0;
+};
+
 template <typename Index>
-struct locality_base : public generic_locality_, public virtual common_functions_<CkArrayIndex> {
+struct locality_base : public generic_locality_,
+                       public future_manager_,
+                       public virtual common_functions_<CkArrayIndex> {
   future_id_t future_authority = 0;
   component_id_t component_authority = 0;
 
@@ -64,12 +72,12 @@ struct locality_base : public generic_locality_, public virtual common_functions
   static void send_action(const collective_ptr<CkArrayIndex>& p,
                           const CkArrayIndex& i, const generic_action_type& a);
 
-  future make_future(void) {
+  virtual future make_future(void) override {
     const auto next = ++this->future_authority;
     return future{.source = this->__element__(), .id = next};
   }
 
-  void request_future(const future& f, const callback_ptr& cb);
+  virtual void request_future(const future& f, const callback_ptr& cb) override;
 
   template<typename Action>
   inline void receive_action(const Action& ptr) { ptr->action(this); }
