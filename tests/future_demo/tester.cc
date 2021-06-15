@@ -14,6 +14,7 @@ constexpr auto kVerbose = false;
 
 void enroll_polymorphs(void) {
   hypercomm::init_polymorph_registry();
+
   hypercomm::thread::setup_isomalloc();
 
   if (CkMyRank() == 0) {
@@ -23,8 +24,6 @@ void enroll_polymorphs(void) {
   }
 }
 
-// NOTE this mirrors the "secdest" Charm++ benchmark at:
-//      https://github.com/Wingpad/charm-benchmarks/tree/main/secdest
 struct main : public CBase_main {
   int numIters, numReps;
 
@@ -74,16 +73,28 @@ struct locality : public vil<CBase_locality, int> {
 
   locality(int _1) : n(_1) {}
 
+  void pup(PUP::er& p) {
+    p | thman;  // pup'ing the manager captures our threads
+    p | n;
+  }
+
   void run(CkMessage* msg) {
+    // create a thread within the manager
     auto tid = thman.emplace(this, &locality::run_, msg);
-    ((Chare *)this)->CkAddThreadListeners(tid, msg);
+    // add our listeners to it
+    ((Chare*)this)->CkAddThreadListeners(tid, msg);
+    // then launch it
     CthResume(tid);
   }
 
   void run_(CkMessage* msg) {
     const auto numIters = typed_value<int>(msg).value();
     const auto& mine = this->__index__();
-    const auto right = (*this->__proxy__())[conv2idx<CkArrayIndex>((mine + 1) % n)];
+    const auto right =
+        (*this->__proxy__())[conv2idx<CkArrayIndex>((mine + 1) % n)];
+
+    // update the context at the outset
+    this->update_context();
 
     // for each iteration:
     for (auto i = 0; i < numIters; i += 1) {
@@ -91,14 +102,17 @@ struct locality : public vil<CBase_locality, int> {
       auto f = this->make_future();
       // get the handle to its remote counterpart (at our right neighbor)
       // NOTE in the future, we can do something fancier here (i.e., iteration-based offset)
-      auto g = future { .source = right, .id = f.id };
+      auto g = future{.source = right, .id = f.id};
       // prepare and send a message
       f.set(hypercomm_msg::make_message(0, {}));
       // request the remote value -> our callback
       auto cb = std::make_shared<resuming_callback<unit_type>>(CthSelf());
       this->request_future(g, cb);
       // suspend if necessary
-      if (!cb->ready()) { CthSuspend(); }
+      if (!cb->ready()) {
+        CthSuspend();
+      }
+      // update the context after resume
       this->update_context();
     }
   }

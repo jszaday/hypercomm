@@ -82,8 +82,9 @@ struct manager {
 
  public:
   inline void on_free(const id_t& tid) {
+    // return the thread's id to the pool
     (&CpvAccess(free_ids_))->push_back(tid);
-
+    // then erase it from our records
     this->threads_.erase(tid);
   }
 
@@ -129,7 +130,8 @@ struct manager {
   }
 };
 
-void setup_isomalloc(void) {
+// initializes the thread module's isomalloc context pool
+inline void setup_isomalloc(void) {
   CpvInitialize(int, n_contexts_);
   CpvAccess(n_contexts_) = CMK_MAX_THREADS * CkNumPes();
 
@@ -141,7 +143,7 @@ void setup_isomalloc(void) {
   std::iota(std::begin(pool), std::end(pool), m_begin);
 }
 
-std::pair<CmiIsomallocContext, int> create_context(void) {
+inline std::pair<CmiIsomallocContext, int> create_context(void) {
   auto& pool = CpvAccess(free_ids_);
 #if CMK_ERROR_CHECKING
   if (pool.empty()) {
@@ -150,10 +152,13 @@ std::pair<CmiIsomallocContext, int> create_context(void) {
         CMK_MAX_THREADS);
   }
 #endif
+  // pop a thread id from the pool
   auto id = pool.back();
   pool.pop_back();
+  // create and configure a context using it
   auto ctx = CmiIsomallocContextCreate(id, CpvAccess(n_contexts_));
-  CmiIsomallocContextEnableRandomAccess(ctx);
+  CmiIsomallocContextEnableRandomAccess(ctx);  // required for heap interception
+  // then return it
   return std::make_pair(ctx, id);
 }
 
