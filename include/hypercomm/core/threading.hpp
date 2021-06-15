@@ -2,6 +2,9 @@
 #define __HYPERCOMM_CORE_THREADING_HPP__
 
 #include "../utilities/hash.hpp"
+#include <memory-isomalloc.h>
+
+PUPbytes(CmiObjId);
 
 namespace hypercomm {
 namespace thread {
@@ -9,7 +12,6 @@ namespace thread {
 using type = CthThread;
 using id_t = CmiObjId;
 using base_listener = CthThreadListener;
-
 }
 
 namespace utilities {
@@ -19,7 +21,6 @@ struct hash<thread::id_t> {
     return hash_iterable(tid.id);
   }
 };
-
 }
 
 namespace thread {
@@ -83,6 +84,26 @@ struct manager_ {
     auto search = this->threads_.find(tid);
     CkAssert(search != std::end(this->threads_) && "could not find thread");
     return search->second;
+  }
+
+  inline void pup(PUP::er& p) {
+    auto n = this->threads_.size();
+    p | n;
+
+    if (p.isUnpacking()) {
+      for (auto i = 0; i < n; i += 1) {
+        id_t tid;
+        p | tid;
+        CthThread th;
+        th = CthPup((pup_er)&p, th);
+        this->threads_.emplace(tid, th);
+      }
+    } else {
+      for (auto& pair : this->threads_) {
+        p | const_cast<id_t&>(pair.first);
+        pair.second = CthPup((pup_er)&p, pair.second);
+      }
+    }
   }
 };
 
