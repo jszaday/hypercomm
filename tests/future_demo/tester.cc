@@ -1,5 +1,7 @@
 #include <charm++.h>
 
+#include <hypercomm/core/threading.hpp>
+
 #include "tester.hh"
 
 #ifndef DECOMP_FACTOR
@@ -12,6 +14,7 @@ constexpr auto kVerbose = false;
 
 void enroll_polymorphs(void) {
   hypercomm::init_polymorph_registry();
+  hypercomm::thread::setup_isomalloc();
 
   if (CkMyRank() == 0) {
     hypercomm::enroll<future_port>();
@@ -38,10 +41,10 @@ struct main : public CBase_main {
   }
 
   void run(CkArrayCreatedMsg* msg) {
-    CProxy_locality localities(msg->aid);
+    auto localities = CProxy_locality(msg->aid);
+    auto value = typed_value<int>(numIters);
     double avgTime = 0.0;
 
-    auto root = conv2idx<CkArrayIndexMax>(0);
     for (int i = 0; i < numReps; i += 1) {
       if ((i % 2) == 0) {
         CkPrintf("main> repetition %d of %d\n", i + 1, numReps);
@@ -49,7 +52,7 @@ struct main : public CBase_main {
 
       auto start = CkWallTimer();
 
-      localities.run(numIters);
+      localities.run(value.release());
 
       CkWaitQD();
 
@@ -66,11 +69,19 @@ struct main : public CBase_main {
 };
 
 struct locality : public vil<CBase_locality, int> {
+  thread::manager thman;
   int n;
 
   locality(int _1) : n(_1) {}
 
-  void run(const int& numIters) {
+  void run(CkMessage* msg) {
+    auto tid = thman.emplace(this, &locality::run_, msg);
+    ((Chare *)this)->CkAddThreadListeners(tid, msg);
+    CthResume(tid);
+  }
+
+  void run_(CkMessage* msg) {
+    const auto numIters = typed_value<int>(msg).value();
     const auto& mine = this->__index__();
     const auto right = (*this->__proxy__())[conv2idx<CkArrayIndex>((mine + 1) % n)];
 

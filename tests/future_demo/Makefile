@@ -11,7 +11,7 @@ CMK_NUM_PES?=2
 CATCHSEGV?=$(shell which catchsegv)
 
 CHARMCFLAGS = $(OPTS)
-CHARMCLINKFLAGS = -language charm++ $(OPTS) $(LIBS)
+CHARMCLINKFLAGS = -language charm++ -memory isomalloc $(OPTS) $(LIBS)
 
 %.o: %.cc
 

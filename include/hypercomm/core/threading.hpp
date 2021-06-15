@@ -1,29 +1,26 @@
 #ifndef __HYPERCOMM_CORE_THREADING_HPP__
 #define __HYPERCOMM_CORE_THREADING_HPP__
 
-#include "../utilities/hash.hpp"
-#include <memory-isomalloc.h>
+#ifndef CMK_MAX_THREADS
+#define CMK_MAX_THREADS 16
+#endif
 
-PUPbytes(CmiObjId);
+#include <charm++.h>
+#include <memory-isomalloc.h>
 
 namespace hypercomm {
 namespace thread {
 
 using type = CthThread;
-using id_t = CmiObjId;
+using id_t = int;
+using pair_type = std::pair<type, id_t>;
 using base_listener = CthThreadListener;
+
+namespace {
+template <typename T>
+using member_fn = void (T::*)(CkMessage*);
 }
 
-namespace utilities {
-template <>
-struct hash<thread::id_t> {
-  std::size_t operator()(const thread::id_t& tid) const {
-    return hash_iterable(tid.id);
-  }
-};
-}
-
-namespace thread {
 class listener : public base_listener {
  public:
   listener(void) {
@@ -53,20 +50,30 @@ class listener : public base_listener {
   }
 };
 
-struct manager_ {
-  using thread_map = std::unordered_map<id_t, CthThread, utilities::hash<id_t>>;
+namespace {
+CpvDeclare(int, n_contexts_);
+
+using free_pool_type = std::vector<int>;
+CpvDeclare(free_pool_type, free_ids_);
+}
+
+template <typename T>
+inline pair_type create(T* obj, const member_fn<T>& fn, CkMessage* msg);
+
+struct manager {
+  using thread_map = std::map<id_t, type>;
 
  private:
   thread_map threads_;
 
   struct manager_listener_ : public listener {
-    CmiObjId tid;
+    id_t tid;
 
-    manager_listener_(manager_* _1, CmiObjId* _2) : listener(_1), tid(*_2) {}
+    manager_listener_(manager* _1, const id_t& _2) : listener(_1), tid(_2) {}
 
     virtual bool free(void) override {
-      auto man = (manager_*)this->data;
-      man->threads_.erase(tid);
+      ((manager*)this->data)->on_free(this->tid);
+
       return true;
     }
   };
@@ -74,13 +81,28 @@ struct manager_ {
   friend class manager_listener_;
 
  public:
-  inline void put(type th) {
-    auto l = new manager_listener_(this, CthGetThreadID(th));
-    this->threads_.emplace(l->tid, th);
+  inline void on_free(const id_t& tid) {
+    (&CpvAccess(free_ids_))->push_back(tid);
+
+    this->threads_.erase(tid);
+  }
+
+  inline void put(const pair_type& pair) { this->put(pair.second, pair.first); }
+
+  inline void put(const id_t& tid, const CthThread& th) {
+    auto l = new manager_listener_(this, tid);
+    this->threads_.emplace(tid, th);
     CthAddListener(th, l);
   }
 
-  inline type find(const CmiObjId& tid) {
+  template <typename T>
+  inline type emplace(T* obj, const member_fn<T>& fn, CkMessage* msg) {
+    auto pair = create(obj, fn, msg);
+    this->put(pair);
+    return pair.first;
+  }
+
+  inline type find(const id_t& tid) {
     auto search = this->threads_.find(tid);
     CkAssert(search != std::end(this->threads_) && "could not find thread");
     return search->second;
@@ -107,8 +129,33 @@ struct manager_ {
   }
 };
 
-template <typename T>
-using member_fn = void (T::*)(CkMessage*);
+void setup_isomalloc(void) {
+  CpvInitialize(int, n_contexts_);
+  CpvAccess(n_contexts_) = CMK_MAX_THREADS * CkNumPes();
+
+  CpvInitialize(free_pool_type, free_ids_);
+  auto& pool = CpvAccess(free_ids_);
+  new (&pool) free_pool_type(CMK_MAX_THREADS);
+
+  int m_begin = CMK_MAX_THREADS * CkMyPe();
+  std::iota(std::begin(pool), std::end(pool), m_begin);
+}
+
+std::pair<CmiIsomallocContext, int> create_context(void) {
+  auto& pool = CpvAccess(free_ids_);
+#if CMK_ERROR_CHECKING
+  if (pool.empty()) {
+    CkAbort(
+        "unable to allocate a thread id, increase CMK_MAX_THREADS beyond %d",
+        CMK_MAX_THREADS);
+  }
+#endif
+  auto id = pool.back();
+  pool.pop_back();
+  auto ctx = CmiIsomallocContextCreate(id, CpvAccess(n_contexts_));
+  CmiIsomallocContextEnableRandomAccess(ctx);
+  return std::make_pair(ctx, id);
+}
 
 template <typename T>
 struct launch_pack {
@@ -128,9 +175,12 @@ struct launch_pack {
 };
 
 template <typename T>
-inline type create(T* obj, const member_fn<T>& fn, CkMessage* msg) {
-  return CthCreate((CthVoidFn)launch_pack<T>::action,
-                   new launch_pack<T>(obj, fn, msg), 0);
+inline pair_type create(T* obj, const member_fn<T>& fn, CkMessage* msg) {
+  auto ctx = create_context();
+  return std::make_pair(
+      CthCreateMigratable((CthVoidFn)launch_pack<T>::action,
+                          new launch_pack<T>(obj, fn, msg), 0, ctx.first),
+      ctx.second);
 }
 }
 }
