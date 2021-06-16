@@ -7,11 +7,13 @@ LIBS = -L$(HYPERCOMM_HOME)/lib -lhypercomm-components -lhypercomm-utilities -lhy
 
 OPTS?=-g -O2
 TESTOPTS?=4
+CMK_LB_STRATEGY?=RotateLB
+TESTOPTS:=$(TESTOPTS) +LBDebug 1 +balancer $(CMK_LB_STRATEGY)
 CMK_NUM_PES?=2
 CATCHSEGV?=$(shell which catchsegv)
 
 CHARMCFLAGS = $(OPTS)
-CHARMCLINKFLAGS = -language charm++ -memory isomalloc $(OPTS) $(LIBS)
+CHARMCLINKFLAGS = -language charm++ -memory isomalloc -module TreeLB $(OPTS) $(LIBS)
 
 %.o: %.cc
 
@@ -22,7 +24,7 @@ $(BINARY): $(patsubst %.cc,%.o,$(wildcard *.cc))
 .SECONDARY: $(patsubst %.cc,%.decl.h,$(wildcard *.cc))
 .SECONDARY: $(patsubst %.cc,%.def.h,$(wildcard *.cc))
 
-%.o: %.cc %.hh %.decl.h %.def.h
+%.o: %.cc %.decl.h %.def.h
 	$(CHARMC) $(CHARMCFLAGS) $(INCLUDES) $<
 
 %.def.h: %.decl.h ;

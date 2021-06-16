@@ -8,7 +8,7 @@ mainmodule tester {
 
     array [Max] locality : locality_base_ {
         entry locality(int);
-        entry [threaded] void run(const int&);
+        entry void run(CkMessage*);
     };
 
     initproc void enroll_polymorphs(void);

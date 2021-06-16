@@ -1,5 +1,7 @@
 #include <charm++.h>
 
+#include <hypercomm/core/threading.hpp>
+
 #include "tester.hh"
 
 #ifndef DECOMP_FACTOR
@@ -13,6 +15,8 @@ constexpr auto kVerbose = false;
 void enroll_polymorphs(void) {
   hypercomm::init_polymorph_registry();
 
+  hypercomm::thread::setup_isomalloc();
+
   if (CkMyRank() == 0) {
     hypercomm::enroll<future_port>();
     hypercomm::enroll<port_opener>();
@@ -20,8 +24,6 @@ void enroll_polymorphs(void) {
   }
 }
 
-// NOTE this mirrors the "secdest" Charm++ benchmark at:
-//      https://github.com/Wingpad/charm-benchmarks/tree/main/secdest
 struct main : public CBase_main {
   int numIters, numReps;
 
@@ -38,10 +40,10 @@ struct main : public CBase_main {
   }
 
   void run(CkArrayCreatedMsg* msg) {
-    CProxy_locality localities(msg->aid);
+    auto localities = CProxy_locality(msg->aid);
+    auto value = typed_value<int>(numIters);
     double avgTime = 0.0;
 
-    auto root = conv2idx<CkArrayIndexMax>(0);
     for (int i = 0; i < numReps; i += 1) {
       if ((i % 2) == 0) {
         CkPrintf("main> repetition %d of %d\n", i + 1, numReps);
@@ -49,7 +51,7 @@ struct main : public CBase_main {
 
       auto start = CkWallTimer();
 
-      localities.run(numIters);
+      localities.run(value.release());
 
       CkWaitQD();
 
@@ -66,29 +68,55 @@ struct main : public CBase_main {
 };
 
 struct locality : public vil<CBase_locality, int> {
+  thread::manager thman;
   int n;
 
-  locality(int _1) : n(_1) {}
+  locality(int _1) : n(_1), thman(this) {}
 
-  void run(const int& numIters) {
-    const auto& mine = this->__index__();
-    const auto right = (*this->__proxy__())[conv2idx<CkArrayIndex>((mine + 1) % n)];
+  void pup(PUP::er& p) {
+    if (p.isUnpacking()) thman.set_owner(this);
+    p | thman;  // pup'ing the manager captures our threads
+
+    p | n;
+  }
+
+  void run(CkMessage* msg) {
+    // create a thread within the manager
+    auto thp = thman.emplace(&locality::run_, msg);
+    auto& th = thp.first;
+    // add our listeners to it
+    ((Chare*)this)->CkAddThreadListeners(th, msg);
+    // then launch it
+    CthResume(th);
+  }
+
+  static void run_(locality* &self, CkMessage* msg) {
+    const auto numIters = typed_value<int>(msg).value();
+    const auto& mine = self->__index__();
+    const auto right =
+        (*self->__proxy__())[conv2idx<CkArrayIndex>((mine + 1) % self->n)];
+
+    // update the context at the outset
+    self->update_context();
 
     // for each iteration:
     for (auto i = 0; i < numIters; i += 1) {
       // make a future
-      auto f = this->make_future();
+      auto f = self->make_future();
       // get the handle to its remote counterpart (at our right neighbor)
       // NOTE in the future, we can do something fancier here (i.e., iteration-based offset)
-      auto g = future { .source = right, .id = f.id };
+      auto g = future{.source = right, .id = f.id};
       // prepare and send a message
       f.set(hypercomm_msg::make_message(0, {}));
       // request the remote value -> our callback
       auto cb = std::make_shared<resuming_callback<unit_type>>(CthSelf());
-      this->request_future(g, cb);
+      self->request_future(g, cb);
       // suspend if necessary
-      if (!cb->ready()) { CthSuspend(); }
-      this->update_context();
+      if (!cb->ready()) {
+        CthSuspend();
+      }
+      // update the context after resume
+      self->update_context();
     }
   }
 };
