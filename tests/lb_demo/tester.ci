@@ -1,0 +1,11 @@
+mainmodule tester {
+    mainchare main {
+        entry main(CkArgMsg*);
+    };
+
+    array [1D] locality {
+        entry locality(void);
+    };
+
+    initproc void setup_environment(void);
+}

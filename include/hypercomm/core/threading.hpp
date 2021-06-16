@@ -59,11 +59,13 @@ CpvDeclare(free_pool_type, free_ids_);
 CtvDeclare(void*, self_);
 }
 
+inline std::pair<CmiIsomallocContext, int> create_context(void);
+
 template <typename T>
-inline pair_type create(T* obj, const member_fn<T>& fn, CkMessage* msg);
+inline type create(CmiIsomallocContext ctx, T* &obj, const member_fn<T>& fn, CkMessage* msg);
 
 struct manager {
-  using thread_map = std::map<id_t, type>;
+  using thread_map = std::map<id_t, std::pair<type, std::intptr_t>>;
 
  private:
   thread_map threads_;
@@ -75,7 +77,8 @@ struct manager {
     manager_listener_(manager* _1, const id_t& _2) : listener(_1), tid(_2) {}
 
     virtual bool free(void) override {
-      ((manager*)this->data)->on_free(this->tid);
+      // this cannot be called until the final free!
+      // ((manager*)this->data)->on_free(this->tid);
 
       return true;
     }
@@ -86,7 +89,6 @@ struct manager {
  public:
 
   manager(void* owner): owner_(owner) {}
-  manager(PUP::reconstruct) {}
 
   inline void on_free(const id_t& tid) {
     // return the thread's id to the pool
@@ -95,25 +97,21 @@ struct manager {
     this->threads_.erase(tid);
   }
 
-  inline void put(const pair_type& pair) { this->put(pair.second, pair.first); }
-
-  inline void put(const id_t& tid, const CthThread& th) {
-    auto l = new manager_listener_(this, tid);
-    this->threads_.emplace(tid, th);
-    CthAddListener(th, l);
-  }
-
   template <typename T>
-  inline type emplace(const member_fn<T>& fn, CkMessage* msg) {
-    auto pair = create((T*)this->owner_, fn, msg);
-    this->put(pair);
-    return pair.first;
+  inline pair_type emplace(const member_fn<T>& fn, CkMessage* msg) {
+    auto ctx = create_context();
+    auto res = this->threads_.emplace(ctx.second, std::make_pair(nullptr, (std::intptr_t)this->owner_));
+    auto th = create(ctx.first, *((T**)(&res.first->second.second)), fn, msg);
+    res.first->second.first = th;
+    auto l = new manager_listener_(this, ctx.second);
+    CthAddListener(th, l);
+    return std::make_pair(th, ctx.second);
   }
 
   inline type find(const id_t& tid) {
     auto search = this->threads_.find(tid);
     CkAssert(search != std::end(this->threads_) && "could not find thread");
-    return search->second;
+    return search->second.first;
   }
 
   inline void set_owner(void* owner) { this->owner_ = owner; }
@@ -126,15 +124,18 @@ struct manager {
       for (auto i = 0; i < n; i += 1) {
         id_t tid;
         p | tid;
+        std::intptr_t self_;
+        p | self_;
         CthThread th;
         th = CthPup((pup_er)&p, th);
-        this->threads_.emplace(tid, th);
-        CtvAccessOther(th, self_) = this->owner_;
+        this->threads_.emplace(tid, std::make_pair(th, self_));
+        (void*&)self_ = this->owner_;
       }
     } else {
       for (auto& pair : this->threads_) {
         p | const_cast<id_t&>(pair.first);
-        pair.second = CthPup((pup_er)&p, pair.second);
+        p | pair.second.second;
+        pair.second.first = CthPup((pup_er)&p, pair.second.first);
       }
     }
   }
@@ -176,28 +177,27 @@ template <typename T>
 struct launch_pack {
   member_fn<T> fn;
   CkMessage* msg;
-  T* obj;
+  T* &obj;
 
-  launch_pack(T* _1, const member_fn<T>& _2, CkMessage* _3)
+  launch_pack(T* &_1, const member_fn<T>& _2, CkMessage* _3)
       : obj(_1), fn(_2), msg(_3) {}
 
   static void action(launch_pack<T>* pack) {
-    CtvInitialize(void*, self_);
-    auto& self =
-      *(reinterpret_cast<T**>(&CtvAccess(self_)));
-    self = pack->obj;
-    (*pack->fn)(self, pack->msg);
+    auto fn = pack->fn;
+    auto msg = pack->msg;
+    T* self = pack->obj;
+    pack->obj = self;
     delete pack;
+
+    (*fn)(self, msg);
   }
 };
 
 template <typename T>
-inline pair_type create(T* obj, const member_fn<T>& fn, CkMessage* msg) {
-  auto ctx = create_context();
-  return std::make_pair(
-      CthCreateMigratable((CthVoidFn)launch_pack<T>::action,
-                          new launch_pack<T>(obj, fn, msg), 0, ctx.first),
-      ctx.second);
+inline type create(CmiIsomallocContext ctx, T* &obj, const member_fn<T>& fn, CkMessage* msg) {
+  return CthCreateMigratable(
+            (CthVoidFn)launch_pack<T>::action,
+            new launch_pack<T>(obj, fn, msg), 0, ctx);
 }
 }
 }

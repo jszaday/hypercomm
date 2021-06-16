@@ -82,11 +82,12 @@ struct locality : public vil<CBase_locality, int> {
 
   void run(CkMessage* msg) {
     // create a thread within the manager
-    auto tid = thman.emplace(&locality::run_, msg);
+    auto thp = thman.emplace(&locality::run_, msg);
+    auto& th = thp.first;
     // add our listeners to it
-    ((Chare*)this)->CkAddThreadListeners(tid, msg);
+    ((Chare*)this)->CkAddThreadListeners(th, msg);
     // then launch it
-    CthResume(tid);
+    CthResume(th);
   }
 
   static void run_(locality* &self, CkMessage* msg) {
