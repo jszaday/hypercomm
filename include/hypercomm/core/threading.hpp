@@ -18,6 +18,9 @@ using base_listener = CthThreadListener;
 
 namespace {
 template <typename T>
+using back_ref_ = T**;
+
+template <typename T>
 using member_fn = void (*)(T*&, CkMessage*);
 }
 
@@ -57,15 +60,13 @@ using free_pool_type = std::vector<int>;
 CpvDeclare(free_pool_type, free_ids_);
 
 CtvDeclare(void*, self_);
-
-template<typename T>
-using back_ref_ = T**;
 }
 
 inline std::pair<CmiIsomallocContext, int> create_context(void);
 
 template <typename T>
-inline type create(CmiIsomallocContext ctx, back_ref_<T> obj, const member_fn<T>& fn, CkMessage* msg);
+inline type create(CmiIsomallocContext ctx, back_ref_<T> obj,
+                   const member_fn<T>& fn, CkMessage* msg);
 
 struct manager {
   using thread_map = std::map<id_t, std::pair<type, std::intptr_t>>;
@@ -89,9 +90,21 @@ struct manager {
 
   friend class manager_listener_;
 
- public:
+  inline typename thread_map::mapped_type& find_(const id_t& tid) {
+    auto search = this->threads_.find(tid);
+    CkAssert(search != std::end(this->threads_) && "could not find thread");
+    return search->second;
+  }
 
-  manager(void* owner): owner_(owner) {}
+ public:
+  manager(void* owner) : owner_(owner) {}
+
+  inline void resume(const id_t& tid) {
+    auto& pair = this->find_(tid);
+    auto& self_ = pair.second;
+    *((back_ref_<void>)self_) = this->owner_;
+    CthAwaken(pair.first);
+  }
 
   inline void on_free(const id_t& tid) {
     // return the thread's id to the pool
@@ -103,19 +116,17 @@ struct manager {
   template <typename T>
   inline pair_type emplace(const member_fn<T>& fn, CkMessage* msg) {
     auto ctx = create_context();
-    auto res = this->threads_.emplace(ctx.second, std::make_pair(nullptr, (std::intptr_t)this->owner_));
-    auto th = create(ctx.first, (back_ref_<T>)(&res.first->second.second), fn, msg);
+    auto res = this->threads_.emplace(
+        ctx.second, std::make_pair(nullptr, (std::intptr_t) this->owner_));
+    auto th =
+        create(ctx.first, (back_ref_<T>)(&res.first->second.second), fn, msg);
     res.first->second.first = th;
     auto l = new manager_listener_(this, ctx.second);
     CthAddListener(th, l);
     return std::make_pair(th, ctx.second);
   }
 
-  inline type find(const id_t& tid) {
-    auto search = this->threads_.find(tid);
-    CkAssert(search != std::end(this->threads_) && "could not find thread");
-    return search->second.first;
-  }
+  inline type find(const id_t& tid) { return (this->find_(tid)).first; }
 
   inline void set_owner(void* owner) { this->owner_ = owner; }
 
@@ -133,7 +144,8 @@ struct manager {
         th = CthPup((pup_er)&p, th);
         this->threads_.emplace(tid, std::make_pair(th, self_));
 #if CMK_VERBOSE
-        CkPrintf("manager> recreating %p with owner(%p) via %p\n", th, this->owner_, (void*)self_);
+        CkPrintf("manager> recreating %p with owner(%p) via %p\n", th,
+                 this->owner_, (void*)self_);
 #endif
         *((void**)self_) = this->owner_;
       }
@@ -179,7 +191,6 @@ inline std::pair<CmiIsomallocContext, int> create_context(void) {
   return std::make_pair(ctx, id);
 }
 
-
 template <typename T>
 struct launch_pack {
   back_ref_<T> obj;
@@ -192,19 +203,18 @@ struct launch_pack {
   static void action(launch_pack<T>* pack) {
     auto fn = pack->fn;
     auto msg = pack->msg;
-    T* self = *(pack->obj);
-    *((back_ref_<T>*)pack->obj) = &self;
+    void* self = *(pack->obj);
+    *((back_ref_<void>*)pack->obj) = &self;
     delete pack;
-
-    (*fn)(self, msg);
+    (*fn)((T*&)self, msg);
   }
 };
 
 template <typename T>
-inline type create(CmiIsomallocContext ctx, back_ref_<T> obj, const member_fn<T>& fn, CkMessage* msg) {
-  return CthCreateMigratable(
-            (CthVoidFn)launch_pack<T>::action,
-            new launch_pack<T>(obj, fn, msg), 0, ctx);
+inline type create(CmiIsomallocContext ctx, back_ref_<T> obj,
+                   const member_fn<T>& fn, CkMessage* msg) {
+  return CthCreateMigratable((CthVoidFn)launch_pack<T>::action,
+                             new launch_pack<T>(obj, fn, msg), 0, ctx);
 }
 }
 }

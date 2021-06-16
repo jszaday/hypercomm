@@ -11,9 +11,12 @@ struct main : public CBase_main {
   int multiplier;
 
   main(CkArgMsg* m) : multiplier((m->argc <= 1) ? 4 : atoi(m->argv[1])) {
-    int n = multiplier * CkNumPes();
+    auto np = CkNumPes();
+    if (np < 2) CkAbort("this demo expects at least two PEs");
 
-    CkPrintf("main> multiplier=%d, numPes=%d\n", multiplier, CkNumPes());
+    int n = np * multiplier;
+
+    CkPrintf("main> multiplier=%d, numPes=%d\n", multiplier, np);
 
     CProxy_locality localities = CProxy_locality::ckNew();
     // loads all the work onto our PE
@@ -61,20 +64,22 @@ struct locality : public CBase_locality {
     // indicate we're ready to migrate
     self->AtSync();
     // print a message (as one does)
-    CkPrintf("ch%d@pe%d> I'm going to sleep...\n", self->thisIndex, CkMyPe());
+    auto idx = self->thisIndex;
+    CkPrintf("ch%d@pe%d> I'm going to sleep...\n", idx, CkMyPe());
     // then suspend
     CthSuspend();
     // validate that (self) is still accessible
 #if CMK_VERBOSE
     CkPrintf("th%p> was resumed with owner(%p) via %p.\n", CthSelf(), self, &self);
 #endif
-    CkPrintf("ch%d@pe%d> I'm alive again~!\n", self->thisIndex, CkMyPe());
+    CkAssert(idx == self->thisIndex && "self restore failed!");
+    CkPrintf("ch%d@pe%d> I'm alive again~!\n", idx, CkMyPe());
     // unblock quiescence detection
     QdProcess(1);
   }
 
   void ResumeFromSync(void) {
-    CthAwaken(this->thman.find(this->tid));
+    this->thman.resume(this->tid);
   }
 };
 
