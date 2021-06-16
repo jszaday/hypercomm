@@ -65,6 +65,9 @@ struct locality : public CBase_locality {
     // then suspend
     CthSuspend();
     // validate that (self) is still accessible
+#if CMK_VERBOSE
+    CkPrintf("th%p> was resumed with owner(%p) via %p.\n", CthSelf(), self, &self);
+#endif
     CkPrintf("ch%d@pe%d> I'm alive again~!\n", self->thisIndex, CkMyPe());
     // unblock quiescence detection
     QdProcess(1);

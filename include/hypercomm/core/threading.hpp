@@ -57,12 +57,15 @@ using free_pool_type = std::vector<int>;
 CpvDeclare(free_pool_type, free_ids_);
 
 CtvDeclare(void*, self_);
+
+template<typename T>
+using back_ref_ = T**;
 }
 
 inline std::pair<CmiIsomallocContext, int> create_context(void);
 
 template <typename T>
-inline type create(CmiIsomallocContext ctx, T* &obj, const member_fn<T>& fn, CkMessage* msg);
+inline type create(CmiIsomallocContext ctx, back_ref_<T> obj, const member_fn<T>& fn, CkMessage* msg);
 
 struct manager {
   using thread_map = std::map<id_t, std::pair<type, std::intptr_t>>;
@@ -101,7 +104,7 @@ struct manager {
   inline pair_type emplace(const member_fn<T>& fn, CkMessage* msg) {
     auto ctx = create_context();
     auto res = this->threads_.emplace(ctx.second, std::make_pair(nullptr, (std::intptr_t)this->owner_));
-    auto th = create(ctx.first, *((T**)(&res.first->second.second)), fn, msg);
+    auto th = create(ctx.first, (back_ref_<T>)(&res.first->second.second), fn, msg);
     res.first->second.first = th;
     auto l = new manager_listener_(this, ctx.second);
     CthAddListener(th, l);
@@ -129,7 +132,10 @@ struct manager {
         CthThread th;
         th = CthPup((pup_er)&p, th);
         this->threads_.emplace(tid, std::make_pair(th, self_));
-        (void*&)self_ = this->owner_;
+#if CMK_VERBOSE
+        CkPrintf("manager> recreating %p with owner(%p) via %p\n", th, this->owner_, (void*)self_);
+#endif
+        *((void**)self_) = this->owner_;
       }
     } else {
       for (auto& pair : this->threads_) {
@@ -173,20 +179,21 @@ inline std::pair<CmiIsomallocContext, int> create_context(void) {
   return std::make_pair(ctx, id);
 }
 
+
 template <typename T>
 struct launch_pack {
+  back_ref_<T> obj;
   member_fn<T> fn;
   CkMessage* msg;
-  T* &obj;
 
-  launch_pack(T* &_1, const member_fn<T>& _2, CkMessage* _3)
+  launch_pack(back_ref_<T> _1, const member_fn<T>& _2, CkMessage* _3)
       : obj(_1), fn(_2), msg(_3) {}
 
   static void action(launch_pack<T>* pack) {
     auto fn = pack->fn;
     auto msg = pack->msg;
-    T* self = pack->obj;
-    pack->obj = self;
+    T* self = *(pack->obj);
+    *((back_ref_<T>*)pack->obj) = &self;
     delete pack;
 
     (*fn)(self, msg);
@@ -194,7 +201,7 @@ struct launch_pack {
 };
 
 template <typename T>
-inline type create(CmiIsomallocContext ctx, T* &obj, const member_fn<T>& fn, CkMessage* msg) {
+inline type create(CmiIsomallocContext ctx, back_ref_<T> obj, const member_fn<T>& fn, CkMessage* msg) {
   return CthCreateMigratable(
             (CthVoidFn)launch_pack<T>::action,
             new launch_pack<T>(obj, fn, msg), 0, ctx);

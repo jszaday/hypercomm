@@ -23,7 +23,7 @@ $(BINARY): $(patsubst %.cc,%.o,$(wildcard *.cc))
 .SECONDARY: $(patsubst %.cc,%.decl.h,$(wildcard *.cc))
 .SECONDARY: $(patsubst %.cc,%.def.h,$(wildcard *.cc))
 
-%.o: %.cc %.hh %.decl.h %.def.h
+%.o: %.cc %.decl.h %.def.h
 	$(CHARMC) $(CHARMCFLAGS) $(INCLUDES) $<
 
 %.def.h: %.decl.h ;
