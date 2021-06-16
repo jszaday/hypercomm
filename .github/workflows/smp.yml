@@ -62,6 +62,8 @@ jobs:
         TESTOPTS="++local -nn" make test
         TESTOPTS="++local -np" make test
         TESTOPTS="++local -nd 4" make test
+        cd ../lb_demo
+        TESTOPTS="++local" make test
         cd ../avalanche
         TESTOPTS="++local 65" DEBUG=1 make test
         TESTOPTS="++local ++ppn 2 65" DEBUG=1 make test

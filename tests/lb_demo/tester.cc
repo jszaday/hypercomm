@@ -68,19 +68,22 @@ struct locality : public CBase_locality {
     CkPrintf("ch%d@pe%d> I'm going to sleep...\n", idx, CkMyPe());
     // then suspend
     CthSuspend();
-    // validate that (self) is still accessible
 #if CMK_VERBOSE
-    CkPrintf("th%p> was resumed with owner(%p) via %p.\n", CthSelf(), self, &self);
+    CkPrintf("th%p> was resumed with owner(%p) via %p.\n", CthSelf(), self,
+             &self);
 #endif
-    CkAssert(idx == self->thisIndex && "self restore failed!");
-    CkPrintf("ch%d@pe%d> I'm alive again~!\n", idx, CkMyPe());
+    // validate that (self) is still accessible
+    if (idx != self->thisIndex) {
+      ::CkAbort("ch%d> unsuccessful resume-from-sync! incorrect idx(%d)!\n",
+                idx, self->thisIndex);
+    } else {
+      CkPrintf("ch%d@pe%d> I'm alive again~!\n", idx, CkMyPe());
+    }
     // unblock quiescence detection
     QdProcess(1);
   }
 
-  void ResumeFromSync(void) {
-    this->thman.resume(this->tid);
-  }
+  void ResumeFromSync(void) { this->thman.resume(this->tid); }
 };
 
 #define CK_TEMPLATES_ONLY
