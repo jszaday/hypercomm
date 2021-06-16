@@ -18,7 +18,7 @@ using base_listener = CthThreadListener;
 
 namespace {
 template <typename T>
-using member_fn = void (T::*)(CkMessage*);
+using member_fn = void (*)(T*&, CkMessage*);
 }
 
 class listener : public base_listener {
@@ -55,6 +55,8 @@ CpvDeclare(int, n_contexts_);
 
 using free_pool_type = std::vector<int>;
 CpvDeclare(free_pool_type, free_ids_);
+
+CtvDeclare(void*, self_);
 }
 
 template <typename T>
@@ -65,6 +67,7 @@ struct manager {
 
  private:
   thread_map threads_;
+  void* owner_;
 
   struct manager_listener_ : public listener {
     id_t tid;
@@ -81,6 +84,10 @@ struct manager {
   friend class manager_listener_;
 
  public:
+
+  manager(void* owner): owner_(owner) {}
+  manager(PUP::reconstruct) {}
+
   inline void on_free(const id_t& tid) {
     // return the thread's id to the pool
     (&CpvAccess(free_ids_))->push_back(tid);
@@ -97,8 +104,8 @@ struct manager {
   }
 
   template <typename T>
-  inline type emplace(T* obj, const member_fn<T>& fn, CkMessage* msg) {
-    auto pair = create(obj, fn, msg);
+  inline type emplace(const member_fn<T>& fn, CkMessage* msg) {
+    auto pair = create((T*)this->owner_, fn, msg);
     this->put(pair);
     return pair.first;
   }
@@ -108,6 +115,8 @@ struct manager {
     CkAssert(search != std::end(this->threads_) && "could not find thread");
     return search->second;
   }
+
+  inline void set_owner(void* owner) { this->owner_ = owner; }
 
   inline void pup(PUP::er& p) {
     auto n = this->threads_.size();
@@ -120,6 +129,7 @@ struct manager {
         CthThread th;
         th = CthPup((pup_er)&p, th);
         this->threads_.emplace(tid, th);
+        CtvAccessOther(th, self_) = this->owner_;
       }
     } else {
       for (auto& pair : this->threads_) {
@@ -171,10 +181,12 @@ struct launch_pack {
   launch_pack(T* _1, const member_fn<T>& _2, CkMessage* _3)
       : obj(_1), fn(_2), msg(_3) {}
 
-  inline void run(void) { ((obj)->*(fn))(msg); }
-
   static void action(launch_pack<T>* pack) {
-    pack->run();
+    CtvInitialize(void*, self_);
+    auto& self =
+      *(reinterpret_cast<T**>(&CtvAccess(self_)));
+    self = pack->obj;
+    (*pack->fn)(self, pack->msg);
     delete pack;
   }
 };
