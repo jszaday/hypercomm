@@ -7,7 +7,8 @@ LIBS = -L$(HYPERCOMM_HOME)/lib -lhypercomm-components -lhypercomm-utilities -lhy
 
 OPTS?=-g -O2
 TESTOPTS?=4
-TESTOPTS:=$(TESTOPTS) +LBDebug 1 +balancer GreedyRefineLB
+CMK_LB_STRATEGY?=RotateLB
+TESTOPTS:=$(TESTOPTS) +LBDebug 1 +balancer $(CMK_LB_STRATEGY)
 CMK_NUM_PES?=2
 CATCHSEGV?=$(shell which catchsegv)
 
