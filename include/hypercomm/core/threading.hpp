@@ -73,6 +73,7 @@ struct manager {
 
  private:
   thread_map threads_;
+  bool is_migrating_ = false;
   void* owner_;
 
   struct manager_listener_ : public listener {
@@ -81,8 +82,7 @@ struct manager {
     manager_listener_(manager* _1, const id_t& _2) : listener(_1), tid(_2) {}
 
     virtual bool free(void) override {
-      // this cannot be called until the final free!
-      // ((manager*)this->data)->on_free(this->tid);
+      ((manager*)this->data)->on_free(this->tid);
 
       return true;
     }
@@ -96,6 +96,10 @@ struct manager {
     return search->second;
   }
 
+  inline void add_listener_(const id_t& tid, CthThread th) {
+    CthAddListener(th, new manager_listener_(this, tid));
+  }
+
  public:
   manager(void* owner) : owner_(owner) {}
 
@@ -107,10 +111,13 @@ struct manager {
   }
 
   inline void on_free(const id_t& tid) {
-    // return the thread's id to the pool
-    (&CpvAccess(free_ids_))->push_back(tid);
-    // then erase it from our records
-    this->threads_.erase(tid);
+    // ignore frees while we're migrating
+    if (!this->is_migrating_) {
+      // return the thread's id to the pool
+      (&CpvAccess(free_ids_))->push_back(tid);
+      // then erase it from our records
+      this->threads_.erase(tid);
+    }
   }
 
   template <typename T>
@@ -121,8 +128,7 @@ struct manager {
     auto th =
         create(ctx.first, (back_ref_<T>)(&res.first->second.second), fn, msg);
     res.first->second.first = th;
-    auto l = new manager_listener_(this, ctx.second);
-    CthAddListener(th, l);
+    this->add_listener_(ctx.second, th);
     return std::make_pair(th, ctx.second);
   }
 
@@ -148,8 +154,11 @@ struct manager {
                  this->owner_, (void*)self_);
 #endif
         *((void**)self_) = this->owner_;
+        this->add_listener_(tid, th);
       }
     } else {
+      this->is_migrating_ = true;
+
       for (auto& pair : this->threads_) {
         p | const_cast<id_t&>(pair.first);
         p | pair.second.second;
