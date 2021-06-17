@@ -14,6 +14,12 @@ constexpr bool is_bytes(void) {
   return PUP::as_bytes<T>::value;
 }
 
+template<typename T>
+using is_polymorph = std::is_base_of<hypercomm::polymorph, T>;
+
+template<typename T>
+using is_trait = std::is_base_of<hypercomm::polymorph::trait, T>;
+
 template <typename T>
 struct is_list_or_deque {
   enum { value = false };
