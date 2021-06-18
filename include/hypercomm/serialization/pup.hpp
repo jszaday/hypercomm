@@ -239,7 +239,7 @@ template <typename T>
 struct puper<T, typename std::enable_if<is_polymorph<T>::value &&
                                        !std::is_abstract<T>::value>::type> {
   inline static void impl(serdes& s, T& t) {
-    reconstruct(&t);
+    if (s.unpacking()) reconstruct(&t);
 
     t.__pup__(s);
   }
