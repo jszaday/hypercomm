@@ -198,6 +198,21 @@ struct puper<
 };
 
 namespace {
+
+template<typename T, typename Enable = void>
+struct pack_helper {
+  static void pack(serdes& s, T& p) {
+    pup(s, p);
+  }
+};
+
+template<typename T>
+struct pack_helper<T, typename std::enable_if<is_polymorph<T>::value>::type> {
+  static void pack(serdes& s, T& p) {
+    p.__pup__(s);
+  }
+};
+
 template <typename T, typename IdentifyFn>
 inline static void pack_ptr(serdes& s, std::shared_ptr<T>& p,
                             const IdentifyFn& f) {
@@ -214,15 +229,20 @@ inline static void pack_ptr(serdes& s, std::shared_ptr<T>& p,
       ptr_record rec(id, f());
       pup(s, rec);
       s.records[p] = id;
-      pup(s, *p);
+      pack_helper<T>::pack(s, *p);
     }
   }
 }
 }
 
-template <>
-struct puper<polymorph> {
-  inline static void impl(serdes& s, polymorph& t) { t.__pup__(s); }
+template <typename T>
+struct puper<T, typename std::enable_if<is_polymorph<T>::value &&
+                                       !std::is_abstract<T>::value>::type> {
+  inline static void impl(serdes& s, T& t) {
+    if (s.unpacking()) reconstruct(&t);
+
+    t.__pup__(s);
+  }
 };
 
 template <>
@@ -249,11 +269,25 @@ struct puper<ptr_record> {
   }
 };
 
+namespace {
 template <typename T>
-struct puper<std::shared_ptr<T>,
+using skip_cast = typename std::integral_constant<bool, is_polymorph<T>::value>::type;
+}
+
+template <typename T>
+class puper<std::shared_ptr<T>,
              typename std::enable_if<
-                 std::is_base_of<hypercomm::polymorph, T>::value ||
-                 std::is_base_of<hypercomm::polymorph::trait, T>::value>::type> {
+                 is_polymorph<T>::value || is_trait<T>::value>::type> {
+
+  inline static std::shared_ptr<polymorph> cast_to_packable(std::shared_ptr<T> &t, std::false_type) {
+    return std::dynamic_pointer_cast<polymorph>(t);
+  }
+
+  inline static std::shared_ptr<T> cast_to_packable(std::shared_ptr<T> &t, std::true_type) {
+    return t;
+  }
+
+public:
   inline static void impl(serdes& s, std::shared_ptr<T>& t) {
     if (s.unpacking()) {
       ptr_record rec;
@@ -275,7 +309,7 @@ struct puper<std::shared_ptr<T>,
         ::new (&t) std::shared_ptr<T>(std::dynamic_pointer_cast<T>(p));
       }
     } else {
-      auto p = std::dynamic_pointer_cast<polymorph>(t);
+      auto p = cast_to_packable(t, skip_cast<T>());
 #if CMK_ERROR_CHECKING
       if (t && (p == nullptr))
         CkAbort("could not cast %s to pup'able", typeid(t.get()).name());
