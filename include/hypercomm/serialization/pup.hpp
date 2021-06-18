@@ -236,8 +236,13 @@ inline static void pack_ptr(serdes& s, std::shared_ptr<T>& p,
 }
 
 template <typename T>
-struct puper<T, typename std::enable_if<is_polymorph<T>::value>::type> {
-  inline static void impl(serdes& s, T& t) { t.__pup__(s); }
+struct puper<T, typename std::enable_if<is_polymorph<T>::value &&
+                                       !std::is_abstract<T>::value>::type> {
+  inline static void impl(serdes& s, T& t) {
+    reconstruct(&t);
+
+    t.__pup__(s);
+  }
 };
 
 template <>
