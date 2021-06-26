@@ -127,7 +127,7 @@ typename my_redn_com::value_set my_redn_com::action(value_set&& accepted) {
   auto& idx = std::get<0>(tmp->value());
   auto& numIters = std::get<1>(tmp->value());
   // make the function and callback
-  auto fn = std::make_shared<nop_combiner>();
+  auto fn = std::make_shared<null_combiner>();
   auto cb = std::make_shared<forwarding_callback>(
       make_proxy(self->thisProxy[idx]), self->redn_port);
   // then do numIters reductions, each with empty messages
