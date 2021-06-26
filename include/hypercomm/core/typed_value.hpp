@@ -34,6 +34,10 @@ class typed_value : public hyper_value {
   }
 };
 
+inline std::shared_ptr<typed_value<unit_type>> make_unit_value(void) {
+  return std::make_shared<typed_value<unit_type>>(nullptr);
+}
+
 template <typename T>
 std::shared_ptr<typed_value<T>> value2typed(
     std::shared_ptr<hyper_value>&& value) {

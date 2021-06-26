@@ -183,14 +183,14 @@ struct locality_base : public generic_locality_,
   }
 
   template <typename T>
-  void local_contribution(const T& which, std::shared_ptr<CkMessage>&& value,
+  void local_contribution(const T& which, component::value_type&& value,
                           const combiner_ptr& fn, const callback_ptr& cb) {
     local_contribution(this->identity_for(which), std::move(value), fn, cb);
   }
 
  protected:
   void local_contribution(const identity_ptr& ident,
-                          std::shared_ptr<CkMessage>&& value,
+                          component::value_type&& value,
                           const combiner_ptr& fn, const callback_ptr& cb) {
     auto next = ident->next_reduction();
     auto ustream = ident->upstream();
@@ -222,7 +222,7 @@ struct locality_base : public generic_locality_,
     }
 
     this->activate_component(rdcr);
-    rdcr->receive_value(0, msg2value(std::move(value)));
+    rdcr->receive_value(0, std::move(value));
   }
 
  public:
