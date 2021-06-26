@@ -170,6 +170,15 @@ struct puper<
   }
 };
 
+template <>
+struct puper<CkCallback> {
+  inline static void impl(serdes& s, CkCallback& t) {
+    auto p = make_puper(s);
+    *p | t;
+    s.advanceBytes(p->size());
+  }
+};
+
 template <typename T>
 struct puper<
     T*,
