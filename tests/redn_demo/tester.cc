@@ -135,10 +135,9 @@ typename my_redn_com::value_set my_redn_com::action(value_set&& accepted) {
 #if CMK_DEBUG
     CkPrintf("com%lu@%d> contributing a value\n", this->id, self->__index__());
 #endif
-    auto msg = hypercomm_msg::make_message(0x0, {});
+    auto val = hypercomm::make_unit_value();
     // NOTE ( this is equivalent to Charm++'s contribute but, sadly, we cannot overload it )
-    self->local_contribution(self->section,
-                             hypercomm::utilities::wrap_message(msg), fn, cb);
+    self->local_contribution(self->section, std::move(val), fn, cb);
   }
   // no return value
   return {};
