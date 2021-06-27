@@ -174,12 +174,16 @@ inline void broadcast_to(
                                     action);
 }
 
+int locality_demux_index_(void) {
+  return CkIndex_locality_base_::demux(nullptr);
+}
+
 template <typename Index>
 void locality_base<Index>::receive_message(hypercomm_msg* msg) {
   auto* env = UsrToEnv(msg);
   auto idx = env->getEpIdx();
 
-  if (idx == CkIndex_locality_base_::demux(nullptr)) {
+  if (idx == locality_demux_index_()) {
     this->receive_value(msg->dst, msg2value(msg));
   } else {
     _entryTable[idx]->call(msg, this);

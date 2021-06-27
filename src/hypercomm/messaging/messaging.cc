@@ -6,6 +6,9 @@
 #include <hypercomm/utilities.hpp>
 
 namespace hypercomm {
+
+extern int locality_demux_index_(void);
+
 namespace messaging {
 
 constexpr auto hdr_size = sizeof(__msg__);
@@ -52,7 +55,7 @@ __msg__ *__msg__::make_message(const std::size_t &user_size,
   auto *msg = new (raw) __msg__;
   msg->dst = dst;
   msg->payload = (char *)msg + hdr_size + port_size;
-  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::demux(nullptr));
+  UsrToEnv(msg)->setEpIdx(locality_demux_index_());
   return msg;
 }
 
