@@ -7,8 +7,6 @@
 
 namespace hypercomm {
 
-extern int locality_demux_index_(void);
-
 namespace messaging {
 
 constexpr auto hdr_size = sizeof(__msg__);
@@ -45,6 +43,11 @@ __msg__ *__msg__::unpack(void *buf) {
   return msg;
 }
 
+bool locality_registered_(void) {
+  static bool registered_ = (CkGetChareIdx("locality_base_") != -1);
+  return registered_;
+}
+
 __msg__ *__msg__::make_message(const std::size_t &user_size,
                                const entry_port_ptr &dst) {
   const auto real_size = hypercomm::size(dst);
@@ -55,7 +58,9 @@ __msg__ *__msg__::make_message(const std::size_t &user_size,
   auto *msg = new (raw) __msg__;
   msg->dst = dst;
   msg->payload = (char *)msg + hdr_size + port_size;
-  UsrToEnv(msg)->setEpIdx(locality_demux_index_());
+  if (locality_registered_()) {
+    UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::demux(nullptr));
+  }
   return msg;
 }
 
