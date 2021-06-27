@@ -146,6 +146,17 @@ template <typename Proxy, typename Index>
 inline void broadcast_to(
     const Proxy& proxy,
     const typename locality_base<Index>::section_ptr& section,
+    const int& epIdx,
+    hypercomm_msg* msg) {
+  UsrToEnv(msg)->setEpIdx(epIdx);
+
+  broadcast_to(proxy, section, msg);
+}
+
+template <typename Proxy, typename Index>
+inline void broadcast_to(
+    const Proxy& proxy,
+    const typename locality_base<Index>::section_ptr& section,
     hypercomm_msg* msg) {
   broadcast_to(make_proxy(proxy), section, msg);
 }
