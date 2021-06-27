@@ -30,7 +30,7 @@ struct reduction_port : public virtual entry_port {
   }
 
   virtual hash_code hash(void) const override  {
-    return hash_combine(hash_code(id), hash_code(index));
+    return hash_combine(hash_code(id), utilities::hash<Index>{}(index));
   }
 
   virtual void __pup__(serdes& s) override {
