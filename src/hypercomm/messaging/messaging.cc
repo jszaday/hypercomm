@@ -1,5 +1,8 @@
 #include <hypercomm/messaging/packing.hpp>
+
+#include <hypercomm/core/locality.decl.h>
 #include <hypercomm/core/config.hpp>
+
 #include <hypercomm/utilities.hpp>
 
 namespace hypercomm {
@@ -49,6 +52,7 @@ __msg__ *__msg__::make_message(const std::size_t &user_size,
   auto *msg = new (raw) __msg__;
   msg->dst = dst;
   msg->payload = (char *)msg + hdr_size + port_size;
+  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::demux(nullptr));
   return msg;
 }
 

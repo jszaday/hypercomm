@@ -142,21 +142,51 @@ inline void send2future(const future& f, component::value_type &&value) {
   send2port(src, port, std::move(value));
 }
 
-template <typename Index>
-void locality_base<Index>::broadcast(const section_ptr &section,
-                                     hypercomm_msg *_msg) {
-  auto identity = this->identity_for(section);
-  auto root = section->index_at(0);
-  auto msg =
-      std::static_pointer_cast<hypercomm_msg>(utilities::wrap_message(_msg));
-  auto action = std::make_shared<broadcaster<Index>>(section, std::move(msg));
+template <typename Proxy, typename Index>
+inline void broadcast_to(
+    const Proxy& proxy,
+    const typename locality_base<Index>::section_ptr& section,
+    hypercomm_msg* msg) {
+  broadcast_to(make_proxy(proxy), section, msg);
+}
 
+template <typename Index>
+inline void broadcast_to(
+    const proxy_ptr& proxy,
+    const typename locality_base<Index>::section_ptr& section,
+    hypercomm_msg* msg) {
+  auto root = section->index_at(0);
+  auto action = std::make_shared<broadcaster<Index>>(section, msg);
+  auto collective = std::dynamic_pointer_cast<array_proxy>(proxy);
   using index_type = array_proxy::index_type;
+  locality_base<Index>::send_action(collective, conv2idx<index_type>(root),
+                                    action);
+}
+
+template <typename Index>
+void locality_base<Index>::receive_message(hypercomm_msg* msg) {
+  auto* env = UsrToEnv(msg);
+  auto idx = env->getEpIdx();
+
+  if (idx == CkIndex_locality_base_::demux(nullptr)) {
+    this->receive_value(msg->dst, msg2value(msg));
+  } else {
+    _entryTable[idx]->call(msg, this);
+  }
+}
+
+template <typename Index>
+void locality_base<Index>::broadcast(const section_ptr& section,
+                                     hypercomm_msg* msg) {
+  auto root = section->index_at(0);
+  auto action = std::make_shared<broadcaster<Index>>(section, msg);
+
   if (root == this->__index__()) {
     this->receive_action(action);
   } else {
     auto collective = std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
-    send_action(collective, conv2idx<CkArrayIndex>(root), action);
+    using index_type = array_proxy::index_type;
+    send_action(collective, conv2idx<index_type>(root), action);
   }
 }
 
