@@ -145,26 +145,18 @@ inline void send2future(const future& f, component::value_type &&value) {
 template <typename Proxy, typename Index>
 inline void broadcast_to(
     const Proxy& proxy,
-    const typename locality_base<Index>::section_ptr& section,
+    const std::shared_ptr<section<std::int64_t, Index>>& section,
     const int& epIdx,
     hypercomm_msg* msg) {
   UsrToEnv(msg)->setEpIdx(epIdx);
 
-  broadcast_to(proxy, section, msg);
-}
-
-template <typename Proxy, typename Index>
-inline void broadcast_to(
-    const Proxy& proxy,
-    const typename locality_base<Index>::section_ptr& section,
-    hypercomm_msg* msg) {
   broadcast_to(make_proxy(proxy), section, msg);
 }
 
 template <typename Index>
 inline void broadcast_to(
     const proxy_ptr& proxy,
-    const typename locality_base<Index>::section_ptr& section,
+    const std::shared_ptr<section<std::int64_t, Index>>& section,
     hypercomm_msg* msg) {
   auto root = section->index_at(0);
   auto action = std::make_shared<broadcaster<Index>>(section, msg);
@@ -182,7 +174,7 @@ void locality_base<Index>::receive_message(hypercomm_msg* msg) {
   if (idx == CkIndex_locality_base_::demux(nullptr)) {
     this->receive_value(msg->dst, msg2value(msg));
   } else {
-    _entryTable[idx]->call(msg, this);
+    _entryTable[idx]->call(msg, dynamic_cast<CkMigratable*>(this));
   }
 }
 
