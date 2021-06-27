@@ -4,8 +4,8 @@
 #include "locality_base.hpp"
 
 namespace hypercomm {
-template<typename Index>
-struct broadcaster: public immediate_action<void(locality_base<Index>*)> {
+template <typename Index>
+struct broadcaster : public immediate_action<void(locality_base<Index>*)> {
   using index_type = array_proxy::index_type;
   using section_ptr = typename locality_base<Index>::section_ptr;
 
@@ -14,8 +14,11 @@ struct broadcaster: public immediate_action<void(locality_base<Index>*)> {
 
   broadcaster(PUP::reconstruct) {}
 
-  broadcaster(const section_ptr& _1, decltype(msg) &&_2)
-  : section(_1), msg(_2) {}
+  broadcaster(const section_ptr& _1, decltype(msg)&& _2)
+      : section(_1), msg(_2) {}
+
+  broadcaster(const section_ptr& _1, hypercomm::message *_2)
+      : section(_1), msg(std::static_pointer_cast<hypercomm::message>(utilities::wrap_message(_2))) {}
 
   virtual void action(locality_base<Index>* _1) override {
     auto& locality = const_cast<locality_base<Index>&>(*_1);
@@ -26,13 +29,15 @@ struct broadcaster: public immediate_action<void(locality_base<Index>*)> {
     const auto& identity = locality.identity_for(this->section);
     auto ustream = identity->upstream();
     for (const auto& up : ustream) {
-      auto copy = std::static_pointer_cast<hypercomm_msg>(utilities::copy_message(msg));
+      auto copy =
+          std::static_pointer_cast<hypercomm_msg>(utilities::copy_message(msg));
       auto next = std::make_shared<broadcaster>(this->section, std::move(copy));
-      locality_base<Index>::send_action(collective, conv2idx<CkArrayIndex>(up), std::move(next));
+      locality_base<Index>::send_action(collective, conv2idx<CkArrayIndex>(up),
+                                        std::move(next));
     }
 
-    const auto dest = msg->dst;
-    locality.receive_value(dest, std::move(msg2value(std::move(msg))));
+    locality.receive_message(static_cast<hypercomm::message*>(
+        utilities::unwrap_message(std::move(msg))));
   }
 
   virtual void __pup__(serdes& s) override {

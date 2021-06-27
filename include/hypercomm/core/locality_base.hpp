@@ -84,6 +84,8 @@ struct locality_base : public generic_locality_,
 
   void broadcast(const section_ptr&, hypercomm_msg*);
 
+  void receive_message(hypercomm_msg* msg);
+
   void receive_value(const entry_port_ptr& port,
                      component::value_type&& value) {
     auto search = this->entry_ports.find(port);
