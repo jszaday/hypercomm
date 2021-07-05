@@ -48,7 +48,7 @@ polymorph_id_t identify(const polymorph& morph) {
 
 polymorph_id_t identify(const polymorph_ptr& morph) { return identify(*morph); }
 
-polymorph_ptr instantiate(const polymorph_id_t& id) {
+polymorph* instantiate(const polymorph_id_t& id) {
 #if CMK_ERROR_CHECKING
   auto* reg = &(CsvAccess(alloc_registry_));
   auto search = reg->find(id);
