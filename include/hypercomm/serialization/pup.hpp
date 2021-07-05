@@ -306,7 +306,7 @@ public:
       } else {
         std::shared_ptr<polymorph> p;
         if (rec.is_instance()) {
-          p = hypercomm::instantiate(rec.d.instance.ty);
+          p.reset(hypercomm::instantiate(rec.d.instance.ty));
           s.instances[rec.d.instance.id] = p;
           p->__pup__(s);
         } else if (rec.is_reference()) {
@@ -324,6 +324,37 @@ public:
         CkAbort("could not cast %s to pup'able", typeid(t.get()).name());
 #endif
       pack_ptr(s, p, [p]() { return hypercomm::identify(*p); });
+    }
+  }
+};
+
+template <typename T>
+class puper<std::unique_ptr<T>,
+            typename std::enable_if<is_polymorph<T>::value ||
+                                    is_trait<T>::value>::type> {
+  inline static polymorph* cast_to_packable(std::unique_ptr<T>& t,
+                                            std::false_type) {
+    return dynamic_cast<polymorph*>(t.get());
+  }
+
+  inline static T* cast_to_packable(std::unique_ptr<T>& t, std::true_type) {
+    return t.get();
+  }
+
+ public:
+  inline static void impl(serdes& s, std::unique_ptr<T>& t) {
+    if (s.unpacking()) {
+      polymorph_id_t tid;
+      s | tid;
+      auto p = hypercomm::instantiate(tid);
+      p->__pup__(s);
+      t.reset(dynamic_cast<T*>(p));
+    } else {
+      auto* p = cast_to_packable(t, skip_cast<T>());
+      CkAssert(p != nullptr && "expected a non-null unique ptr");
+      auto tid = hypercomm::identify(*p);
+      s | tid;
+      p->__pup__(s);
     }
   }
 };
