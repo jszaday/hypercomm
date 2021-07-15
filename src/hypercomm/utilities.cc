@@ -55,16 +55,6 @@ std::shared_ptr<CkMessage> copy_message(const std::shared_ptr<CkMessage>& msg) {
   return wrap_message(copy_message(msg.get()));
 }
 
-CkMessage* unwrap_message(std::shared_ptr<CkMessage>&& msg) {
-  auto msg_raw = msg.get();
-  if (msg.use_count() == 1) {
-    ::new (&msg) std::shared_ptr<CkMessage>{};
-    return msg_raw;
-  } else {
-    return (CkMessage*)CkCopyMsg((void**)&msg_raw);
-  }
-}
-
 void pack_message(CkMessage* msg) {
   auto idx = UsrToEnv(msg)->getMsgIdx();
   if (_msgTable[idx]->pack) {
