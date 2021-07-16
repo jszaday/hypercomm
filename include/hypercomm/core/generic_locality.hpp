@@ -1,6 +1,7 @@
 #ifndef __HYPERCOMM_CORE_GENLOC_HPP__
 #define __HYPERCOMM_CORE_GENLOC_HPP__
 
+#include <LBManager.h>
 #include "entry_port.hpp"
 
 namespace hypercomm {
@@ -135,18 +136,24 @@ namespace {
 CpvDeclare(generic_locality_*, locality_);
 }
 
-inline void generic_locality_::update_context(void) {
-  if (!CpvInitialized(locality_)) {
-    CpvInitialize(generic_locality_*, locality_);
-  }
-
-  CpvAccess(locality_) = this;
-}
+inline void generic_locality_::update_context(void) {}
 
 inline generic_locality_* access_context(void) {
-  auto& locality = *(&CpvAccess(locality_));
-  CkAssert(locality && "locality must be valid");
+#if CMK_LBDB_ON
+  auto* db = LBManager::Object()->getLBDB();
+  auto* obj = db->LbObj(db->RunningObj());
+  auto* rec = static_cast<CkLocRec*>(obj->getLocalUserData());
+  auto* man = rec->getLocMgr();
+  auto& arrays = man->managers;
+  CkAssert(arrays.size() == 1 && "bound arrays are currently unsupported");
+  auto& array = (arrays.begin())->second;
+  auto* element = array->lookup(rec->getIndex());
+  auto* locality = dynamic_cast<generic_locality_*>(element);
+  CkAssert(locality != nullptr && "unable to retrieve locality via lb-db");
   return locality;
+#else
+  static_assert(false, "Rebuild Charm++ with CMK_LBDB_ON to Access this Feature");
+#endif
 }
 
 void locally_invalidate_(entry_port& which) {
