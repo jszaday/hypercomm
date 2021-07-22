@@ -11,6 +11,8 @@ class identity {
 
  public:
   reduction_id_t next_reduction(void) { return current_++; }
+
+  virtual const Index& mine(void) const = 0;
   virtual std::vector<Index> upstream(void) const = 0;
   virtual std::vector<Index> downstream(void) const = 0;
 };
