@@ -56,11 +56,11 @@ struct locality_base : public generic_locality_,
 
   using impl_index_type = array_proxy::index_type;
 
-  using identity_t = section_identity<Index>;
-  using section_ptr = typename identity_t::section_ptr;
+  using identity_type = identity<Index>;
+  using section_ptr = typename section_identity<Index>::section_ptr;
   using section_type = typename section_ptr::element_type;
 
-  using identity_ptr = std::shared_ptr<identity_t>;
+  using identity_ptr = std::shared_ptr<identity_type>;
   using identity_map_t = comparable_map<section_ptr, identity_ptr>;
   identity_map_t identities;
 
@@ -218,7 +218,7 @@ struct locality_base : public generic_locality_,
       auto collective =
           std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
       CkAssert(collective && "locality must be a valid collective");
-      auto theirs = std::make_shared<reduction_port<Index>>(next, ident->mine);
+      auto theirs = std::make_shared<reduction_port<Index>>(next, ident->mine());
 
       count = 0;
       for (const auto& down : dstream) {
@@ -258,7 +258,7 @@ struct locality_base : public generic_locality_,
       auto mine = this->__index__();
       auto iter = identities.emplace(
           which,
-          std::make_shared<typename identity_ptr::element_type>(which, mine));
+          std::make_shared<section_identity<Index>>(which, mine));
       CkAssert(iter.second && "section should be unique!");
       return (iter.first)->second;
     } else {
