@@ -6,9 +6,12 @@
 #include <charm++.h>
 #include <type_traits>
 
+#include "utilities/hash.hpp"
+
 namespace hypercomm {
 namespace utilities {
 
+std::string idx2str(const CkArrayIndex &idx);
 std::string buf2str(const char* data, const std::size_t& size);
 std::string env2str(const envelope* env);
 

@@ -24,6 +24,25 @@ char* get_message_buffer(const CkMessage* _1) {
   }
 }
 
+std::string idx2str(const CkArrayIndex &idx) {
+  auto &nDims = idx.dimension;
+  if (nDims == 1) {
+    return std::to_string(idx.data()[0]);
+  } else {
+    std::stringstream ss;
+    ss << "(";
+    for (auto i = 0; i < nDims; i += 1) {
+      if (nDims >= 4) {
+        ss << idx.shortData()[i] << ",";
+      } else {
+        ss << idx.data()[i] << ",";
+      }
+    }
+    ss << ")";
+    return ss.str();
+  }
+}
+
 std::string buf2str(const char* data, const std::size_t& size) {
   std::stringstream ss;
   ss << "[ ";

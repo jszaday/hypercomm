@@ -6,8 +6,8 @@
 #include <memory>
 #include <utility>
 
+#include "../utilities.hpp"
 #include "../messaging/messaging.hpp"
-#include "../utilities/hash.hpp"
 
 namespace hypercomm {
 using chare_t = ChareType;
@@ -250,20 +250,9 @@ struct array_element_proxy : public element_proxy<CkArrayIndex>, public typed_pr
 
   virtual std::string to_string(void) const override {
     std::stringstream ss;
+    const auto& id = ((CkGroupID) this->id()).idx;
     const auto& idx = this->index();
-    ss << "array(idx=[";
-    if (idx.dimension > 4) {
-      const auto& data = idx.indexShorts;
-      for (auto i = 0; i < idx.dimension; i++) {
-        ss << data[i] << ",";
-      }
-    } else {
-      const auto& data = idx.index;
-      for (auto i = 0; i < idx.dimension; i++) {
-        ss << data[i] << ",";
-      }
-    }
-    ss << "],id=" << ((CkGroupID) this->id()).idx << ")";
+    ss << "array(id=" << id << ", idx=" << utilities::idx2str(idx) << ")";
     return ss.str();
   }
 };
