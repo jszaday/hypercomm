@@ -43,6 +43,8 @@ namespace hypercomm {
 template <typename Base, typename Index>
 class vil : public Base, public locality_base<Index> {
 public:
+  using index_type = Index;
+
   // NOTE ( this is a mechanism for remote task invocation )
   virtual void execute(CkMessage *_1) override {
     this->update_context();
