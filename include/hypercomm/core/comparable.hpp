@@ -15,28 +15,22 @@ struct hashable : public virtual polymorph::trait {
 struct comparable : public virtual hashable {
   virtual bool equals(const std::shared_ptr<comparable>& other) const = 0;
 };
+}
 
-struct hashable_hasher {
-  inline hash_code operator()(const std::shared_ptr<hashable>& value) const {
-    if (value) {
-      return hash_combine(typeid(*value).hash_code(), value->hash());
-    } else {
-      return (hash_code)0;
-    }
-  }
-};
+#include "../utilities.hpp"
 
+namespace hypercomm {
+template <typename T>
 struct comparable_comparator {
-  inline bool operator()(const std::shared_ptr<comparable>& lhs,
-                         const std::shared_ptr<comparable>& rhs) const {
-    return (typeid(*lhs) == typeid(*rhs)) && lhs->equals(rhs);
+  inline bool operator()(const T& lhs, const T& rhs) const {
+    auto lhsRaw = lhs.get(), rhsRaw = rhs.get();
+    return (lhsRaw == rhsRaw) || (lhsRaw && rhsRaw && lhsRaw->equals(rhs));
   }
 };
 
 template <typename Key, typename Value>
-using comparable_map =
-    std::unordered_map<Key, Value, hashable_hasher, comparable_comparator>;
-
+using comparable_map = std::unordered_map<Key, Value, utilities::hash<Key>,
+                                          comparable_comparator<Key>>;
 }
 
 #endif

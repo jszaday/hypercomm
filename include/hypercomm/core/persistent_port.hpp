@@ -20,7 +20,7 @@ struct persistent_port : public virtual entry_port {
 
   virtual bool equals(const std::shared_ptr<comparable>& other) const override {
     auto theirs = std::dynamic_pointer_cast<persistent_port>(other);
-    return this->id == theirs->id;
+    return theirs && this->id == theirs->id;
   }
 
   virtual hash_code hash(void) const override  {

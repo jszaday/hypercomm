@@ -15,6 +15,8 @@ struct reducer : public hypercomm::component {
           const std::size_t &_3, const std::size_t &_4)
       : component(_1), combiner(_2), n_ustream(_3), n_dstream(_4) {}
 
+  virtual bool permissive(void) const override { return true; }
+
   virtual std::size_t n_inputs(void) const override { return this->n_ustream; }
 
   virtual std::size_t n_outputs(void) const override { return this->n_dstream; }
@@ -24,11 +26,13 @@ struct reducer : public hypercomm::component {
     //      the combiner, but is it valid to do so?
     CkAssert(this->n_dstream == 1 && "multi output unsupported");
     // TODO is there a more efficient way to do this?
-    typename combiner::argument_type args(accepted.size());
-    std::transform(std::begin(accepted), std::end(accepted), std::begin(args),
-                   [](typename value_set::value_type &value) {
-                     return std::move(value.second);
-                   });
+    typename combiner::argument_type args;
+    for (auto& pair : accepted) {
+      auto& value = pair.second;
+      if (value) {
+        args.emplace_back(std::move(value));
+      }
+    }
     return { std::make_pair(0, this->combiner->send(std::move(args)))};
   }
 };

@@ -91,9 +91,42 @@ struct locality_base : public generic_locality_,
 
   void receive_message(hypercomm_msg* msg);
 
+  std::string fmt_ports(const entry_port_ptr& port) const {
+    std::stringstream ss;
+
+    ss << std::to_string(this->__index__()) << "> has ports [ ";
+    for (auto& pair : this->entry_ports) {
+      ss << pair.first->to_string() << "(" << pair.first->hash() << ")" << ", ";
+    }
+    ss << "]. it sought " << port->to_string() << "(" << port->hash() << ")" << ", but couldn't find it.";
+
+    return ss.str();
+  }
+
+  entry_port_iterator manually_seek(const entry_port_ptr& port) {
+    utilities::hash<entry_port_ptr> hasher;
+    auto ourHash = hasher(port);
+    auto it = std::begin(this->entry_ports);
+    for (; it != std::end(this->entry_ports); it++) {
+      auto theirHash = hasher(it->first);
+      if (comparable_comparator<entry_port_ptr>()(port, it->first)) {
+        if (ourHash != theirHash) {
+          CkError("warning> hash mismatch, got %lx but expected %lx.\n", theirHash, ourHash);
+        }
+        break;
+      }
+    }
+    // TODO fix this!
+    // auto search = this->entry_ports.find(port);
+    // if (it != search) {
+    //   CkAbort("it mismatch!");
+    // }
+    return it;
+  }
+
   void receive_value(const entry_port_ptr& port,
                      component::value_type&& value) {
-    auto search = this->entry_ports.find(port);
+    auto search = this->manually_seek(port);
     if (search == std::end(this->entry_ports)) {
       QdCreate(1);
       port_queue[port].push_back(std::move(value));

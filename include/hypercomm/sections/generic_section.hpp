@@ -39,7 +39,7 @@ struct vector_section : public section<std::int64_t, Index>, public polymorph {
 
   virtual bool equals(const std::shared_ptr<comparable>& _1) const override {
     const auto& other = std::dynamic_pointer_cast<vector_section<Index>>(_1);
-    return this->members() == other->members();
+    return other && this->members() == other->members();
   }
 
   virtual void __pup__(serdes& s) override {
