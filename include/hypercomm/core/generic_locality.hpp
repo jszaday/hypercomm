@@ -36,12 +36,26 @@ struct generic_locality_ {
 
   generic_locality_(void) { this->update_context(); }
 
+  void receive_value(const entry_port_ptr& port,
+                     component::value_type&& value) {
+    auto search = this->entry_ports.find(port);
+    if (search == std::end(this->entry_ports)) {
+      QdCreate(1);
+      port_queue[port].push_back(std::move(value));
+    } else {
+      CkAssert(search->first && search->first->alive &&
+               "entry port must be alive");
+      this->try_send(search->second, std::move(value));
+      // this->try_collect(search);
+    }
+  }
+
   void resync_port_queue(entry_port_iterator& it) {
-    const auto entry_port = it->first;
-    auto search = port_queue.find(entry_port);
+    const auto port = it->first;
+    auto search = port_queue.find(port);
     if (search != port_queue.end()) {
       auto& buffer = search->second;
-      while (entry_port->alive && !buffer.empty()) {
+      while (port->alive && !buffer.empty()) {
         auto& msg = buffer.front();
         this->try_send(it->second, std::move(msg));
         // this->try_collect(it);
@@ -79,16 +93,11 @@ struct generic_locality_ {
     this->resync_port_queue(pair.first);
   }
 
-  inline void invalidate_port(entry_port& port) {
-    port.alive = port.alive && port.keep_alive();
-    if (!port.alive) {
-      auto end = std::end(this->entry_ports);
-      auto search =
-          std::find_if(std::begin(this->entry_ports), end,
-                       [&](const typename entry_port_map::value_type& pair) {
-                         return &port == pair.first.get();
-                       });
-      if (search != end) {
+  inline void invalidate_port(const entry_port_ptr& port) {
+    port->alive = port->alive && port->keep_alive();
+    if (!port->alive) {
+      auto search = this->entry_ports.find(port);
+      if (search != std::end(this->entry_ports)) {
         this->entry_ports.erase(search);
       }
     }
@@ -148,7 +157,7 @@ inline generic_locality_* access_context(void) {
   return locality;
 }
 
-void locally_invalidate_(entry_port& which) {
+void locally_invalidate_(const entry_port_ptr& which) {
   access_context()->invalidate_port(which);
 }
 
@@ -158,6 +167,11 @@ void locally_invalidate_(const component::id_t& which) {
 
 callback_ptr local_connector_(const component_ptr& com, const component::port_type& port) {
   return access_context()->make_connector(com, port);
+}
+
+template <typename T>
+void entry_port<T>::take_back(std::shared_ptr<hyper_value>&& value) {
+  access_context()->receive_value(this->shared_from_this(), std::move(value));
 }
 
 }

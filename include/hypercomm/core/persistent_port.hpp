@@ -4,7 +4,7 @@
 #include "entry_port.hpp"
 
 namespace hypercomm {
-struct persistent_port : public virtual entry_port {
+struct persistent_port : public entry_port<persistent_port> {
   components::port_id_t id = 0;
 
   persistent_port(PUP::reconstruct) {}

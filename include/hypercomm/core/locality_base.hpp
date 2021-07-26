@@ -103,20 +103,6 @@ struct locality_base : public generic_locality_,
     return ss.str();
   }
 
-  void receive_value(const entry_port_ptr& port,
-                     component::value_type&& value) {
-    auto search = this->entry_ports.find(port);
-    if (search == std::end(this->entry_ports)) {
-      QdCreate(1);
-      port_queue[port].push_back(std::move(value));
-    } else {
-      CkAssert(search->first && search->first->alive &&
-               "entry port must be alive");
-      this->try_send(search->second, std::move(value));
-      // this->try_collect(search);
-    }
-  }
-
   /* TODO consider introducing a simplified connection API that
    *      utilizes "port authorities", aka port id counters, to
    *      remove src/dstPort for trivial, unordered connections
