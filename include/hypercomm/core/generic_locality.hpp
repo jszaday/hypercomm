@@ -32,7 +32,6 @@ struct generic_locality_ {
   component_map components;
   message_queue<entry_port_ptr> port_queue;
 
-
   using entry_port_iterator = typename decltype(entry_ports)::iterator;
 
   generic_locality_(void) { this->update_context(); }
@@ -65,7 +64,7 @@ struct generic_locality_ {
       ss << "[";
       for (const auto& epp : this->entry_ports) {
         const auto& other_port = epp.first;
-        if (comparable_comparator()(ours, other_port)) {
+        if (comparable_comparator<entry_port_ptr>()(ours, other_port)) {
           ss << "{" << other_port->to_string() << "}, ";
         } else {
           ss << other_port->to_string() << ", ";

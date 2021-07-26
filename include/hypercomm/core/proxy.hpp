@@ -139,7 +139,7 @@ struct generic_collective_proxy
   virtual bool equals(const hypercomm::proxy& _1) const override {
     const auto* other =
         dynamic_cast<const generic_collective_proxy<Proxy>*>(&_1);
-    return (other != nullptr) &&
+    return other &&
            (const_cast<proxy_type&>(this->proxy_) == other->proxy_);
   }
 
@@ -215,6 +215,7 @@ struct array_element_proxy : public element_proxy<CkArrayIndex>, public typed_pr
   virtual bool equals(const hypercomm::proxy& _1) const override {
     const auto* other = dynamic_cast<const array_element_proxy*>(&_1);
     auto result = other && other->id() == this->id();
+    if (!result) return false;
     const auto& ourIdx = this->proxy_.ckGetIndex();
     const auto& theirIdx = other->proxy_.ckGetIndex();
     const auto* ourData = ourIdx.data();
@@ -275,7 +276,7 @@ struct grouplike_element_proxy : public element_proxy<int>,
 
   virtual bool equals(const hypercomm::proxy& _1) const override {
     const auto* other = dynamic_cast<const grouplike_element_proxy<T>*>(&_1);
-    return (other != nullptr) &&
+    return other &&
            (const_cast<proxy_type&>(this->proxy_) == other->proxy_);
   }
 

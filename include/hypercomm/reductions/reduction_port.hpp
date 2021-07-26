@@ -20,7 +20,7 @@ struct reduction_port : public virtual entry_port {
 
   virtual bool equals(const std::shared_ptr<comparable>& other) const override  {
     auto theirs = std::dynamic_pointer_cast<reduction_port<Index>>(other);
-    return this->id == theirs->id && this->index == theirs->index;
+    return theirs && this->id == theirs->id && this->index == theirs->index;
   }
 
   virtual std::string to_string(void) const override {
@@ -30,7 +30,9 @@ struct reduction_port : public virtual entry_port {
   }
 
   virtual hash_code hash(void) const override  {
-    return hash_combine(hash_code(id), utilities::hash<Index>{}(index));
+    auto hashId = utilities::hash<reduction_id_t>()(this->id);
+    auto hashIdx = utilities::hash<Index>()(this->index);
+    return hash_combine(hashId, hashIdx);
   }
 
   virtual void __pup__(serdes& s) override {

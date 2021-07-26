@@ -61,7 +61,7 @@ struct future_port: public virtual entry_port {
 
   virtual bool equals(const std::shared_ptr<comparable>& _1) const override {
     auto other = std::dynamic_pointer_cast<future_port>(_1);
-    return this->f.equals(other->f);
+    return other && this->f.equals(other->f);
   }
 
   virtual hash_code hash(void) const override {

@@ -91,6 +91,18 @@ struct locality_base : public generic_locality_,
 
   void receive_message(hypercomm_msg* msg);
 
+  std::string fmt_ports(const entry_port_ptr& port) const {
+    std::stringstream ss;
+
+    ss << std::to_string(this->__index__()) << "> has ports [ ";
+    for (auto& pair : this->entry_ports) {
+      ss << pair.first->to_string() << "(" << pair.first->hash() << ")" << ", ";
+    }
+    ss << "]. it sought " << port->to_string() << "(" << port->hash() << ")" << ", but couldn't find it.";
+
+    return ss.str();
+  }
+
   void receive_value(const entry_port_ptr& port,
                      component::value_type&& value) {
     auto search = this->entry_ports.find(port);

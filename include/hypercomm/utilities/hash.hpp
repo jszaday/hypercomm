@@ -20,7 +20,8 @@ struct hash<
 template <class T>
 struct hash<
     T*, typename std::enable_if<std::is_base_of<hashable, T>::value>::type> {
-  std::size_t operator()(const T* t) const { return const_cast<T*>(t)->hash(); }
+  using type = T*;
+  std::size_t operator()(const type& t) const { return t ? t->hash() : 0; }
 };
 
 template <class T>
