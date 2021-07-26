@@ -278,23 +278,12 @@ struct locality_base : public generic_locality_,
     }
   }
 
-  const identity_ptr& identity_for(const section_type& _1) {
-    section_ptr which(const_cast<section_type*>(&_1), [](section_type*) {});
-    auto search = identities.find(which);
-    if (search == identities.end()) {
-      auto mine = this->__index__();
-      auto ident =
-          std::make_shared<typename identity_ptr::element_type>(*which, mine);
-      auto iter = identities.emplace(ident->sect, std::move(ident));
-      CkAssert(iter.second && "section should be unique!");
-      return (iter.first)->second;
-    } else {
-      return search->second;
-    }
+  inline const identity_ptr& identity_for(const section_type& src) {
+    return this->identity_for(std::move(src.clone()));
   }
 
-  inline const identity_ptr& identity_for(const std::vector<Index>& _1) {
-    return this->identity_for(vector_section<Index>(_1));
+  inline const identity_ptr& identity_for(const std::vector<Index>& src) {
+    return this->identity_for(vector_section<Index>(src));
   }
 };
 }
