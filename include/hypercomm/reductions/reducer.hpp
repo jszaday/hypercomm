@@ -8,12 +8,18 @@
 namespace hypercomm {
 
 struct reducer : public hypercomm::component {
+  const reduction_id_t redn_no;
+  std::size_t n_ustream, n_dstream;
   hypercomm::combiner_ptr combiner;
-  const std::size_t n_ustream, n_dstream;
 
-  reducer(const reduction_id_t &_1, const hypercomm::combiner_ptr &_2,
-          const std::size_t &_3, const std::size_t &_4)
-      : component(_1), combiner(_2), n_ustream(_3), n_dstream(_4) {}
+  reducer(const component::id_t &_1, const reduction_id_t &_2,
+          const hypercomm::combiner_ptr &_3, const std::size_t &_4,
+          const std::size_t &_5)
+      : component(_1),
+        redn_no(_2),
+        combiner(_3),
+        n_ustream(_4),
+        n_dstream(_5) {}
 
   virtual bool permissive(void) const override { return true; }
 
@@ -27,13 +33,13 @@ struct reducer : public hypercomm::component {
     CkAssert(this->n_dstream == 1 && "multi output unsupported");
     // TODO is there a more efficient way to do this?
     typename combiner::argument_type args;
-    for (auto& pair : accepted) {
-      auto& value = pair.second;
+    for (auto &pair : accepted) {
+      auto &value = pair.second;
       if (value) {
         args.emplace_back(std::move(value));
       }
     }
-    return { std::make_pair(0, this->combiner->send(std::move(args)))};
+    return {std::make_pair(0, this->combiner->send(std::move(args)))};
   }
 };
 }

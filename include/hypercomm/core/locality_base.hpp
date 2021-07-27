@@ -79,42 +79,20 @@ struct locality_base : public generic_locality_,
 
   virtual void request_future(const future& f, const callback_ptr& cb) override;
 
-  template<typename Action>
-  inline void receive_action(const Action& ptr) { ptr->action(this); }
+  template <typename Action>
+  inline void receive_action(const Action& ptr) {
+    ptr->action(this);
+  }
 
   void broadcast(const section_ptr&, hypercomm_msg*);
 
-  inline void broadcast(const section_ptr& section, const int& epIdx, hypercomm_msg* msg) {
+  inline void broadcast(const section_ptr& section, const int& epIdx,
+                        hypercomm_msg* msg) {
     UsrToEnv(msg)->setEpIdx(epIdx);
     this->broadcast(section, msg);
   }
 
   void receive_message(hypercomm_msg* msg);
-
-  /* TODO consider introducing a simplified connection API that
-   *      utilizes "port authorities", aka port id counters, to
-   *      remove src/dstPort for trivial, unordered connections
-   */
-
-  inline void connect(const component_id_t& src,
-                      const components::port_id_t& srcPort,
-                      const component_id_t& dst,
-                      const components::port_id_t& dstPort) {
-    this->components[src]->update_destination(srcPort, this->make_connector(dst, dstPort));
-  }
-
-  inline void connect(const component_id_t& src,
-                      const components::port_id_t& srcPort,
-                      const callback_ptr& cb) {
-    this->components[src]->update_destination(srcPort, cb);
-  }
-
-  inline void connect(const entry_port_ptr& srcPort,
-                      const component_id_t& dst,
-                      const components::port_id_t& dstPort) {
-    this->components[dst]->add_listener(srcPort);
-    this->open(srcPort, std::make_pair(dst, dstPort));
-  }
 
   void try_collect(const component_id_t& which) {
     this->try_collect(this->components[which]);
@@ -128,16 +106,17 @@ struct locality_base : public generic_locality_,
     }
   }
 
-  virtual void try_send(const destination_& dest, component::value_type&& value) override {
+  virtual void try_send(const destination_& dest,
+                        component::value_type&& value) override {
     switch (dest.type) {
       case destination_::type_::kCallback: {
-        const auto& cb = dest.cb;
+        const auto& cb = dest.cb();
         CkAssert(cb && "callback must be valid!");
         cb->send(std::move(value));
         break;
       }
       case destination_::type_::kComponentPort:
-        this->try_send(dest.port, std::move(value));
+        this->try_send(dest.port(), std::move(value));
         break;
       default:
         CkAbort("unknown destination type");
@@ -169,14 +148,14 @@ struct locality_base : public generic_locality_,
 
  protected:
   void local_contribution(const identity_ptr& ident,
-                          component::value_type&& value,
-                          const combiner_ptr& fn, const callback_ptr& cb) {
+                          component::value_type&& value, const combiner_ptr& fn,
+                          const callback_ptr& cb) {
     auto next = ident->next_reduction();
     auto ustream = ident->upstream();
     auto dstream = ident->downstream();
 
     const auto& rdcr = this->emplace_component<reducer>(
-        fn, ustream.size() + 1, dstream.empty() ? 1 : dstream.size());
+         next, fn, ustream.size() + 1, dstream.empty() ? 1 : dstream.size());
 
     auto count = 0;
     for (const auto& up : ustream) {
@@ -190,7 +169,8 @@ struct locality_base : public generic_locality_,
       auto collective =
           std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
       CkAssert(collective && "locality must be a valid collective");
-      auto theirs = std::make_shared<reduction_port<Index>>(next, ident->mine());
+      auto theirs =
+          std::make_shared<reduction_port<Index>>(next, ident->mine());
 
       count = 0;
       for (const auto& down : dstream) {
@@ -205,7 +185,6 @@ struct locality_base : public generic_locality_,
   }
 
  public:
-
   template <typename T, typename... Args>
   const component_id_t& emplace_component(Args... args) {
     auto next = this->component_authority++;
@@ -214,7 +193,7 @@ struct locality_base : public generic_locality_,
     return ((component*)inst)->id;
   }
 
-  template<typename T>
+  template <typename T>
   T* get_component(const component_id_t& id) {
     auto search = this->components.find(id);
     if (search != std::end(this->components)) {
@@ -244,8 +223,7 @@ struct locality_base : public generic_locality_,
     if (search == identities.end()) {
       auto mine = this->__index__();
       auto iter = identities.emplace(
-          which,
-          std::make_shared<section_identity<Index>>(which, mine));
+          which, std::make_shared<section_identity<Index>>(which, mine));
       CkAssert(iter.second && "section should be unique!");
       return (iter.first)->second;
     } else {

@@ -7,18 +7,60 @@ namespace hypercomm {
 
 using component_port_t = std::pair<component::id_t, component::port_type>;
 
-// TODO elevate this functionality to a more general purpose callback
-//      ensure that the reference counting on the callback port is elided when
-//      !kCallback
-struct destination_ {
-  enum type_ : uint8_t { kInvalid, kCallback, kComponentPort };
+class destination_ {
+  union u_options {
+    callback_ptr cb;
+    component_port_t port;
+    ~u_options() {}
+    u_options(void) {}
+    u_options(const callback_ptr& x) : cb(x) {}
+    u_options(const component_port_t& x) : port(x) {}
+  } options;
 
-  type_ type;
-  callback_ptr cb;
-  component_port_t port;
+ public:
+  enum type_ : uint8_t { kCallback, kComponentPort };
 
-  destination_(const component_port_t& _1) : type(kComponentPort), port(_1) {}
-  destination_(const callback_ptr& _2) : type(kCallback), cb(_2) {}
+  const type_ type;
+
+  ~destination_() {
+    switch (type) {
+      case kCallback: {
+        this->options.cb.~callback_ptr();
+        break;
+      }
+      case kComponentPort: {
+        this->options.port.~component_port_t();
+        break;
+      }
+    }
+  }
+
+  destination_(const callback_ptr& cb) : type(kCallback), options(cb) {}
+  destination_(const component_port_t& port)
+      : type(kComponentPort), options(port) {}
+
+  destination_(const destination_& dst) : type(dst.type) {
+    switch (type) {
+      case kCallback: {
+        ::new (&this->options) u_options(dst.cb());
+        break;
+      }
+      case kComponentPort: {
+        ::new (&this->options) u_options(dst.port());
+        break;
+      }
+    }
+  }
+
+  const callback_ptr& cb(void) const {
+    CkAssert(this->type == kCallback);
+    return this->options.cb;
+  }
+
+  const component_port_t& port(void) const {
+    CkAssert(this->type == kComponentPort);
+    return this->options.port;
+  }
 };
 
 using entry_port_map = comparable_map<entry_port_ptr, destination_>;
@@ -61,6 +103,31 @@ struct generic_locality_ {
         QdProcess(1);
       }
     }
+  }
+
+  /* TODO consider introducing a simplified connection API that
+   *      utilizes "port authorities", aka port id counters, to
+   *      remove src/dstPort for trivial, unordered connections
+   */
+
+  inline void connect(const component_id_t& src,
+                      const components::port_id_t& srcPort,
+                      const component_id_t& dst,
+                      const components::port_id_t& dstPort) {
+    this->components[src]->update_destination(
+        srcPort, this->make_connector(dst, dstPort));
+  }
+
+  inline void connect(const component_id_t& src,
+                      const components::port_id_t& srcPort,
+                      const callback_ptr& cb) {
+    this->components[src]->update_destination(srcPort, cb);
+  }
+
+  inline void connect(const entry_port_ptr& srcPort, const component_id_t& dst,
+                      const components::port_id_t& dstPort) {
+    this->components[dst]->add_listener(srcPort);
+    this->open(srcPort, std::make_pair(dst, dstPort));
   }
 
   void receive_value(const entry_port_ptr& port,
