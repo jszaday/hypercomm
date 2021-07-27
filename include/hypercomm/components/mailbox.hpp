@@ -7,12 +7,10 @@
 
 namespace hypercomm {
 
-extern callback_ptr local_connector_(const component_ptr&, const component::port_type&);
+extern callback_ptr local_connector_(const component_id_t&, const component::port_type&);
 
 template <typename T>
-class mailbox : public component,
-                public virtual value_source,
-                public std::enable_shared_from_this<mailbox<T>> {
+class mailbox : public component {
  public:
   using predicate_type = std::shared_ptr<immediate_action<bool(const T&)>>;
   using action_type = callback_ptr;
@@ -71,10 +69,12 @@ class mailbox : public component,
     }
   }
 
-  inline void put_request_to(const predicate_type& pred, const component_ptr& com, const component::port_type& port) {
+  inline void put_request_to(const predicate_type& pred, const component_id_t& com, const component::port_type& port) {
     auto cb = local_connector_(com, port);
     auto req = this->put_request(pred, cb);
-    if (req) com->add_listener(req);
+    if (req) {
+      (access_context()->components[com])->add_listener(req);
+    }
   }
 
   inline void pop_request(const request_type& req) {
@@ -85,14 +85,9 @@ class mailbox : public component,
     }
   }
 
-  virtual void take_back(value_type&& value) override {
-    this->receive_value(0, std::move(value));
-  }
-
   virtual value_set action(value_set&& accepted) override {
     auto value = value2typed<T>(std::move(accepted[0]));
     auto search = this->find_matching(value);
-    value->source = this->shared_from_this();
 
     if (search == std::end(this->requests_)) {
       QdCreate(1);

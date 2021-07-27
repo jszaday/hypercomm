@@ -22,7 +22,7 @@ struct destination_ {
 };
 
 using entry_port_map = comparable_map<entry_port_ptr, destination_>;
-using component_map = std::unordered_map<component::id_t, component_ptr>;
+using component_map = std::unordered_map<component::id_t, std::unique_ptr<component>>;
 
 extern message *repack_to_port(const entry_port_ptr &port, component::value_type &&value);
 
@@ -33,13 +33,14 @@ struct generic_locality_ {
   entry_port_map entry_ports;
   component_map components;
   message_queue<entry_port_ptr> port_queue;
+  std::vector<component_id_t> invalidations;
 
   using entry_port_iterator = typename decltype(entry_ports)::iterator;
 
   generic_locality_(void) { this->update_context(); }
 
   // implemented in locality.hpp
-  void loopback(CkMessage* msg);
+  void loopback(message* msg);
 
   virtual ~generic_locality_() {
     // update context (just in case)
@@ -63,7 +64,7 @@ struct generic_locality_ {
   void receive_value(const entry_port_ptr& port,
                      component::value_type&& value) {
     // save this port as the source of the value
-    value->source = port;
+    if (value) value->source = port;
     // seek this port in our list of active ports
     auto search = this->entry_ports.find(port);
     if (search == std::end(this->entry_ports)) {
@@ -131,19 +132,36 @@ struct generic_locality_ {
     }
   }
 
+  inline bool invalidated(const component::id_t& id) {
+    auto search = std::find(std::begin(this->invalidations), std::end(this->invalidations), id);
+    if (search == std::end(this->invalidations)) {
+      return false;
+    } else {
+      this->invalidations.erase(search);
+
+      return true;
+    }
+  }
+
   // forces termination of component, regardless of resilience
   inline void invalidate_component(const component::id_t& id) {
     auto search = this->components.find(id);
     if (search != std::end(this->components)) {
-      search->second->alive = false;
-      search->second->on_invalidation();
-      this->components.erase(search);
+      auto& com = search->second;
+      auto was_alive = com->alive;
+      com->alive = false;
+      com->on_invalidation();
+      if (was_alive) {
+        this->components.erase(search);
+      } else {
+        this->invalidations.emplace_back(id);
+      }
     }
   }
 
   inline void update_context(void);
 
-  inline callback_ptr make_connector(const component_ptr& com,
+  inline callback_ptr make_connector(const component_id_t& com,
                                      const component::port_type& port);
 
   virtual void try_send(const destination_& dest,
@@ -166,8 +184,8 @@ struct connector_ : public callback {
 };
 
 inline callback_ptr generic_locality_::make_connector(
-    const component_ptr& com, const component::port_type& port) {
-  return std::make_shared<connector_>(this, std::make_pair(com->id, port));
+    const component_id_t& com, const component::port_type& port) {
+  return std::make_shared<connector_>(this, std::make_pair(com, port));
 }
 
 namespace {
@@ -196,7 +214,7 @@ void locally_invalidate_(const component::id_t& which) {
   access_context()->invalidate_component(which);
 }
 
-callback_ptr local_connector_(const component_ptr& com,
+callback_ptr local_connector_(const component_id_t& com,
                               const component::port_type& port) {
   return access_context()->make_connector(com, port);
 }

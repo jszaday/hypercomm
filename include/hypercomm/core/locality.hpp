@@ -125,9 +125,11 @@ message *repack_to_port(const entry_port_ptr &port, component::value_type &&valu
   }
 }
 
-void generic_locality_::loopback(CkMessage* msg) {
+void generic_locality_::loopback(message* msg) {
   CkArrayID aid = UsrToEnv(msg)->getArrayMgr();
-  aid.ckLocalBranch()->deliver((CkArrayMessage*)msg, CkDeliver_queue);
+  auto id = ((CkArrayMessage*)msg)->array_element_id();
+  auto idx = aid.ckLocalBranch()->getLocMgr()->lookupIdx(id);
+  (CProxy_locality_base_(aid))[idx].demux(msg);
 }
 
 // NOTE this should always be used for invalidations
