@@ -26,6 +26,18 @@ class hyper_value {
 
 using value_ptr = std::shared_ptr<hyper_value>;
 
+inline void try_return(value_ptr&& value) {
+  auto &src = value->source;
+  if (src) {
+    src->take_back(std::move(value));
+  }
+#if HYPERCOMM_VERBOSE
+  else {
+    CkError("warning> unable to return value %p.\n", value.get());
+  }
+#endif
+}
+
 class plain_value : public hyper_value {
  public:
   message_type msg;

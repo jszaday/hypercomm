@@ -26,6 +26,31 @@ class component : virtual public impermanent {
 
   component(const id_t& _1) : id(_1), activated(false) {}
 
+  virtual ~component() {
+    // try to return all unused values
+    for (auto& set : this->incoming) {
+      for (auto& pair : set) {
+        try_return(std::move(pair.second));
+      }
+    }
+
+    // invalidate all unfulfilled routes
+    for (auto& pair : this->routes) {
+      for (auto& route : pair.second) {
+        route->send(value_type{});
+      }
+    }
+
+#if HYPERCOMM_VERBOSE
+    // we have values but nowhere to send 'em
+    auto n_outgoing = this->outgoing.size();
+    if (n_outgoing > 0) {
+      CkError("warning> com%lu destroyed with %lu unsent message(s).\n",
+              this->id, n_outgoing);
+    }
+#endif
+  }
+
   // determeines whether the component should stay
   // "alive" after its acted
   virtual bool keep_alive(void) const override;

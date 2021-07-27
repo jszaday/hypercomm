@@ -125,6 +125,11 @@ message *repack_to_port(const entry_port_ptr &port, component::value_type &&valu
   }
 }
 
+void generic_locality_::loopback(CkMessage* msg) {
+  CkArrayID aid = UsrToEnv(msg)->getArrayMgr();
+  aid.ckLocalBranch()->deliver((CkArrayMessage*)msg, CkDeliver_queue);
+}
+
 // NOTE this should always be used for invalidations
 template <typename Index>
 inline void send2port(const element_ptr<Index> &proxy, const entry_port_ptr &port,
