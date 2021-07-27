@@ -221,7 +221,8 @@ callback_ptr local_connector_(const component_id_t& com,
 
 template <typename T>
 void entry_port<T>::take_back(std::shared_ptr<hyper_value>&& value) {
-  access_context()->receive_value(this->shared_from_this(), std::move(value));
+  auto self = entry_port_ptr((entry_port_base*)this, [](void*){}); // THIS IS EXTREMELY UNSAFE
+  access_context()->receive_value(self, std::move(value));
 }
 }
 
