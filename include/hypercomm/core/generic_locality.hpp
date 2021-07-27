@@ -5,6 +5,9 @@
 
 namespace hypercomm {
 
+template <typename A, typename Enable = void>
+class comproxy;
+
 using component_port_t = std::pair<component::id_t, component::port_type>;
 
 class destination_ {
@@ -73,7 +76,22 @@ extern message* repack_to_port(const entry_port_ptr& port,
 template <typename Key>
 using message_queue = comparable_map<Key, std::deque<component::value_type>>;
 
-struct generic_locality_ {
+class generic_locality_ {
+ private:
+  template<typename A, typename Enable>
+  friend class comproxy;
+
+  template <typename A>
+  A* get_component(const component_id_t& id) {
+    auto search = this->components.find(id);
+    if (search != std::end(this->components)) {
+      return dynamic_cast<A*>(search->second.get());
+    } else {
+      return nullptr;
+    }
+  }
+
+ public:
   entry_port_map entry_ports;
   component_map components;
   message_queue<entry_port_ptr> port_queue;

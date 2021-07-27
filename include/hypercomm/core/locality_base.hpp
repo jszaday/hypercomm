@@ -12,6 +12,7 @@
 
 #include "future.hpp"
 #include "generic_locality.hpp"
+#include "../components/comproxy.hpp"
 
 namespace hypercomm {
 
@@ -186,21 +187,11 @@ struct locality_base : public generic_locality_,
 
  public:
   template <typename T, typename... Args>
-  const component_id_t& emplace_component(Args... args) {
+  comproxy<T> emplace_component(Args... args) {
     auto next = this->component_authority++;
     auto inst = new T(next, std::move(args)...);
     this->components.emplace(next, inst);
     return ((component*)inst)->id;
-  }
-
-  template <typename T>
-  T* get_component(const component_id_t& id) {
-    auto search = this->components.find(id);
-    if (search != std::end(this->components)) {
-      return dynamic_cast<T*>(search->second.get());
-    } else {
-      return nullptr;
-    }
   }
 
   void activate_component(const component_id_t& id) {

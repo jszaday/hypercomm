@@ -65,7 +65,7 @@ struct main : public CBase_main {
 
 struct locality : public vil<CBase_locality, int> {
   entry_port_ptr foo_port, bar_port, baz_port;
-  component_id_t foo_mailbox, bar_mailbox, baz_mailbox;
+  comproxy<mailbox<int>> foo_mailbox, bar_mailbox, baz_mailbox;
   int n, repNo;
   section_ptr section;
 
@@ -74,11 +74,10 @@ struct locality : public vil<CBase_locality, int> {
         repNo(0),
         foo_port(std::make_shared<persistent_port>(0)),
         bar_port(std::make_shared<persistent_port>(1)),
-        baz_port(std::make_shared<persistent_port>(2)) {
-    this->foo_mailbox = this->emplace_component<mailbox<int>>();
-    this->bar_mailbox = this->emplace_component<mailbox<int>>();
-    this->baz_mailbox = this->emplace_component<mailbox<int>>();
-
+        baz_port(std::make_shared<persistent_port>(2)),
+        foo_mailbox(this->emplace_component<mailbox<int>>()),
+        bar_mailbox(this->emplace_component<mailbox<int>>()),
+        baz_mailbox(this->emplace_component<mailbox<int>>()) {
     this->connect(this->foo_port, this->foo_mailbox, 0);
     this->connect(this->bar_port, this->bar_mailbox, 0);
     this->connect(this->baz_port, this->baz_mailbox, 0);
@@ -139,9 +138,9 @@ struct locality : public vil<CBase_locality, int> {
       // no pattern-matching is necessary, so the predicate is
       // null. additionally, each of these connect to a port
       // of a component (usually formatted as, e.g., com1:0)
-      this->get_component<mailbox<int>>(this->foo_mailbox)->put_request_to({}, com1, 0);
-      this->get_component<mailbox<int>>(this->bar_mailbox)->put_request_to({}, com1, 1);
-      this->get_component<mailbox<int>>(this->baz_mailbox)->put_request_to({}, com0, 0);
+      this->foo_mailbox->put_request_to({}, com1, 0);
+      this->bar_mailbox->put_request_to({}, com1, 1);
+      this->baz_mailbox->put_request_to({}, com0, 0);
 
       // the sentinel requires only one of com0 or com1 to pass
       senti->expect_any(com0, com1);

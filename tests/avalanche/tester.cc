@@ -67,14 +67,14 @@ struct main : public CBase_main {
 };
 
 struct receiver : public vil<CBase_receiver, int> {
-  component_id_t mbox;
+  comproxy<mailbox<int>> mbox;
   entry_port_ptr recv_port;
+
   int numIters;
 
   receiver(const int& _1)
-      : numIters(_1), recv_port(std::make_shared<persistent_port>(0)) {
-    this->mbox = this->emplace_component<mailbox<int>>();
-
+      : numIters(_1), recv_port(std::make_shared<persistent_port>(0)),
+        mbox(this->emplace_component<mailbox<int>>()) {
     this->connect(recv_port, this->mbox, 0);
 
     this->activate_component(this->mbox);
@@ -85,7 +85,7 @@ struct receiver : public vil<CBase_receiver, int> {
       for (int j = 0; j < numElements; j++) {
         auto mtchr = std::make_shared<matcher<int>>(i);
         auto cb = std::make_shared<nil_callback>();
-        this->get_component<mailbox<int>>(this->mbox)->put_request(mtchr, cb);
+        this->mbox->put_request(mtchr, cb);
       }
     }
   }

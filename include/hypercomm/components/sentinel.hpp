@@ -75,10 +75,10 @@ class sentinel : public component::status_listener,
   }
 
   template <typename T>
-  inline const component::id_t& any_helper(const T& t) {
-    (access_context()->components[t])->add_listener(this->shared_from_this());
-
-    return t;
+  inline component::id_t any_helper(T& t) {
+    component::id_t id = t;
+    (access_context()->components[id])->add_listener(this->shared_from_this());
+    return id;
   }
 
  public:
