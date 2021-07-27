@@ -42,6 +42,8 @@ struct generic_locality_ {
   void loopback(CkMessage* msg);
 
   virtual ~generic_locality_() {
+    // update context (just in case)
+    this->update_context();
     // (I) destroy all our entry ports
     // TODO ensure graceful exit(s) via invalidations?
     this->entry_ports.clear();
