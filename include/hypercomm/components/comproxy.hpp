@@ -10,9 +10,11 @@ template <typename A>
 class comproxy<
     A, typename std::enable_if<std::is_base_of<component, A>::value>::type> {
   using id_t = component::id_t;
-  const id_t id;
+  id_t id;
 
  public:
+  using type = A;
+
   comproxy(void) : id(std::numeric_limits<id_t>::max()) {}
   comproxy(const id_t& id) : id(id) {}
   comproxy(const comproxy<A>& proxy) : id(proxy->id) {}
