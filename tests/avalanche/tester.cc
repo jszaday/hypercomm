@@ -81,6 +81,8 @@ struct receiver : public vil<CBase_receiver, int> {
   }
 
   void run(void) {
+    this->update_context();
+
     for (int i = 0; i < numIters; i++) {
       for (int j = 0; j < numElements; j++) {
         auto mtchr = std::make_shared<matcher<int>>(i);
