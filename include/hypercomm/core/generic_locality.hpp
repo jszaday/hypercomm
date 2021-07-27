@@ -22,9 +22,11 @@ struct destination_ {
 };
 
 using entry_port_map = comparable_map<entry_port_ptr, destination_>;
-using component_map = std::unordered_map<component::id_t, std::unique_ptr<component>>;
+using component_map =
+    std::unordered_map<component::id_t, std::unique_ptr<component>>;
 
-extern message *repack_to_port(const entry_port_ptr &port, component::value_type &&value);
+extern message* repack_to_port(const entry_port_ptr& port,
+                               component::value_type&& value);
 
 template <typename Key>
 using message_queue = comparable_map<Key, std::deque<component::value_type>>;
@@ -133,7 +135,8 @@ struct generic_locality_ {
   }
 
   inline bool invalidated(const component::id_t& id) {
-    auto search = std::find(std::begin(this->invalidations), std::end(this->invalidations), id);
+    auto search = std::find(std::begin(this->invalidations),
+                            std::end(this->invalidations), id);
     if (search == std::end(this->invalidations)) {
       return false;
     } else {
@@ -206,10 +209,6 @@ inline generic_locality_* access_context(void) {
   return locality;
 }
 
-void locally_invalidate_(const entry_port_ptr& which) {
-  access_context()->invalidate_port(which);
-}
-
 void locally_invalidate_(const component::id_t& which) {
   access_context()->invalidate_component(which);
 }
@@ -219,10 +218,16 @@ callback_ptr local_connector_(const component_id_t& com,
   return access_context()->make_connector(com, port);
 }
 
-template <typename T>
-void entry_port<T>::take_back(std::shared_ptr<hyper_value>&& value) {
-  auto self = entry_port_ptr((entry_port_base*)this, [](void*){}); // THIS IS EXTREMELY UNSAFE
-  access_context()->receive_value(self, std::move(value));
+void entry_port::take_back(std::shared_ptr<hyper_value>&& value) {
+  access_context()->receive_value(this->shared_from_this(), std::move(value));
+}
+
+void entry_port::on_completion(const component&) {
+  access_context()->invalidate_port(this->shared_from_this());
+}
+
+void entry_port::on_invalidation(const component&) {
+  access_context()->invalidate_port(this->shared_from_this());
 }
 }
 
