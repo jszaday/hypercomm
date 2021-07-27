@@ -9,7 +9,7 @@
 namespace hypercomm {
 
 template <typename Index>
-struct reduction_port : public virtual entry_port {
+struct reduction_port : public entry_port {
   reduction_id_t id;
   Index index;
 

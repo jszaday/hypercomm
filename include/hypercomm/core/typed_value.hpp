@@ -17,8 +17,9 @@ class typed_value : public hyper_value {
   typed_value(const T& _1) : tmp(_1) {}
 
   typed_value(message_type msg) {
-    if (msg) unpack(msg, tmp.value());
-    else if (!std::is_same<unit_type, T>::value) {
+    if (msg) {
+      unpack(msg, tmp.value());
+    } else if (!std::is_same<unit_type, T>::value) {
       CkAbort("null pointer exception!");
     }
   }
@@ -45,7 +46,9 @@ std::shared_ptr<typed_value<T>> value2typed(
   if (try_cast) {
     return try_cast;
   } else if (value->recastable()) {
-    return std::make_shared<typed_value<T>>(std::move(value->release()));
+    auto typed = std::make_shared<typed_value<T>>(std::move(value->release()));
+    typed->source = value->source;
+    return std::move(typed);
   } else {
     throw std::runtime_error("invalid cast!");
   }

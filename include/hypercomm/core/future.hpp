@@ -51,7 +51,7 @@ struct puper<future> {
   }
 };
 
-struct future_port: public virtual entry_port {
+struct future_port: public entry_port {
   future f;
 
   future_port(PUP::reconstruct) {}

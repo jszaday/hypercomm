@@ -12,6 +12,7 @@
 
 #include "future.hpp"
 #include "generic_locality.hpp"
+#include "../components/comproxy.hpp"
 
 namespace hypercomm {
 
@@ -79,105 +80,44 @@ struct locality_base : public generic_locality_,
 
   virtual void request_future(const future& f, const callback_ptr& cb) override;
 
-  template<typename Action>
-  inline void receive_action(const Action& ptr) { ptr->action(this); }
+  template <typename Action>
+  inline void receive_action(const Action& ptr) {
+    ptr->action(this);
+  }
 
   void broadcast(const section_ptr&, hypercomm_msg*);
 
-  inline void broadcast(const section_ptr& section, const int& epIdx, hypercomm_msg* msg) {
+  inline void broadcast(const section_ptr& section, const int& epIdx,
+                        hypercomm_msg* msg) {
     UsrToEnv(msg)->setEpIdx(epIdx);
     this->broadcast(section, msg);
   }
 
   void receive_message(hypercomm_msg* msg);
 
-  std::string fmt_ports(const entry_port_ptr& port) const {
-    std::stringstream ss;
-
-    ss << std::to_string(this->__index__()) << "> has ports [ ";
-    for (auto& pair : this->entry_ports) {
-      ss << pair.first->to_string() << "(" << pair.first->hash() << ")" << ", ";
-    }
-    ss << "]. it sought " << port->to_string() << "(" << port->hash() << ")" << ", but couldn't find it.";
-
-    return ss.str();
-  }
-
-  void receive_value(const entry_port_ptr& port,
-                     component::value_type&& value) {
-    auto search = this->entry_ports.find(port);
-    if (search == std::end(this->entry_ports)) {
-      QdCreate(1);
-      port_queue[port].push_back(std::move(value));
-    } else {
-      CkAssert(search->first && search->first->alive &&
-               "entry port must be alive");
-      this->try_send(search->second, std::move(value));
-      // this->try_collect(search);
-    }
-  }
-
-  /* TODO consider introducing a simplified connection API that
-   *      utilizes "port authorities", aka port id counters, to
-   *      remove src/dstPort for trivial, unordered connections
-   */
-
-  inline void connect(const component_ptr& src,
-                      const components::port_id_t& srcPort,
-                      const component_ptr& dst,
-                      const components::port_id_t& dstPort) {
-    src->update_destination(srcPort, this->make_connector(dst, dstPort));
-  }
-
-  inline void connect(const component_ptr& src,
-                      const components::port_id_t& srcPort,
-                      const callback_ptr& cb) {
-    src->update_destination(srcPort, cb);
-  }
-
-  inline void connect(const entry_port_ptr& srcPort, const component_ptr& dst,
-                      const components::port_id_t& dstPort) {
-    dst->add_listener(srcPort);
-
-    this->open(srcPort, std::make_pair(dst->id, dstPort));
-  }
-
-  // void try_collect(entry_port_iterator& it) {
-  //   const auto& port = it->first;
-  //   port->alive = port->keep_alive();
-  //   if (!port->alive) {
-  //     this->entry_ports.erase(it);
-  //   }
-  // }
-
   void try_collect(const component_id_t& which) {
     this->try_collect(this->components[which]);
   }
 
-  void try_collect(const component_ptr& ptr) {
-    if (ptr && ptr->collectible()) {
-      const auto& id = ptr->id;
-#if CMK_VERBOSE
-      const auto& uses = ptr.use_count();
-      if (uses > 1) {
-        CkError("warning> component %lu replicated %lu time(s)!\n", id,
-                uses - 1);
-      }
-#endif
-      this->components.erase(id);
+  using component_type = typename decltype(components)::mapped_type;
+
+  void try_collect(const component_type& com) {
+    if (com && com->collectible()) {
+      this->components.erase(com->id);
     }
   }
 
-  virtual void try_send(const destination_& dest, component::value_type&& value) override {
+  virtual void try_send(const destination_& dest,
+                        component::value_type&& value) override {
     switch (dest.type) {
       case destination_::type_::kCallback: {
-        const auto& cb = dest.cb;
+        const auto& cb = dest.cb();
         CkAssert(cb && "callback must be valid!");
         cb->send(std::move(value));
         break;
       }
       case destination_::type_::kComponentPort:
-        this->try_send(dest.port, std::move(value));
+        this->try_send(dest.port(), std::move(value));
         break;
       default:
         CkAbort("unknown destination type");
@@ -209,14 +149,14 @@ struct locality_base : public generic_locality_,
 
  protected:
   void local_contribution(const identity_ptr& ident,
-                          component::value_type&& value,
-                          const combiner_ptr& fn, const callback_ptr& cb) {
+                          component::value_type&& value, const combiner_ptr& fn,
+                          const callback_ptr& cb) {
     auto next = ident->next_reduction();
     auto ustream = ident->upstream();
     auto dstream = ident->downstream();
 
     const auto& rdcr = this->emplace_component<reducer>(
-        fn, ustream.size() + 1, dstream.empty() ? 1 : dstream.size());
+         next, fn, ustream.size() + 1, dstream.empty() ? 1 : dstream.size());
 
     auto count = 0;
     for (const auto& up : ustream) {
@@ -230,7 +170,8 @@ struct locality_base : public generic_locality_,
       auto collective =
           std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
       CkAssert(collective && "locality must be a valid collective");
-      auto theirs = std::make_shared<reduction_port<Index>>(next, ident->mine());
+      auto theirs =
+          std::make_shared<reduction_port<Index>>(next, ident->mine());
 
       count = 0;
       for (const auto& down : dstream) {
@@ -241,27 +182,31 @@ struct locality_base : public generic_locality_,
     }
 
     this->activate_component(rdcr);
-    rdcr->receive_value(0, std::move(value));
+    this->components[rdcr]->receive_value(0, std::move(value));
   }
 
  public:
-  const component_ptr& emplace_component(component_ptr&& which) {
-    auto placed = this->components.emplace(which->id, std::move(which));
-    CkAssert(placed.second && "component id must be unique");
-    return placed.first->second;
-  }
-
   template <typename T, typename... Args>
-  const component_ptr& emplace_component(Args... args) {
+  comproxy<T> emplace_component(Args... args) {
     auto next = this->component_authority++;
-    return this->emplace_component(
-        std::make_shared<T>(next, std::move(args)...));
+    auto inst = new T(next, std::move(args)...);
+    this->components.emplace(next, inst);
+    return ((component*)inst)->id;
   }
 
-  void activate_component(const component_ptr& which) {
-    which->activate();
-
-    this->try_collect(which);
+  void activate_component(const component_id_t& id) {
+    auto search = this->components.find(id);
+    if (search != std::end(this->components)) {
+      if (this->invalidated(id)) {
+        this->components.erase(search);
+      } else {
+        auto& com = search->second;
+        com->activate();
+        this->try_collect(com);
+      }
+    } else {
+      CkAbort("fatal> unable to find com%lu.\n", id);
+    }
   }
 
   const identity_ptr& identity_for(const section_ptr& which) {
@@ -269,8 +214,7 @@ struct locality_base : public generic_locality_,
     if (search == identities.end()) {
       auto mine = this->__index__();
       auto iter = identities.emplace(
-          which,
-          std::make_shared<section_identity<Index>>(which, mine));
+          which, std::make_shared<section_identity<Index>>(which, mine));
       CkAssert(iter.second && "section should be unique!");
       return (iter.first)->second;
     } else {

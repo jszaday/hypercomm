@@ -65,7 +65,7 @@ struct main : public CBase_main {
 
 struct locality : public vil<CBase_locality, int> {
   entry_port_ptr foo_port, bar_port, baz_port;
-  std::shared_ptr<mailbox<int>> foo_mailbox, bar_mailbox, baz_mailbox;
+  comproxy<mailbox<int>> foo_mailbox, bar_mailbox, baz_mailbox;
   int n, repNo;
   section_ptr section;
 
@@ -74,14 +74,10 @@ struct locality : public vil<CBase_locality, int> {
         repNo(0),
         foo_port(std::make_shared<persistent_port>(0)),
         bar_port(std::make_shared<persistent_port>(1)),
-        baz_port(std::make_shared<persistent_port>(2)) {
-    this->foo_mailbox = std::dynamic_pointer_cast<mailbox<int>>(
-        this->emplace_component<mailbox<int>>());
-    this->bar_mailbox = std::dynamic_pointer_cast<mailbox<int>>(
-        this->emplace_component<mailbox<int>>());
-    this->baz_mailbox = std::dynamic_pointer_cast<mailbox<int>>(
-        this->emplace_component<mailbox<int>>());
-
+        baz_port(std::make_shared<persistent_port>(2)),
+        foo_mailbox(this->emplace_component<mailbox<int>>()),
+        bar_mailbox(this->emplace_component<mailbox<int>>()),
+        baz_mailbox(this->emplace_component<mailbox<int>>()) {
     this->connect(this->foo_port, this->foo_mailbox, 0);
     this->connect(this->bar_port, this->bar_mailbox, 0);
     this->connect(this->baz_port, this->baz_mailbox, 0);
