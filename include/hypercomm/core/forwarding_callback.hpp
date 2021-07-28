@@ -24,17 +24,15 @@ struct forwarding_callback : public core::callback {
 };
 
 template <typename Index>
-callback_ptr forward_to(const element_ptr<Index>& elt,
-                        const entry_port_ptr& port) {
+inline callback_ptr forward_to(const element_ptr<Index>& elt,
+                               const entry_port_ptr& port) {
   return std::make_shared<forwarding_callback<Index>>(elt, port);
 }
 
 template <typename Proxy>
-callback_ptr forward_to(const Proxy& elt, const entry_port_ptr& port) {
-  using index_type = impl_index_t<Proxy>;
-  using proxy_type = element_ptr<index_type>;
-  return std::make_shared<forwarding_callback<index_type>>(
-      (proxy_type)make_proxy(elt), port);
+inline callback_ptr forward_to(const Proxy& elt, const entry_port_ptr& port) {
+  using proxy_type = element_ptr<impl_index_t<Proxy>>;
+  return forward_to((proxy_type)make_proxy(elt), port);
 }
 }
 

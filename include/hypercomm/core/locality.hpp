@@ -218,7 +218,8 @@ class vil : public locality_bridge_<Base>,
 
       count = 0;
       for (const auto& down : dstream) {
-        auto fwd = forward_to(this->thisProxy[conv2idx<base_index_type>(down)], theirs);
+        auto downIdx = conv2idx<base_index_type>(down);
+        auto fwd = forward_to(this->thisProxy[downIdx], theirs);
         this->connect(rdcr, count++, std::move(fwd));
       }
     }
@@ -281,8 +282,11 @@ void generic_locality_::loopback(message* msg) {
   (CProxy_locality_base_(aid))[idx].demux(msg);
 }
 
-template <typename Proxy, typename = typename std::enable_if<std::is_base_of<CProxyElement_locality_base_, Proxy>::value>::type>
-inline void send2port(const Proxy& proxy, const entry_port_ptr& port, component::value_type&& value) {
+template <typename Proxy,
+          typename = typename std::enable_if<std::is_base_of<
+              CProxyElement_locality_base_, Proxy>::value>::type>
+inline void send2port(const Proxy& proxy, const entry_port_ptr& port,
+                      component::value_type&& value) {
   auto* msg = repack_to_port(port, std::move(value));
   const_cast<CProxyElement_locality_base_&>(proxy).demux(msg);
 }
@@ -370,15 +374,17 @@ void vil<Base, Index>::request_future(const future& f, const callback_ptr& cb) {
 
   auto& source = *f.source;
   if (!ourElement->equals(source)) {
+    // open a remote port that forwards to this locality
+    // TODO ( make this more generic, i.e., do not assume base_index_type )
     auto theirElement = dynamic_cast<element_proxy<base_index_type>*>(&source);
-    auto fwd = std::make_shared<forwarding_callback<base_index_type>>(ourElement, ourPort);
-    auto opener = std::make_shared<port_opener>(ourPort, fwd);
+    auto fwd = forward_to(std::move(ourElement), ourPort);
+    auto opener = std::make_shared<port_opener>(ourPort, std::move(fwd));
     indexed_locality_<base_index_type, Index>::send_action(
         theirElement->collection(), theirElement->index(), opener);
   }
 }
 
-template<typename Index>
+template <typename Index>
 void forwarding_callback<Index>::send(callback::value_type&& value) {
   send2port(this->proxy, this->port, std::move(value));
 }
