@@ -25,4 +25,4 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/hypercomm/messaging)
 add_subdirectory(src)
 
 # Generate template for tests
-configure_file(Makefile.common.in ${PROJECT_SOURCE_DIR}/Makefile.common)
+configure_file(Makefile.common.in ${CMAKE_SOURCE_DIR}/Makefile.common)

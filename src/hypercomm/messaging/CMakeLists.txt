@@ -15,5 +15,5 @@ target_include_directories(
 )
 
 target_include_directories(
-    hypercomm-messaging PUBLIC "${PROJECT_SOURCE_DIR}/include"
+    hypercomm-messaging PUBLIC "${CMAKE_SOURCE_DIR}/include"
 )

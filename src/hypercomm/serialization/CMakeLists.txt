@@ -9,5 +9,5 @@ target_include_directories(
 
 target_include_directories(
     hypercomm-serialization PUBLIC
-    "${PROJECT_SOURCE_DIR}/include"
+    "${CMAKE_SOURCE_DIR}/include"
 )
