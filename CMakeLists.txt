@@ -2,8 +2,16 @@ cmake_minimum_required(VERSION 3.10)
 
 project(hypercomm VERSION "0.0.001")
 
-set(CMAKE_C_COMPILER "$(CHARM_HOME)/bin/charmc")
-set(CMAKE_CXX_COMPILER "$(CHARM_HOME)/bin/charmc")
+
+set(CHARMC_PATH $ENV{CHARM_HOME})
+if(CHARMC_PATH)
+    message(STATUS "Charm compiler found at: ${CHARMC_PATH}")
+else(CHARMC_PATH)
+    message(FATAL_ERROR "Charm compiler not found. Set path using environment variable CHARM_HOME to the right location.")
+endif(CHARMC_PATH)
+
+set(CMAKE_C_COMPILER "${CHARMC_PATH}/bin/charmc")
+set(CMAKE_CXX_COMPILER "${CHARMC_PATH}/bin/charmc")
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
