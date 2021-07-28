@@ -1,25 +1,19 @@
 #ifndef __HYPERCOMM_CORE_FWDCB_HPP__
 #define __HYPERCOMM_CORE_FWDCB_HPP__
 
-#include "callback.hpp"
-#include "entry_port.hpp"
-#include "../serialization/pup.hpp"
+#include "common.hpp"
 
 namespace hypercomm {
 
+template <typename Index>
 struct forwarding_callback : public core::callback {
-  using proxy_ptr = std::shared_ptr<hypercomm::proxy>;
-  using array_element_ptr = std::shared_ptr<array_element_proxy>;
-
-  array_element_ptr proxy;
+  element_ptr<Index> proxy;
   entry_port_ptr port;
 
   forwarding_callback(PUP::reconstruct) {}
 
-  forwarding_callback(const proxy_ptr& _1, const entry_port_ptr& _2)
-        // TODO (make this more generic)
-      : proxy(std::dynamic_pointer_cast<typename array_element_ptr::element_type>(_1)),
-        port(_2) {}
+  forwarding_callback(const element_ptr<Index>& _1, const entry_port_ptr& _2)
+      : proxy(_1), port(_2) {}
 
   virtual void send(core::callback::value_type&&) override;
 
@@ -29,6 +23,19 @@ struct forwarding_callback : public core::callback {
   }
 };
 
+template <typename Index>
+callback_ptr forward_to(const element_ptr<Index>& elt,
+                        const entry_port_ptr& port) {
+  return std::make_shared<forwarding_callback<Index>>(elt, port);
+}
+
+template <typename Proxy>
+callback_ptr forward_to(const Proxy& elt, const entry_port_ptr& port) {
+  using index_type = impl_index_t<Proxy>;
+  using proxy_type = element_ptr<index_type>;
+  return std::make_shared<forwarding_callback<index_type>>(
+      (proxy_type)make_proxy(elt), port);
+}
 }
 
 #endif

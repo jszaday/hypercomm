@@ -70,9 +70,6 @@ class indexed_locality_ : public generic_locality_ {
   }
 };
 
-template <typename T>
-using impl_index_t = typename index_for<T>::type;
-
 template <typename Base, typename Enable = void>
 class locality_bridge_;
 
@@ -216,17 +213,13 @@ class vil : public locality_bridge_<Base>,
     if (dstream.empty()) {
       this->connect(rdcr, 0, cb);
     } else {
-      auto collective =
-          std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
-      CkAssert(collective && "locality must be a valid collective");
       auto theirs =
           std::make_shared<reduction_port<Index>>(next, ident->mine());
 
       count = 0;
       for (const auto& down : dstream) {
-        auto down_idx = conv2idx<base_index_type>(down);
-        this->connect(rdcr, count++, std::make_shared<forwarding_callback>(
-                                         (*collective)[down_idx], theirs));
+        auto fwd = forward_to(this->thisProxy[conv2idx<base_index_type>(down)], theirs);
+        this->connect(rdcr, count++, std::move(fwd));
       }
     }
 
@@ -288,12 +281,20 @@ void generic_locality_::loopback(message* msg) {
   (CProxy_locality_base_(aid))[idx].demux(msg);
 }
 
+template <typename Proxy, typename = typename std::enable_if<std::is_base_of<CProxyElement_locality_base_, Proxy>::value>::type>
+inline void send2port(const Proxy& proxy, const entry_port_ptr& port, component::value_type&& value) {
+  auto* msg = repack_to_port(port, std::move(value));
+  const_cast<CProxyElement_locality_base_&>(proxy).demux(msg);
+}
+
 // NOTE this should always be used for invalidations
 template <typename Index>
 inline void send2port(const element_ptr<Index>& proxy,
                       const entry_port_ptr& port,
                       component::value_type&& value) {
-  deliver(*proxy, repack_to_port(port, std::move(value)));
+  const auto& base =
+      static_cast<const CProxyElement_locality_base_&>(proxy->c_proxy());
+  send2port(base, port, std::move(value));
 }
 
 inline void send2port(const std::shared_ptr<generic_element_proxy>& proxy,
@@ -370,17 +371,16 @@ void vil<Base, Index>::request_future(const future& f, const callback_ptr& cb) {
   auto& source = *f.source;
   if (!ourElement->equals(source)) {
     auto theirElement = dynamic_cast<element_proxy<base_index_type>*>(&source);
-    auto fwd = std::make_shared<forwarding_callback>(ourElement, ourPort);
+    auto fwd = std::make_shared<forwarding_callback<base_index_type>>(ourElement, ourPort);
     auto opener = std::make_shared<port_opener>(ourPort, fwd);
     indexed_locality_<base_index_type, Index>::send_action(
         theirElement->collection(), theirElement->index(), opener);
   }
 }
 
-void forwarding_callback::send(callback::value_type&& value) {
-  // TODO ( make this more generic )
-  send2port(std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(this->proxy),
-            this->port, std::move(value));
+template<typename Index>
+void forwarding_callback<Index>::send(callback::value_type&& value) {
+  send2port(this->proxy, this->port, std::move(value));
 }
 }
 

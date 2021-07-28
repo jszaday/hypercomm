@@ -42,7 +42,7 @@ struct main : public CBase_main {
     CProxy_locality localities(msg->aid);
     double avgTime = 0.0;
 
-    auto root = conv2idx<CkArrayIndexMax>(0);
+    auto root = conv2idx<CkArrayIndex>(0);
     for (int i = 0; i < numReps; i += 1) {
       if ((i % 2) == 0) {
         CkPrintf("main> repetition %d of %d\n", i + 1, numReps);
@@ -128,8 +128,7 @@ typename my_redn_com::value_set my_redn_com::action(value_set&& accepted) {
   auto& numIters = std::get<1>(tmp->value());
   // make the function and callback
   auto fn = std::make_shared<null_combiner>();
-  auto cb = std::make_shared<forwarding_callback>(
-      make_proxy(self->thisProxy[idx]), self->redn_port);
+  auto cb = forward_to(self->thisProxy[idx], self->redn_port);
   // then do numIters reductions, each with empty messages
   for (auto it = 0; it < numIters; it++) {
 #if CMK_DEBUG
