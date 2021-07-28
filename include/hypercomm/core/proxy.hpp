@@ -65,11 +65,16 @@ constexpr bool is_array_proxy(void) {
   return std::is_base_of<CProxy_ArrayBase, T>::value;
 }
 
+template <typename T>
+constexpr bool is_array_element(void) {
+  return std::is_base_of<ArrayElement, T>::value;
+}
+
 template <typename T, typename Enable = void>
 struct index_for;
 
 template <typename T>
-struct index_for<T, typename std::enable_if<is_array_proxy<T>()>::type> {
+struct index_for<T, typename std::enable_if<is_array_proxy<T>() || is_array_element<T>()>::type> {
   using type = CkArrayIndex;
 };
 

@@ -1,8 +1,7 @@
 #ifndef __HYPERCOMM_COMPONENTS_COMPROXY_HPP__
 #define __HYPERCOMM_COMPONENTS_COMPROXY_HPP__
 
-#include "component.hpp"
-#include "../core/generic_locality.hpp"
+#include "../core/common.hpp"
 
 namespace hypercomm {
 
@@ -20,7 +19,7 @@ class comproxy<
   comproxy(const comproxy<A>& proxy) : id(proxy->id) {}
 
   A* operator->(void) const noexcept {
-    return access_context()->get_component<A>(this->id);
+    return access_context_()->get_component<A>(this->id);
   }
 
   operator id_t(void) const noexcept { return this->id; }

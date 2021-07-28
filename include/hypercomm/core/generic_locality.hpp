@@ -1,14 +1,9 @@
 #ifndef __HYPERCOMM_CORE_GENLOC_HPP__
 #define __HYPERCOMM_CORE_GENLOC_HPP__
 
-#include "entry_port.hpp"
+#include "common.hpp"
 
 namespace hypercomm {
-
-template <typename A, typename Enable = void>
-class comproxy;
-
-using component_port_t = std::pair<component::id_t, component::port_type>;
 
 class destination_ {
   union u_options {
@@ -66,16 +61,6 @@ class destination_ {
   }
 };
 
-using entry_port_map = comparable_map<entry_port_ptr, destination_>;
-using component_map =
-    std::unordered_map<component::id_t, std::unique_ptr<component>>;
-
-extern message* repack_to_port(const entry_port_ptr& port,
-                               component::value_type&& value);
-
-template <typename Key>
-using message_queue = comparable_map<Key, std::deque<component::value_type>>;
-
 class generic_locality_ {
  private:
   template<typename A, typename Enable>
@@ -96,10 +81,73 @@ class generic_locality_ {
   component_map components;
   message_queue<entry_port_ptr> port_queue;
   std::vector<component_id_t> invalidations;
+  future_id_t future_authority = 0;
+  component_id_t component_authority = 0;
 
   using entry_port_iterator = typename decltype(entry_ports)::iterator;
 
   generic_locality_(void) { this->update_context(); }
+
+  void activate_component(const component_id_t& id) {
+    auto search = this->components.find(id);
+    if (search != std::end(this->components)) {
+      if (this->invalidated(id)) {
+        this->components.erase(search);
+      } else {
+        auto& com = search->second;
+        com->activate();
+        this->try_collect(com);
+      }
+    } else {
+      CkAbort("fatal> unable to find com%lu.\n", id);
+    }
+  }
+
+  void receive_message(hypercomm_msg* msg);
+
+  void try_collect(const component_id_t& which) {
+    this->try_collect(this->components[which]);
+  }
+
+  using component_type = typename decltype(components)::mapped_type;
+
+  void try_collect(const component_type& com) {
+    if (com && com->collectible()) {
+      this->components.erase(com->id);
+    }
+  }
+
+  void try_send(const destination_& dest, component::value_type&& value) {
+    switch (dest.type) {
+      case destination_::type_::kCallback: {
+        const auto& cb = dest.cb();
+        CkAssert(cb && "callback must be valid!");
+        cb->send(std::move(value));
+        break;
+      }
+      case destination_::type_::kComponentPort:
+        this->try_send(dest.port(), std::move(value));
+        break;
+      default:
+        CkAbort("unknown destination type");
+    }
+  }
+
+  void try_send(const component_port_t& port, component::value_type&& value) {
+    auto search = components.find(port.first);
+#if CMK_ERROR_CHECKING
+    if (search == std::end(components)) {
+      std::stringstream ss;
+      ss << "fatal> recvd msg for invalid destination com" << port.first << ":"
+         << port.second << "!";
+      CkAbort("%s", ss.str().c_str());
+    }
+#endif
+
+    search->second->receive_value(port.second, std::move(value));
+
+    this->try_collect(search->second);
+  }
 
   // implemented in locality.hpp
   void loopback(message* msg);
@@ -251,9 +299,6 @@ class generic_locality_ {
 
   inline callback_ptr make_connector(const component_id_t& com,
                                      const component::port_type& port);
-
-  virtual void try_send(const destination_& dest,
-                        component::value_type&& value) = 0;
 };
 
 // TODO this is a temporary solution
@@ -288,31 +333,27 @@ inline void generic_locality_::update_context(void) {
   CpvAccess(locality_) = this;
 }
 
-inline generic_locality_* access_context(void) {
+inline generic_locality_* access_context_(void) {
   auto& locality = *(&CpvAccess(locality_));
   CkAssert(locality && "locality must be valid");
   return locality;
 }
 
-void locally_invalidate_(const component::id_t& which) {
-  access_context()->invalidate_component(which);
-}
-
 callback_ptr local_connector_(const component_id_t& com,
                               const component::port_type& port) {
-  return access_context()->make_connector(com, port);
+  return access_context_()->make_connector(com, port);
 }
 
 void entry_port::take_back(std::shared_ptr<hyper_value>&& value) {
-  access_context()->receive_value(this->shared_from_this(), std::move(value));
+  access_context_()->receive_value(this->shared_from_this(), std::move(value));
 }
 
 void entry_port::on_completion(const component&) {
-  access_context()->invalidate_port(this->shared_from_this());
+  access_context_()->invalidate_port(this->shared_from_this());
 }
 
 void entry_port::on_invalidation(const component&) {
-  access_context()->invalidate_port(this->shared_from_this());
+  access_context_()->invalidate_port(this->shared_from_this());
 }
 }
 

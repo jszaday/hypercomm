@@ -1,9 +1,7 @@
 #ifndef __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 #define __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 
-#include "../core/callback.hpp"
 #include "../components.hpp"
-#include "../serialization/pup.hpp"
 
 namespace hypercomm {
 

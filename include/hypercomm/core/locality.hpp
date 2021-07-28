@@ -1,52 +1,99 @@
 #ifndef __HYPERCOMM_CORE_LOCALITY_HPP__
 #define __HYPERCOMM_CORE_LOCALITY_HPP__
 
-#include "../messaging/packing.hpp"
+#include "../sections.hpp"
+#include "../components.hpp"
+#include "../utilities.hpp"
+#include "../reductions.hpp"
+
+#include "generic_locality.hpp"
+#include "locality_map.hpp"
 
 #include "broadcaster.hpp"
 #include "port_opener.hpp"
-#include "locality_map.hpp"
+
+#include "../messaging/packing.hpp"
+#include "../messaging/messaging.hpp"
+
+#include "../components/comproxy.hpp"
+#include "../core/forwarding_callback.hpp"
 
 struct locality_base_
-    : public CBase_locality_base_,
-      public virtual hypercomm::common_functions_<CkArrayIndex> {
-  using this_ptr = locality_base_ *;
-
+    : public CBase_locality_base_ {
   locality_base_(void) {}
 
-  virtual void demux(hypercomm_msg *msg) {
+  virtual void demux(hypercomm_msg* msg) {
     throw std::runtime_error("you should never see this!");
   }
 
-  virtual void execute(CkMessage *msg) {
+  virtual void execute(CkMessage* msg) {
     throw std::runtime_error("you should never see this!");
-  }
-
-  virtual const CkArrayIndex &__index_max__(void) const override {
-    return this->thisIndexMax;
-  }
-
-  virtual std::shared_ptr<hypercomm::collective_proxy<CkArrayIndex>>
-  __proxy__(void) const override {
-    return hypercomm::make_proxy(const_cast<this_ptr>(this)->thisProxy);
-  }
-
-  virtual std::shared_ptr<hypercomm::element_proxy<CkArrayIndex>>
-  __element__(void) const override {
-    return hypercomm::make_proxy(
-        (const_cast<this_ptr>(this)->thisProxy)[this->ckGetArrayIndex()]);
   }
 };
 
 namespace hypercomm {
 
+template <typename T>
+using impl_index_t = typename index_for<T>::type;
+
+template <typename BaseIndex, typename Index>
+class indexed_locality_ : public generic_locality_ {
+ public:
+  using action_type = typename std::shared_ptr<
+      immediate_action<void(indexed_locality_<BaseIndex, Index>*)>>;
+
+  using generic_action_type =
+      typename std::shared_ptr<immediate_action<void(generic_locality_*)>>;
+
+  // TODO make this more generic
+  static void send_action(const collective_ptr<BaseIndex>& p,
+                          const BaseIndex& i, const action_type& a);
+
+  static void send_action(const collective_ptr<BaseIndex>& p,
+                          const BaseIndex& i, const generic_action_type& a);
+};
+
 template <typename Base, typename Index>
-class vil : public Base, public locality_base<Index> {
-public:
+class vil : public Base,
+            public indexed_locality_<impl_index_t<Base>, Index>,
+            public future_manager_ {
+  using this_ptr = vil<Base, Index>*;
+
+ public:
   using index_type = Index;
+  using base_index_type = impl_index_t<Base>;
+
+  using identity_type = identity<Index>;
+  using section_ptr = typename section_identity<Index>::section_ptr;
+  using section_type = typename section_ptr::element_type;
+
+  using identity_ptr = std::shared_ptr<identity_type>;
+  using identity_map_t = comparable_map<section_ptr, identity_ptr>;
+  identity_map_t identities;
+
+  template <typename T, typename... Args>
+  comproxy<T> emplace_component(Args... args) {
+    auto next = this->component_authority++;
+    auto inst = new T(next, std::move(args)...);
+    this->components.emplace(next, inst);
+    return ((component*)inst)->id;
+  }
+
+  // TODO ( guard these in enable if based on index type )
+  const CkArrayIndex& __index_max__(void) const {
+    return this->thisIndexMax;
+  }
+
+  std::shared_ptr<hypercomm::collective_proxy<base_index_type>> __proxy__(void) const {
+    return hypercomm::make_proxy(const_cast<this_ptr>(this)->thisProxy);
+  }
+
+  std::shared_ptr<hypercomm::element_proxy<base_index_type>> __element__(void) const {
+    return hypercomm::make_proxy((const_cast<this_ptr>(this)->thisProxy)[this->ckGetArrayIndex()]);
+  }
 
   // NOTE ( this is a mechanism for remote task invocation )
-  virtual void execute(CkMessage *_1) override {
+  virtual void execute(CkMessage* _1) override {
     this->update_context();
 
     auto msg = utilities::wrap_message(_1);
@@ -56,11 +103,12 @@ public:
     s | typed;
 
     if (typed) {
-      typename locality_base<Index>::action_type action{};
+      typename indexed_locality_<base_index_type, Index>::action_type action{};
       s | action;
       this->receive_action(action);
     } else {
-      typename locality_base<Index>::generic_action_type action{};
+      typename indexed_locality_<base_index_type, Index>::generic_action_type
+          action{};
       s | action;
       this->receive_action(action);
     }
@@ -69,47 +117,135 @@ public:
   /* NOTE ( this is a mechanism for demux'ing an incoming message
    *        to the appropriate entry port )
    */
-  virtual void demux(hypercomm_msg *_1) override {
+  virtual void demux(hypercomm_msg* _1) override {
     this->update_context();
     auto msg = _1->is_null() ? std::shared_ptr<hyper_value>(
-                                   nullptr, [_1](void *) { CkFreeMsg(_1); })
+                                   nullptr, [_1](void*) { CkFreeMsg(_1); })
                              : msg2value(_1);
     this->receive_value(_1->dst, std::move(msg));
   }
+
+  const Index& __index__(void) const {
+    return reinterpret_index<Index>(this->__index_max__());
+  }
+
+  virtual future make_future(void) override {
+    const auto next = ++this->future_authority;
+    return future{.source = this->__element__(), .id = next};
+  }
+
+  virtual void request_future(const future& f, const callback_ptr& cb) override;
+
+  template <typename Action>
+  inline void receive_action(const Action& ptr) {
+    ptr->action(this);
+  }
+
+  void broadcast(const section_ptr&, hypercomm_msg*);
+
+  inline void broadcast(const section_ptr& section, const int& epIdx,
+                        hypercomm_msg* msg) {
+    UsrToEnv(msg)->setEpIdx(epIdx);
+    this->broadcast(section, msg);
+  }
+
+  template <typename T>
+  void local_contribution(const T& which, component::value_type&& value,
+                          const combiner_ptr& fn, const callback_ptr& cb) {
+    local_contribution(this->identity_for(which), std::move(value), fn, cb);
+  }
+
+  const identity_ptr& identity_for(const section_ptr& which) {
+    auto search = identities.find(which);
+    if (search == identities.end()) {
+      auto mine = this->__index__();
+      auto iter = identities.emplace(
+          which, std::make_shared<section_identity<Index>>(which, mine));
+      CkAssert(iter.second && "section should be unique!");
+      return (iter.first)->second;
+    } else {
+      return search->second;
+    }
+  }
+
+  inline const identity_ptr& identity_for(const section_type& src) {
+    return this->identity_for(std::move(src.clone()));
+  }
+
+  inline const identity_ptr& identity_for(const std::vector<Index>& src) {
+    return this->identity_for(vector_section<Index>(src));
+  }
+
+ protected:
+  void local_contribution(const identity_ptr& ident,
+                          component::value_type&& value, const combiner_ptr& fn,
+                          const callback_ptr& cb) {
+    auto next = ident->next_reduction();
+    auto ustream = ident->upstream();
+    auto dstream = ident->downstream();
+
+    const auto& rdcr = this->emplace_component<hypercomm::reducer>(
+        next, fn, ustream.size() + 1, dstream.empty() ? 1 : dstream.size());
+
+    auto count = 0;
+    for (const auto& up : ustream) {
+      auto ours = std::make_shared<reduction_port<Index>>(next, up);
+      this->connect(ours, rdcr, ++count);
+    }
+
+    if (dstream.empty()) {
+      this->connect(rdcr, 0, cb);
+    } else {
+      auto collective =
+          std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
+      CkAssert(collective && "locality must be a valid collective");
+      auto theirs =
+          std::make_shared<reduction_port<Index>>(next, ident->mine());
+
+      count = 0;
+      for (const auto& down : dstream) {
+        auto down_idx = conv2idx<base_index_type>(down);
+        this->connect(rdcr, count++, std::make_shared<forwarding_callback>(
+                                         (*collective)[down_idx], theirs));
+      }
+    }
+
+    this->activate_component(rdcr);
+    this->components[rdcr]->receive_value(0, std::move(value));
+  }
 };
 
-template <typename Index>
-/* static */ void
-locality_base<Index>::send_action(const collective_ptr<CkArrayIndex> &p,
-                                  const CkArrayIndex &i, const action_type &a) {
-  const auto &thisCollection =
-      static_cast<const CProxy_locality_base_ &>(p->c_proxy());
+template <typename BaseIndex, typename Index>
+/* static */ void indexed_locality_<BaseIndex, Index>::send_action(
+    const collective_ptr<BaseIndex>& p, const BaseIndex& i,
+    const action_type& a) {
+  const auto& thisCollection =
+      static_cast<const CProxy_locality_base_&>(p->c_proxy());
   auto msg = hypercomm::pack(true, a);
-  (const_cast<CProxy_locality_base_ &>(thisCollection))[i].execute(msg);
+  (const_cast<CProxy_locality_base_&>(thisCollection))[i].execute(msg);
+}
+
+template <typename BaseIndex, typename Index>
+/* static */ void indexed_locality_<BaseIndex, Index>::send_action(
+    const collective_ptr<BaseIndex>& p, const BaseIndex& i,
+    const generic_action_type& a) {
+  const auto& thisCollection =
+      static_cast<const CProxy_locality_base_&>(p->c_proxy());
+  auto msg = hypercomm::pack(false, a);
+  (const_cast<CProxy_locality_base_&>(thisCollection))[i].execute(msg);
 }
 
 template <typename Index>
-/* static */ void
-locality_base<Index>::send_action(const collective_ptr<CkArrayIndex> &p,
-                                  const CkArrayIndex &i, const generic_action_type &a) {
-  const auto &thisCollection =
-      static_cast<const CProxy_locality_base_ &>(p->c_proxy());
-  auto msg = hypercomm::pack(false, a);
-  (const_cast<CProxy_locality_base_ &>(thisCollection))[i].execute(msg);
-}
-
-template<typename Index>
 void deliver(const element_proxy<Index>& proxy, message* msg) {
-  const auto &base =
-      static_cast<const CProxyElement_locality_base_ &>(proxy.c_proxy());
-  const_cast<CProxyElement_locality_base_ &>(base).demux(msg);
+  const auto& base =
+      static_cast<const CProxyElement_locality_base_&>(proxy.c_proxy());
+  const_cast<CProxyElement_locality_base_&>(base).demux(msg);
 }
 
-message *repack_to_port(const entry_port_ptr &port, component::value_type &&value) {
- auto msg =
-      value
-          ? static_cast<message *>(value->release())
-          : hypercomm_msg::make_null_message(port);
+message* repack_to_port(const entry_port_ptr& port,
+                        component::value_type&& value) {
+  auto msg = value ? static_cast<message*>(value->release())
+                   : hypercomm_msg::make_null_message(port);
   auto env = UsrToEnv(msg);
   auto msgIdx = env->getMsgIdx();
   if (msgIdx == message::__idx) {
@@ -134,17 +270,19 @@ void generic_locality_::loopback(message* msg) {
 
 // NOTE this should always be used for invalidations
 template <typename Index>
-inline void send2port(const element_ptr<Index> &proxy, const entry_port_ptr &port,
-                      component::value_type &&value) {
+inline void send2port(const element_ptr<Index>& proxy,
+                      const entry_port_ptr& port,
+                      component::value_type&& value) {
   deliver(*proxy, repack_to_port(port, std::move(value)));
 }
 
-inline void send2port(const std::shared_ptr<generic_element_proxy> &proxy, const entry_port_ptr &port,
-                      component::value_type &&value) {
+inline void send2port(const std::shared_ptr<generic_element_proxy>& proxy,
+                      const entry_port_ptr& port,
+                      component::value_type&& value) {
   proxy->receive(repack_to_port(port, std::move(value)));
 }
 
-inline void send2future(const future& f, component::value_type &&value) {
+inline void send2future(const future& f, component::value_type&& value) {
   auto src = std::dynamic_pointer_cast<generic_element_proxy>(f.source);
   CkAssert(src && "future must be from a locality!");
   auto port = std::make_shared<future_port>(f);
@@ -155,8 +293,7 @@ template <typename Proxy, typename Index>
 inline void broadcast_to(
     const Proxy& proxy,
     const std::shared_ptr<section<std::int64_t, Index>>& section,
-    const int& epIdx,
-    hypercomm_msg* msg) {
+    const int& epIdx, hypercomm_msg* msg) {
   UsrToEnv(msg)->setEpIdx(epIdx);
 
   broadcast_to(make_proxy(proxy), section, msg);
@@ -168,15 +305,15 @@ inline void broadcast_to(
     const std::shared_ptr<section<std::int64_t, Index>>& section,
     hypercomm_msg* msg) {
   auto root = section->index_at(0);
-  auto action = std::make_shared<broadcaster<Index>>(section, msg);
+  using base_index_type = array_proxy::index_type;
+  auto action =
+      std::make_shared<broadcaster<base_index_type, Index>>(section, msg);
   auto collective = std::dynamic_pointer_cast<array_proxy>(proxy);
-  using index_type = array_proxy::index_type;
-  locality_base<Index>::send_action(collective, conv2idx<index_type>(root),
-                                    action);
+  indexed_locality_<base_index_type, Index>::send_action(
+      collective, conv2idx<base_index_type>(root), action);
 }
 
-template <typename Index>
-void locality_base<Index>::receive_message(hypercomm_msg* msg) {
+void generic_locality_::receive_message(hypercomm_msg* msg) {
   auto* env = UsrToEnv(msg);
   auto idx = env->getEpIdx();
 
@@ -187,39 +324,39 @@ void locality_base<Index>::receive_message(hypercomm_msg* msg) {
   }
 }
 
-template <typename Index>
-void locality_base<Index>::broadcast(const section_ptr& section,
-                                     hypercomm_msg* msg) {
+template <typename Base, typename Index>
+void vil<Base, Index>::broadcast(const section_ptr& section,
+                                 hypercomm_msg* msg) {
   auto root = section->index_at(0);
-  auto action = std::make_shared<broadcaster<Index>>(section, msg);
+  auto action =
+      std::make_shared<broadcaster<base_index_type, Index>>(section, msg);
 
   if (root == this->__index__()) {
     this->receive_action(action);
   } else {
     auto collective = std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
-    using index_type = array_proxy::index_type;
     send_action(collective, conv2idx<index_type>(root), action);
   }
 }
 
-template <typename Index>
-void locality_base<Index>::request_future(const future &f,
-                                          const callback_ptr &cb) {
+template <typename Base, typename Index>
+void vil<Base, Index>::request_future(const future& f, const callback_ptr& cb) {
   auto ourPort = std::make_shared<future_port>(f);
   auto ourElement = this->__element__();
 
   this->open(ourPort, cb);
 
-  auto &source = *f.source;
+  auto& source = *f.source;
   if (!ourElement->equals(source)) {
-    auto theirElement = dynamic_cast<element_proxy<CkArrayIndex> *>(&source);
+    auto theirElement = dynamic_cast<element_proxy<base_index_type>*>(&source);
     auto fwd = std::make_shared<forwarding_callback>(ourElement, ourPort);
     auto opener = std::make_shared<port_opener>(ourPort, fwd);
-    send_action(theirElement->collection(), theirElement->index(), opener);
+    indexed_locality_<base_index_type, Index>::send_action(
+        theirElement->collection(), theirElement->index(), opener);
   }
 }
 
-void forwarding_callback::send(callback::value_type &&value) {
+void forwarding_callback::send(callback::value_type&& value) {
   send2port(std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(this->proxy),
             this->port, std::move(value));
 }
