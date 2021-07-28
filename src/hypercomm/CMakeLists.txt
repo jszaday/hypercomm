@@ -10,6 +10,9 @@ add_library(hypercomm-utilities "${UTILITIES_SOURCES}")
 add_dependencies(hypercomm-utilities hypercomm-messaging)
 
 target_include_directories(
-    hypercomm-utilities PUBLIC
-    "${PROJECT_SOURCE_DIR}/include"
+    hypercomm-utilities PUBLIC "${CMAKE_BINARY_DIR}/include"
+)
+
+target_include_directories(
+    hypercomm-utilities PUBLIC "${PROJECT_SOURCE_DIR}/include"
 )

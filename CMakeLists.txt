@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.10)
 
 project(hypercomm VERSION "0.0.001")
 
-
 set(CHARMC_PATH $ENV{CHARM_HOME})
 if(CHARMC_PATH)
     message(STATUS "Charm compiler found at: ${CHARMC_PATH}")
