@@ -47,3 +47,10 @@ _deps
 # Charm++ Files
 *.def.h
 *.decl.h
+
+# Binary files from tests
+charmrun
+tester
+
+# Makefile.common template
+Makefile.common

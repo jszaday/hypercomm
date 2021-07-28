@@ -1,6 +1,6 @@
 add_custom_command(
     OUTPUT "${PROJECT_SOURCE_DIR}/include/hypercomm/core/locality.decl.h"
-    COMMAND "$(CHARM_HOME)/bin/charmc" -I. "${PROJECT_SOURCE_DIR}/src/hypercomm/core/locality.ci"
+    COMMAND ${CMAKE_CXX_COMPILER} -I. "${PROJECT_SOURCE_DIR}/src/hypercomm/core/locality.ci"
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/hypercomm/core
 )
 

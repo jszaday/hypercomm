@@ -9,6 +9,6 @@ target_include_directories(
 
 add_custom_command(
     OUTPUT "${PROJECT_SOURCE_DIR}/include/hypercomm/messaging/messaging.decl.h"
-    COMMAND "$(CHARM_HOME)/bin/charmc" -I. "${PROJECT_SOURCE_DIR}/src/hypercomm/messaging/messaging.ci"
+    COMMAND ${CMAKE_CXX_COMPILER} -I. "${PROJECT_SOURCE_DIR}/src/hypercomm/messaging/messaging.ci"
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/hypercomm/messaging
 )
