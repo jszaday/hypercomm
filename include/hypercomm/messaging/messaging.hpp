@@ -1,7 +1,7 @@
 #ifndef __HYPERCOMM_MESSAGING_MESSAGING_HPP__
 #define __HYPERCOMM_MESSAGING_MESSAGING_HPP__
 
-#include "messaging.decl.h"
+#include <hypercomm/messaging/messaging.decl.h>
 #include "../core/entry_port.hpp"
 
 namespace hypercomm {

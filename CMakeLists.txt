@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.10)
 
 project(hypercomm VERSION "0.0.001")
 
-
 set(CHARMC_PATH $ENV{CHARM_HOME})
 if(CHARMC_PATH)
     message(STATUS "Charm compiler found at: ${CHARMC_PATH}")
@@ -20,7 +19,10 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/hypercomm/core)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/hypercomm/messaging)
+
 add_subdirectory(src)
 
 # Generate template for tests
-configure_file(Makefile.common.in Makefile.common)
+configure_file(Makefile.common.in ${PROJECT_SOURCE_DIR}/Makefile.common)

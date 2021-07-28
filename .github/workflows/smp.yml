@@ -34,8 +34,9 @@ jobs:
     - name: prep-hypercomm
       run: |
         export CHARM_HOME=$GITHUB_WORKSPACE/charm
-        cmake .
-        make -j2
+        cmake -H. -Bbuild/
+        cd build
+        make
 
     # Test Hypercomm
     - name: test-hypercomm

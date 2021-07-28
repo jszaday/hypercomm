@@ -1,9 +1,6 @@
 include ../../Makefile.common
 
-BINARY = tester
-
-INCLUDES = -I$(HYPERCOMM_HOME)/include -I$(HYPERCOMM_HOME)/include/hypercomm/core
-LIBS = -L$(HYPERCOMM_HOME)/lib -lhypercomm-components -lhypercomm-utilities -lhypercomm-serialization -lhypercomm-messaging -lSegFault
+BINARY=tester
 
 OPTS?=-g -O2
 TESTOPTS?=4
