@@ -45,10 +45,10 @@ class indexed_locality_ : public generic_locality_ {
   using identity_ptr = std::shared_ptr<identity_type>;
 
   using action_type = typename std::shared_ptr<
-      immediate_action<void(indexed_locality_<BaseIndex, Index>*)> >;
+      immediate_action<void(indexed_locality_<BaseIndex, Index>*)>>;
 
   using generic_action_type =
-      typename std::shared_ptr<immediate_action<void(generic_locality_*)> >;
+      typename std::shared_ptr<immediate_action<void(generic_locality_*)>>;
 
   static void send_action(const collective_ptr<BaseIndex>& p,
                           const BaseIndex& i, const action_type& a);
@@ -56,11 +56,8 @@ class indexed_locality_ : public generic_locality_ {
   static void send_action(const collective_ptr<BaseIndex>& p,
                           const BaseIndex& i, const generic_action_type& a);
 
-  virtual std::shared_ptr<hypercomm::collective_proxy<base_index_type> >
-  __proxy__(void) const = 0;
-
-  virtual std::shared_ptr<hypercomm::element_proxy<base_index_type> >
-  __element__(void) const = 0;
+  virtual element_ptr<BaseIndex> __element__(void) const = 0;
+  virtual collective_ptr<BaseIndex> __proxy__(void) const = 0;
 
   virtual const identity_ptr& identity_for(const section_ptr& which) = 0;
 
@@ -114,13 +111,11 @@ class vil : public locality_bridge_<Base>,
     return ((component*)inst)->id;
   }
 
-  virtual std::shared_ptr<hypercomm::collective_proxy<base_index_type> >
-  __proxy__(void) const override {
+  virtual collective_ptr<base_index_type> __proxy__(void) const override {
     return hypercomm::make_proxy(const_cast<this_ptr_>(this)->thisProxy);
   }
 
-  virtual std::shared_ptr<hypercomm::element_proxy<base_index_type> >
-  __element__(void) const override {
+  virtual element_ptr<base_index_type> __element__(void) const override {
     return hypercomm::make_proxy(
         (const_cast<this_ptr_>(this)->thisProxy)[this->__base_index__()]);
   }
@@ -193,7 +188,7 @@ class vil : public locality_bridge_<Base>,
     if (search == identities.end()) {
       auto mine = this->__index__();
       auto iter = identities.emplace(
-          which, std::make_shared<section_identity<Index> >(which, mine));
+          which, std::make_shared<section_identity<Index>>(which, mine));
       CkAssert(iter.second && "section should be unique!");
       return (iter.first)->second;
     } else {
@@ -214,7 +209,7 @@ class vil : public locality_bridge_<Base>,
 
     auto count = 0;
     for (const auto& up : ustream) {
-      auto ours = std::make_shared<reduction_port<Index> >(next, up);
+      auto ours = std::make_shared<reduction_port<Index>>(next, up);
       this->connect(ours, rdcr, ++count);
     }
 
@@ -225,7 +220,7 @@ class vil : public locality_bridge_<Base>,
           std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
       CkAssert(collective && "locality must be a valid collective");
       auto theirs =
-          std::make_shared<reduction_port<Index> >(next, ident->mine());
+          std::make_shared<reduction_port<Index>>(next, ident->mine());
 
       count = 0;
       for (const auto& down : dstream) {
@@ -317,7 +312,7 @@ inline void send2future(const future& f, component::value_type&& value) {
 template <typename Proxy, typename Index>
 inline void broadcast_to(
     const Proxy& proxy,
-    const std::shared_ptr<section<std::int64_t, Index> >& section,
+    const std::shared_ptr<section<std::int64_t, Index>>& section,
     const int& epIdx, hypercomm_msg* msg) {
   UsrToEnv(msg)->setEpIdx(epIdx);
 
@@ -327,12 +322,12 @@ inline void broadcast_to(
 template <typename Index>
 inline void broadcast_to(
     const proxy_ptr& proxy,
-    const std::shared_ptr<section<std::int64_t, Index> >& section,
+    const std::shared_ptr<section<std::int64_t, Index>>& section,
     hypercomm_msg* msg) {
   auto root = section->index_at(0);
   using base_index_type = array_proxy::index_type;
   auto action =
-      std::make_shared<broadcaster<base_index_type, Index> >(section, msg);
+      std::make_shared<broadcaster<base_index_type, Index>>(section, msg);
   auto collective = std::dynamic_pointer_cast<array_proxy>(proxy);
   indexed_locality_<base_index_type, Index>::send_action(
       collective, conv2idx<base_index_type>(root), action);
@@ -354,7 +349,7 @@ void vil<Base, Index>::broadcast(const section_ptr& section,
                                  hypercomm_msg* msg) {
   auto root = section->index_at(0);
   auto action =
-      std::make_shared<broadcaster<base_index_type, Index> >(section, msg);
+      std::make_shared<broadcaster<base_index_type, Index>>(section, msg);
 
   if (root == this->__index__()) {
     this->receive_action(action);
@@ -384,9 +379,8 @@ void vil<Base, Index>::request_future(const future& f, const callback_ptr& cb) {
 
 void forwarding_callback::send(callback::value_type&& value) {
   // TODO ( make this more generic )
-  send2port(
-      std::dynamic_pointer_cast<element_proxy<CkArrayIndex> >(this->proxy),
-      this->port, std::move(value));
+  send2port(std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(this->proxy),
+            this->port, std::move(value));
 }
 }
 
