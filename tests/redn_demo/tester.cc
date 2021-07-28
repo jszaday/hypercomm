@@ -16,7 +16,7 @@ void enroll_polymorphs(void) {
   if (CkMyRank() == 0) {
     hypercomm::enroll<persistent_port>();
     hypercomm::enroll<reduction_port<int>>();
-    hypercomm::enroll<broadcaster<int>>();
+    hypercomm::enroll<broadcaster<CkArrayIndex, int>>();
     hypercomm::enroll<generic_section<int>>();
   }
 }

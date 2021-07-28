@@ -2,12 +2,9 @@
 #define __HYPERCOMM_COMPONENTS_MAILBOX_HPP__
 
 #include "../core/typed_value.hpp"
-
-#include "component.hpp"
+#include "../core/common.hpp"
 
 namespace hypercomm {
-
-extern callback_ptr local_connector_(const component_id_t&, const component::port_type&);
 
 template <typename T>
 class mailbox : public component {
@@ -73,7 +70,7 @@ class mailbox : public component {
     auto cb = local_connector_(com, port);
     auto req = this->put_request(pred, cb);
     if (req) {
-      (access_context()->components[com])->add_listener(req);
+      (access_context_()->components[com])->add_listener(req);
     }
   }
 

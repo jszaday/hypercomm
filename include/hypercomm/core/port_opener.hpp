@@ -1,7 +1,7 @@
 #ifndef __HYPERCOMM_CORE_PORT_OPENER_HPP__
 #define __HYPERCOMM_CORE_PORT_OPENER_HPP__
 
-#include "locality_base.hpp"
+#include "common.hpp"
 
 namespace hypercomm {
 

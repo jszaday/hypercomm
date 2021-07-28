@@ -1,11 +1,9 @@
 #ifndef __HYPERCOMM_COMPONENTS_SENTINEL_HPP__
 #define __HYPERCOMM_COMPONENTS_SENTINEL_HPP__
 
-#include "component.hpp"
+#include "../core/common.hpp"
 
 namespace hypercomm {
-
-extern void locally_invalidate_(const component::id_t&);
 
 // NOTE this could be made into a component if it makes sense to
 //      do so, but it doesn't really have i/o so i'm hesitant
@@ -31,7 +29,7 @@ class sentinel : public component::status_listener,
       auto& group = *(search->second);
       for (const auto& peer : group) {
         if (peer != id) {
-          locally_invalidate_(peer);
+          access_context_()->invalidate_component(peer);
         }
       }
 
@@ -71,13 +69,13 @@ class sentinel : public component::status_listener,
   inline void all_helper(const T& t) {
     this->n_expected_ += 1;
 
-    (access_context()->components[t])->add_listener(this->shared_from_this());
+    (access_context_()->components[t])->add_listener(this->shared_from_this());
   }
 
   template <typename T>
   inline component::id_t any_helper(T& t) {
     component::id_t id = t;
-    (access_context()->components[id])->add_listener(this->shared_from_this());
+    (access_context_()->components[id])->add_listener(this->shared_from_this());
     return id;
   }
 
