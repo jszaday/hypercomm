@@ -6,5 +6,10 @@ add_dependencies(hypercomm-components hypercomm-messaging)
 
 target_include_directories(
     hypercomm-components PUBLIC
-    "${CMAKE_SOURCE_DIR}/include"
+    "${CMAKE_BINARY_DIR}/include"
+)
+
+target_include_directories(
+    hypercomm-components PUBLIC
+    "${PROJECT_SOURCE_DIR}/include"
 )

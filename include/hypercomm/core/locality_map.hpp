@@ -3,7 +3,7 @@
 
 #include "../utilities.hpp"
 
-#include "locality.decl.h"
+#include <hypercomm/core/locality.decl.h>
 
 class locality_map_ : public CkArrayMap {
   bool node_level_;

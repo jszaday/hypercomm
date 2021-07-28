@@ -225,6 +225,6 @@ void forwarding_callback::send(callback::value_type &&value) {
 }
 }
 
-#include "locality.def.h"
+#include <hypercomm/core/locality.def.h>
 
 #endif
