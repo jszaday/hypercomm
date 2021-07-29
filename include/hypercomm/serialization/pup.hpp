@@ -143,7 +143,8 @@ struct puper<T, typename std::enable_if<hypercomm::built_in<T>::value>::type> {
   inline static void undelegate(serdes& s, T& t, std::false_type) {}
 
   inline static void impl(serdes& s, T& t) {
-    undelegate(s, t, typename std::integral_constant<bool, is_proxy>::type());
+    // NOTE ( this may be necessary for certain configurations )
+    // undelegate(s, t, typename std::integral_constant<bool, is_proxy>::type());
     auto p = make_puper(s);
     if (s.unpacking()) {
       reconstruct(&t);
