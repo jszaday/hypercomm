@@ -20,7 +20,7 @@ void enroll_polymorphs(void) {
   if (CkMyRank() == 0) {
     hypercomm::enroll<future_port>();
     hypercomm::enroll<port_opener>();
-    hypercomm::enroll<forwarding_callback>();
+    hypercomm::enroll<forwarding_callback<CkArrayIndex>>();
   }
 }
 

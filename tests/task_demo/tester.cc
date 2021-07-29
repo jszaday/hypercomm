@@ -12,6 +12,7 @@ void enroll_polymorphs(void) {
 
   if (CkMyRank() == 0) {
     hypercomm::enroll<persistent_port>();
+    hypercomm::enroll<forwarding_callback<CkArrayIndex>>();
   }
 }
 
@@ -96,9 +97,8 @@ struct locality : public vil<CBase_locality, int> {
     // gen_values.(1) => add values
     this->connect(com0, 1, com2, 0);
     // gen_values.(2) => recv_value@neighbor
-    auto neighborIdx = conv2idx<CkArrayIndexMax>((selfIdx + 1) % n);
-    auto neighbor = make_proxy(thisProxy[neighborIdx]);
-    auto fwd = std::make_shared<forwarding_callback>(neighbor, recv_value);
+    auto neighborIdx = conv2idx<CkArrayIndex>((selfIdx + 1) % n);
+    auto fwd = forward_to(thisProxy[neighborIdx], recv_value);
     this->connect(com0, 2, fwd);
     // recv_value@here => add values
     this->connect(recv_value, com2, 1);

@@ -2,11 +2,17 @@
 #define __HYPERCOMM_CORE_COMMON_HPP__
 
 #include "future.hpp"
+#include "callback.hpp"
 #include "entry_port.hpp"
+
+#include "../serialization/pup.hpp"
 
 #include "../components/component.hpp"
 
 namespace hypercomm {
+
+template <typename T>
+using impl_index_t = typename index_for<T>::type;
 
 template <typename A, typename Enable = void>
 class comproxy;
@@ -42,6 +48,11 @@ using element_ptr = std::shared_ptr<hypercomm::element_proxy<Index>>;
 
 template <typename Index>
 using collective_ptr = std::shared_ptr<hypercomm::collective_proxy<Index>>;
+
+template <typename BaseIndex, typename Action>
+void send_action(
+    const collective_ptr<BaseIndex>& p, const BaseIndex& i,
+    const Action& a);
 
 struct future_manager_ {
   virtual future make_future(void) = 0;
