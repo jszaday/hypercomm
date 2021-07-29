@@ -44,17 +44,11 @@ class indexed_locality_ : public generic_locality_ {
   using identity_type = identity<Index>;
   using identity_ptr = std::shared_ptr<identity_type>;
 
-  using action_type = typename std::shared_ptr<
+  using action_type = std::shared_ptr<
       immediate_action<void(indexed_locality_<BaseIndex, Index>*)>>;
 
   using generic_action_type =
-      typename std::shared_ptr<immediate_action<void(generic_locality_*)>>;
-
-  static void send_action(const collective_ptr<BaseIndex>& p,
-                          const BaseIndex& i, const action_type& a);
-
-  static void send_action(const collective_ptr<BaseIndex>& p,
-                          const BaseIndex& i, const generic_action_type& a);
+      std::shared_ptr<immediate_action<void(generic_locality_*)>>;
 
   virtual element_ptr<BaseIndex> __element__(void) const = 0;
   virtual collective_ptr<BaseIndex> __proxy__(void) const = 0;
@@ -229,24 +223,47 @@ class vil : public locality_bridge_<Base>,
   }
 };
 
-template <typename BaseIndex, typename Index>
-/* static */ void indexed_locality_<BaseIndex, Index>::send_action(
-    const collective_ptr<BaseIndex>& p, const BaseIndex& i,
-    const action_type& a) {
-  const auto& thisCollection =
-      static_cast<const CProxy_locality_base_&>(p->c_proxy());
-  auto msg = hypercomm::pack(true, a);
-  (const_cast<CProxy_locality_base_&>(thisCollection))[i].execute(msg);
+template <typename T, typename Enable = void>
+struct get_argument;
+
+template <typename T>
+struct get_argument<immediate_action<void(T*)>> {
+  using type = T;
+};
+
+template <typename T>
+struct get_argument<T, typename std::enable_if<is_base_of_template<
+                           T, immediate_action>::value>::type> {
+  template <typename A>
+  static A get_argument_impl(const immediate_action<void(A)>*);
+  using ptr_type = decltype(get_argument_impl(std::declval<T*>()));
+  using type = typename std::remove_pointer<ptr_type>::type;
+};
+
+template <typename T>
+struct get_argument<std::shared_ptr<T>> {
+  using type = typename get_argument<T>::type;
+};
+
+template <typename Action>
+void send_action(const std::shared_ptr<generic_element_proxy>& p,
+                 const Action& a) {
+  using arg_type = typename get_argument<Action>::type;
+  constexpr auto is_act =
+      is_base_of_template<arg_type, indexed_locality_>::value;
+  constexpr auto is_gen = std::is_base_of<generic_locality_, arg_type>::value;
+  static_assert(is_act || is_gen, "unrecognized action type");
+
+  auto& c_proxy = const_cast<CProxy&>(p->c_proxy());
+  auto msg = hypercomm::pack(is_act, a);
+
+  (static_cast<CProxyElement_locality_base_&>(c_proxy)).execute(msg);
 }
 
-template <typename BaseIndex, typename Index>
-/* static */ void indexed_locality_<BaseIndex, Index>::send_action(
-    const collective_ptr<BaseIndex>& p, const BaseIndex& i,
-    const generic_action_type& a) {
-  const auto& thisCollection =
-      static_cast<const CProxy_locality_base_&>(p->c_proxy());
-  auto msg = hypercomm::pack(false, a);
-  (const_cast<CProxy_locality_base_&>(thisCollection))[i].execute(msg);
+template <typename BaseIndex, typename Action>
+void send_action(const collective_ptr<BaseIndex>& p, const BaseIndex& i,
+                 const Action& a) {
+  send_action((*p)[i], a);
 }
 
 template <typename Index>
@@ -330,12 +347,12 @@ inline void broadcast_to(
     const std::shared_ptr<section<std::int64_t, Index>>& section,
     hypercomm_msg* msg) {
   auto root = section->index_at(0);
+  // TODO ( make this more generic, i.e., do not assume array proxy )
   using base_index_type = array_proxy::index_type;
   auto action =
       std::make_shared<broadcaster<base_index_type, Index>>(section, msg);
   auto collective = std::dynamic_pointer_cast<array_proxy>(proxy);
-  indexed_locality_<base_index_type, Index>::send_action(
-      collective, conv2idx<base_index_type>(root), action);
+  send_action(collective, conv2idx<base_index_type>(root), action);
 }
 
 void generic_locality_::receive_message(hypercomm_msg* msg) {
@@ -359,9 +376,8 @@ void vil<Base, Index>::broadcast(const section_ptr& section,
   if (root == this->__index__()) {
     this->receive_action(action);
   } else {
-    auto collective = std::dynamic_pointer_cast<array_proxy>(this->__proxy__());
-    indexed_locality_<base_index_type, Index>::send_action(
-        collective, conv2idx<base_index_type>(root), action);
+    auto rootIdx = conv2idx<base_index_type>(root);
+    send_action(this->__proxy__(), rootIdx, action);
   }
 }
 
@@ -372,15 +388,12 @@ void vil<Base, Index>::request_future(const future& f, const callback_ptr& cb) {
 
   this->open(ourPort, cb);
 
-  auto& source = *f.source;
-  if (!ourElement->equals(source)) {
+  auto home = std::dynamic_pointer_cast<generic_element_proxy>(f.source);
+  if (home && !home->equals(*ourElement)) {
     // open a remote port that forwards to this locality
-    // TODO ( make this more generic, i.e., do not assume base_index_type )
-    auto theirElement = dynamic_cast<element_proxy<base_index_type>*>(&source);
     auto fwd = forward_to(std::move(ourElement), ourPort);
     auto opener = std::make_shared<port_opener>(ourPort, std::move(fwd));
-    indexed_locality_<base_index_type, Index>::send_action(
-        theirElement->collection(), theirElement->index(), opener);
+    send_action(home, opener);
   }
 }
 

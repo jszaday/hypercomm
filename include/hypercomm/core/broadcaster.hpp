@@ -7,7 +7,6 @@ namespace hypercomm {
 template <typename BaseIndex, typename Index>
 struct broadcaster
     : public immediate_action<void(indexed_locality_<BaseIndex, Index>*)> {
-  using index_type = array_proxy::index_type;
   using section_ptr = typename indexed_locality_<BaseIndex, Index>::section_ptr;
 
   section_ptr section;
@@ -25,9 +24,7 @@ struct broadcaster
 
   virtual void action(indexed_locality_<BaseIndex, Index>* _1) override {
     auto& locality = const_cast<indexed_locality_<BaseIndex, Index>&>(*_1);
-    auto collective =
-        std::dynamic_pointer_cast<array_proxy>(locality.__proxy__());
-    CkAssert(collective && "must be a valid collective");
+    auto collective = locality.__proxy__();
 
     const auto& identity = locality.identity_for(this->section);
     auto ustream = identity->upstream();
@@ -35,8 +32,7 @@ struct broadcaster
       auto copy =
           std::static_pointer_cast<hypercomm_msg>(utilities::copy_message(msg));
       auto next = std::make_shared<broadcaster<BaseIndex, Index>>(this->section, std::move(copy));
-      indexed_locality_<BaseIndex, Index>::send_action(
-          collective, conv2idx<BaseIndex>(up), std::move(next));
+      send_action(collective, conv2idx<BaseIndex>(up), std::move(next));
     }
 
     locality.receive_message(static_cast<hypercomm::message*>(
