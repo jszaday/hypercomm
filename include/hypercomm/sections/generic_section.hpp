@@ -11,7 +11,7 @@ namespace hypercomm {
 
 // TODO fix the ordinal to be something more like (typename std::vector<Index>::size_type)
 template <typename Index>
-struct vector_section : public section<std::int64_t, Index>, public polymorph {
+struct vector_section : public section<std::int64_t, Index> {
   using indices_type = std::vector<Index>;
   using store_type = typename std::aligned_storage<sizeof(indices_type), alignof(indices_type)>::type;
 

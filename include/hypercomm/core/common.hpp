@@ -22,7 +22,7 @@ class destination_;
 
 class generic_locality_;
 
-template<typename BaseIndex, typename Index>
+template<typename Index>
 class indexed_locality_;
 
 using entry_port_map = comparable_map<entry_port_ptr, destination_>;

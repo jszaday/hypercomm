@@ -2,6 +2,7 @@
 #define __HYPERCOMM_SECTIONS_IDENTITY_HPP__
 
 #include "../components/identifiers.hpp"
+#include <vector>
 
 namespace hypercomm {
 
