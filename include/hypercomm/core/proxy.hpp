@@ -12,7 +12,7 @@
 namespace hypercomm {
 using chare_t = ChareType;
 
-struct proxy : std::enable_shared_from_this<proxy> {
+struct proxy /* : virtual public hashable */ {
  public:
   inline bool node_level(void) const;
 
