@@ -32,26 +32,22 @@ struct locality_base_ : public CBase_locality_base_ {
 
 namespace hypercomm {
 
-template <typename BaseIndex, typename Index>
+template <typename Index>
 class indexed_locality_ : public generic_locality_ {
  public:
-  using index_type = Index;
-  using base_index_type = BaseIndex;
-
   using section_ptr = typename section_identity<Index>::section_ptr;
   using section_type = typename section_ptr::element_type;
 
   using identity_type = identity<Index>;
   using identity_ptr = std::shared_ptr<identity_type>;
 
-  using action_type = std::shared_ptr<
-      immediate_action<void(indexed_locality_<BaseIndex, Index>*)>>;
+  using action_type =
+      std::shared_ptr<immediate_action<void(indexed_locality_<Index>*)>>;
 
   using generic_action_type =
       std::shared_ptr<immediate_action<void(generic_locality_*)>>;
 
-  virtual element_ptr<BaseIndex> __element__(void) const = 0;
-  virtual collective_ptr<BaseIndex> __proxy__(void) const = 0;
+  virtual std::shared_ptr<proxy> __gencon__(void) const = 0;
 
   virtual const identity_ptr& identity_for(const section_ptr& which) = 0;
 
@@ -71,22 +67,34 @@ template <typename Base>
 class locality_bridge_<Base,
                        typename std::enable_if<is_array_element<Base>()>::type>
     : public Base {
+  using this_ptr_ = locality_bridge_<Base>*;
+
  public:
-  const CkArrayIndex& __base_index__(void) const {
+  using base_index_type = CkArrayIndex;
+
+  inline const CkArrayIndex& __base_index__(void) const {
     return this->ckGetArrayIndex();
+  }
+
+  inline collective_ptr<CkArrayIndex> __proxy__(void) const {
+    return hypercomm::make_proxy(const_cast<this_ptr_>(this)->thisProxy);
+  }
+
+  inline element_ptr<CkArrayIndex> __element__(void) const {
+    return hypercomm::make_proxy(
+        (const_cast<this_ptr_>(this)->thisProxy)[this->__base_index__()]);
   }
 };
 
 template <typename Base, typename Index>
 class vil : public locality_bridge_<Base>,
-            public indexed_locality_<impl_index_t<Base>, Index>,
+            public indexed_locality_<Index>,
             public future_manager_ {
-  using this_ptr_ = vil<Base, Index>*;
-  using idx_locality_ = indexed_locality_<impl_index_t<Base>, Index>;
+  using idx_locality_ = indexed_locality_<Index>;
 
  public:
   using index_type = Index;
-  using base_index_type = typename idx_locality_::base_index_type;
+  using base_index_type = typename locality_bridge_<Base>::base_index_type;
 
   using section_ptr = typename idx_locality_::section_ptr;
   using identity_ptr = typename idx_locality_::identity_ptr;
@@ -102,13 +110,9 @@ class vil : public locality_bridge_<Base>,
     return ((component*)inst)->id;
   }
 
-  virtual collective_ptr<base_index_type> __proxy__(void) const override {
-    return hypercomm::make_proxy(const_cast<this_ptr_>(this)->thisProxy);
-  }
-
-  virtual element_ptr<base_index_type> __element__(void) const override {
-    return hypercomm::make_proxy(
-        (const_cast<this_ptr_>(this)->thisProxy)[this->__base_index__()]);
+  // NOTE ( generic collective proxy accessor method )
+  virtual std::shared_ptr<proxy> __gencon__(void) const {
+    return std::static_pointer_cast<proxy>(this->__proxy__());
   }
 
   // NOTE ( this is a mechanism for remote task invocation )
@@ -122,12 +126,11 @@ class vil : public locality_bridge_<Base>,
     s | typed;
 
     if (typed) {
-      typename indexed_locality_<base_index_type, Index>::action_type action{};
+      typename indexed_locality_<Index>::action_type action{};
       s | action;
       this->receive_action(action);
     } else {
-      typename indexed_locality_<base_index_type, Index>::generic_action_type
-          action{};
+      typename indexed_locality_<Index>::generic_action_type action{};
       s | action;
       this->receive_action(action);
     }
@@ -171,7 +174,7 @@ class vil : public locality_bridge_<Base>,
   template <typename T>
   void local_contribution(const T& which, component::value_type&& value,
                           const combiner_ptr& fn, const callback_ptr& cb) {
-    local_contribution(this->identity_for(which), std::move(value), fn, cb);
+    local_contribution(which->imprint(this), std::move(value), fn, cb);
   }
 
   virtual const identity_ptr& identity_for(const section_ptr& which) override {
@@ -332,27 +335,25 @@ inline void send2future(const future& f, component::value_type&& value) {
 }
 
 template <typename Proxy, typename Index>
-inline void broadcast_to(
-    const Proxy& proxy,
-    const std::shared_ptr<section<std::int64_t, Index>>& section,
-    const int& epIdx, hypercomm_msg* msg) {
+inline void broadcast_to(const Proxy& proxy,
+                         const std::shared_ptr<imprintable<Index>>& section,
+                         const int& epIdx, hypercomm_msg* msg) {
   UsrToEnv(msg)->setEpIdx(epIdx);
 
   broadcast_to(make_proxy(proxy), section, msg);
 }
 
 template <typename Index>
-inline void broadcast_to(
-    const proxy_ptr& proxy,
-    const std::shared_ptr<section<std::int64_t, Index>>& section,
-    hypercomm_msg* msg) {
-  auto root = section->index_at(0);
-  // TODO ( make this more generic, i.e., do not assume array proxy )
-  using base_index_type = array_proxy::index_type;
+inline void broadcast_to(const proxy_ptr& proxy,
+                         const std::shared_ptr<imprintable<Index>>& section,
+                         hypercomm_msg* msg) {
+  // TODO ( do not assume array index )
+  using base_index_type = CkArrayIndex;
   auto action =
       std::make_shared<broadcaster<base_index_type, Index>>(section, msg);
-  auto collective = std::dynamic_pointer_cast<array_proxy>(proxy);
-  send_action(collective, conv2idx<base_index_type>(root), action);
+  auto collective =
+      std::dynamic_pointer_cast<collective_proxy<base_index_type>>(proxy);
+  send_action(collective, conv2idx<base_index_type>(section->root()), action);
 }
 
 void generic_locality_::receive_message(hypercomm_msg* msg) {

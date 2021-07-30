@@ -1,16 +1,12 @@
 #ifndef __HYPERCOMM_SECTIONS_BASE_HPP__
 #define __HYPERCOMM_SECTIONS_BASE_HPP__
 
-#include <memory>
-#include <vector>
-#include <algorithm>
-
-#include "../core/comparable.hpp"
+#include "imprintable.hpp"
 
 namespace hypercomm {
 
 template <typename Ordinal, typename Index>
-struct section : public virtual comparable {
+struct section : public polymorph, public comparable, public imprintable<Index> {
   using ordinal_type = Ordinal;
   using this_type = section<Ordinal, Index>;
   using section_ptr = std::shared_ptr<this_type>;
@@ -31,11 +27,22 @@ struct section : public virtual comparable {
     return Ordinal((search == indices.end()) ? -1 : (search - indices.begin()));
   }
 
-  virtual Index index_at(const Ordinal& ord) const {
+  virtual const Index& root(void) const {
+    return this->index_at(0);
+  }
+
+  virtual const Index& index_at(const Ordinal& ord) const {
     return (this->members())[ord];
   }
 
   virtual hash_code hash(void) const override { return 0x0; }
+
+  using identity_ptr = typename imprintable<Index>::identity_ptr;
+  using locality_ptr = typename imprintable<Index>::locality_ptr;
+
+  virtual const identity_ptr& imprint(const locality_ptr& loc) const {
+    return loc->identity_for(this->clone());
+  }
 };
 
 }
