@@ -44,6 +44,10 @@ jobs:
         echo "redn_demo"
         TESTOPTS="++local 65" make test
         TESTOPTS="++local 129" make test
+        cd ../bcast_demo
+        echo "bcast_demo"
+        TESTOPTS="++local 65" make test
+        TESTOPTS="++local 129" make test
         cd ../future_demo
         echo "future_demo"
         TESTOPTS="++local 65" make test
