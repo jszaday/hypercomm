@@ -163,9 +163,11 @@ class vil : public locality_bridge_<Base>,
     ptr->action(this);
   }
 
-  void broadcast(const section_ptr&, hypercomm_msg*);
+  using imprintable_ptr = std::shared_ptr<imprintable<Index>>;
 
-  inline void broadcast(const section_ptr& section, const int& epIdx,
+  void broadcast(const imprintable_ptr&, hypercomm_msg*);
+
+  inline void broadcast(const imprintable_ptr& section, const int& epIdx,
                         hypercomm_msg* msg) {
     UsrToEnv(msg)->setEpIdx(epIdx);
     this->broadcast(section, msg);
@@ -349,11 +351,12 @@ inline void broadcast_to(const proxy_ptr& proxy,
                          hypercomm_msg* msg) {
   // TODO ( do not assume array index )
   using base_index_type = CkArrayIndex;
+  auto root = section->pick_root(proxy);
   auto action =
-      std::make_shared<broadcaster<base_index_type, Index>>(section, msg);
+      std::make_shared<broadcaster<base_index_type, Index>>(root, section, msg);
   auto collective =
       std::dynamic_pointer_cast<collective_proxy<base_index_type>>(proxy);
-  send_action(collective, conv2idx<base_index_type>(section->root()), action);
+  send_action(collective, conv2idx<base_index_type>(root), action);
 }
 
 void generic_locality_::receive_message(hypercomm_msg* msg) {
@@ -368,17 +371,19 @@ void generic_locality_::receive_message(hypercomm_msg* msg) {
 }
 
 template <typename Base, typename Index>
-void vil<Base, Index>::broadcast(const section_ptr& section,
+void vil<Base, Index>::broadcast(const imprintable_ptr& section,
                                  hypercomm_msg* msg) {
-  auto root = section->index_at(0);
+  auto proxy = this->__proxy__();
+  auto mine = this->__index__();
+  auto root = section->pick_root(proxy, &mine);
   auto action =
-      std::make_shared<broadcaster<base_index_type, Index>>(section, msg);
+      std::make_shared<broadcaster<base_index_type, Index>>(root, section, msg);
 
-  if (root == this->__index__()) {
+  if (root == mine) {
     this->receive_action(action);
   } else {
     auto rootIdx = conv2idx<base_index_type>(root);
-    send_action(this->__proxy__(), rootIdx, action);
+    send_action(proxy, rootIdx, action);
   }
 }
 

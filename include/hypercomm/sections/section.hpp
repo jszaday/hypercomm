@@ -6,7 +6,9 @@
 namespace hypercomm {
 
 template <typename Ordinal, typename Index>
-struct section : public polymorph, public comparable, public imprintable<Index> {
+struct section : public polymorph,
+                 public comparable,
+                 public imprintable<Index> {
   using ordinal_type = Ordinal;
   using this_type = section<Ordinal, Index>;
   using section_ptr = std::shared_ptr<this_type>;
@@ -27,8 +29,13 @@ struct section : public polymorph, public comparable, public imprintable<Index> 
     return Ordinal((search == indices.end()) ? -1 : (search - indices.begin()));
   }
 
-  virtual const Index& root(void) const {
-    return this->index_at(0);
+  virtual const Index& pick_root(const proxy_ptr&, Index* favored) const {
+    // pick favored if it is a valid member of this section
+    if (favored && this->ordinal_for(*favored) >= 0) {
+      return *favored;
+    } else {
+      return this->index_at(0);
+    }
   }
 
   virtual const Index& index_at(const Ordinal& ord) const {
@@ -44,7 +51,6 @@ struct section : public polymorph, public comparable, public imprintable<Index> 
     return loc->identity_for(this->clone());
   }
 };
-
 }
 
 #endif
