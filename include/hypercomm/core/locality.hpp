@@ -336,13 +336,12 @@ inline void send2future(const future& f, component::value_type&& value) {
   send2port(src, port, std::move(value));
 }
 
-template <typename Proxy, typename Index>
-inline void broadcast_to(const Proxy& proxy,
+template <typename Index>
+inline void broadcast_to(const proxy_ptr& proxy,
                          const std::shared_ptr<imprintable<Index>>& section,
                          const int& epIdx, hypercomm_msg* msg) {
   UsrToEnv(msg)->setEpIdx(epIdx);
-
-  broadcast_to(make_proxy(proxy), section, msg);
+  broadcast_to(proxy, section, msg);
 }
 
 template <typename Index>

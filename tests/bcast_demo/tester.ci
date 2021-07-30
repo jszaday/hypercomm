@@ -1,0 +1,18 @@
+mainmodule tester {
+    mainchare main {
+        entry main(CkArgMsg*);
+        entry [threaded] void run(CkArrayCreatedMsg*);
+    };
+
+    extern module locality;
+
+    array [Max] locality : locality_base_ {
+        entry locality(int);
+        entry void run(CkMessage*);
+        entry void recv_broadcast(void);
+    };
+
+    readonly std::vector<int> kIndices;
+
+    initproc void enroll_polymorphs(void);
+}

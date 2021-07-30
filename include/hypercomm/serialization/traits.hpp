@@ -60,6 +60,16 @@ struct built_in<CkArrayIndex> {
   enum { value = 1 };
 };
 
+template <>
+struct built_in<CkCallback> {
+  enum { value = 1 };
+};
+
+template <>
+struct built_in<CkArrayID> {
+  enum { value = 1 };
+};
+
 template <typename T>
 struct built_in<
     T, typename std::enable_if<std::is_base_of<CProxy, T>::value>::type> {
