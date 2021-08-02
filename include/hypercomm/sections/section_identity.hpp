@@ -11,7 +11,7 @@ class section_identity : public identity<Index> {
  public:
   // TODO this should be a more generic thing
   //      (e.g., incorporate proxies for cross-array sections)
-  using ordinal_type = typename generic_section<Index>::ordinal_type;
+  using ordinal_type = typename vector_section<Index>::ordinal_type;
   using index_type = Index;
 
   using section_type = section<ordinal_type, index_type>;
