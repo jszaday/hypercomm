@@ -191,7 +191,9 @@ class interceptor : public CBase_interceptor {
   inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
                                 CkMessage* msg) {
     if (((CkGroupID)interceptor_).isZero()) {
-      CkPrintf("warning> unable to deliver through interceptor.\n");
+#if CMK_VERBOSE
+      CkError("warning> unable to deliver through interceptor.\n");
+#endif
       // TODO ( is there a better function for this? )
       CProxyElement_ArrayBase::ckSendWrapper(aid, idx, msg,
                                              UsrToEnv(msg)->getEpIdx(), 0);
