@@ -201,8 +201,9 @@ class vil : public locality_bridge_<Base>,
     auto ustream = ident->upstream();
     auto dstream = ident->downstream();
 
-    const auto& rdcr = this->emplace_component<hypercomm::reducer>(
-        next, fn, ustream.size() + 1, dstream.empty() ? 1 : dstream.size());
+    const auto& rdcr = this->emplace_component<reducer>(
+        std::make_tuple(ident->get_imprintable(), next), fn, ustream.size() + 1,
+        dstream.empty() ? 1 : dstream.size());
 
     auto count = 0;
     for (const auto& up : ustream) {

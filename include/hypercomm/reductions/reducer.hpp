@@ -1,20 +1,22 @@
 #ifndef __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 #define __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 
-#include "../components.hpp"
+#include "../sections/imprintable.hpp"
 
 namespace hypercomm {
 
 struct reducer : public hypercomm::component {
-  const reduction_id_t redn_no;
-  std::size_t n_ustream, n_dstream;
-  hypercomm::combiner_ptr combiner;
+  using stamp_type = std::tuple<std::shared_ptr<imprintable_base_>, reduction_id_t>;
+  stamp_type stamp;
 
-  reducer(const component::id_t &_1, const reduction_id_t &_2,
+  hypercomm::combiner_ptr combiner;
+  std::size_t n_ustream, n_dstream;
+
+  reducer(const component::id_t &_1, const stamp_type &_2,
           const hypercomm::combiner_ptr &_3, const std::size_t &_4,
           const std::size_t &_5)
       : component(_1),
-        redn_no(_2),
+        stamp(_2),
         combiner(_3),
         n_ustream(_4),
         n_dstream(_5) {}

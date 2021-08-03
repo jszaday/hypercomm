@@ -17,6 +17,9 @@ using impl_index_t = typename index_for<T>::type;
 template <typename A, typename Enable = void>
 class comproxy;
 
+template <typename Index>
+class identity;
+
 class connector_;
 class destination_;
 
