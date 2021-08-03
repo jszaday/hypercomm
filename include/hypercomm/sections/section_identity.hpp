@@ -53,8 +53,8 @@ class section_identity : public identity<Index> {
     auto rval = std::vector<Index>{};
     if (sect_->is_valid_ordinal(left)) rval.push_back(sect_->index_at(left));
     if (sect_->is_valid_ordinal(right)) rval.push_back(sect_->index_at(right));
-#if CMK_DEBUG
-    CkPrintf("%d> has children %lu and %lu.\n", mine, left, right);
+#if CMK_VERBOSE
+    CkPrintf("%d> has children %lu and %lu.\n", mine_, left, right);
 #endif
     return rval;
   }

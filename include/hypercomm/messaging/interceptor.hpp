@@ -130,28 +130,33 @@ class interceptor : public CBase_interceptor {
   }
 
   void deliver(const CkArrayID& aid, const CkArrayIndex& raw, CkMessage* msg) {
+    auto* env = UsrToEnv(msg);
+    env->setMsgtype(ForArrayEltMsg);
+    auto& numHops = env->getsetArrayHops();
+
     this->lock();
 
     auto& idx = this->dealias(aid, raw);
     auto pair = this->lastKnown(aid, idx);
     auto& homePe = pair.first;
-    auto& pe = (pair.second >= 0) ? pair.second : homePe;
-    auto nd = CkNodeOf(pe);
+    auto& lastPe = (pair.second >= 0) ? pair.second : homePe;
+    auto homeNode = CkNodeOf(homePe);
+    auto lastNode = CkNodeOf(lastPe);
 
-    if (nd == CkMyNode()) {
+    if (lastNode == CkMyNode()) {
       auto* arr = CProxy_ArrayBase(aid).ckLocalBranchOther(CkRankOf(pe));
       auto* elt = arr->lookup(idx);
 
       if (elt != nullptr) {
-        if (pe == CkMyPe()) {
+        if (lastPe == CkMyPe()) {
           elt->ckInvokeEntry(UsrToEnv(msg)->getEpIdx(), msg, true);
         } else {
-          CmiPushPE(CkRankOf(pe), new intercept_msg(aid, idx, msg));
+          CmiPushPE(CkRankOf(lastPe), new intercept_msg(aid, idx, msg));
         }
 
         this->unlock();
         return;
-      } else if (CkNodeOf(homePe) == CkMyNode()) {
+      } else if (homeNode == CkMyNode()) {
         this->queued_[aid][idx].push_back(msg);
 
 #if CMK_ERROR_CHECKING
@@ -170,12 +175,23 @@ class interceptor : public CBase_interceptor {
     }
 
     this->unlock();
-    thisProxy[nd].deliver(aid, idx, CkMarshalledMessage(msg));
+
+    int destNode;
+    if (numHops > 1 && (homeNode != CkMyNode())) {
+      numHops = 0;
+      destNode = homeNode;
+    } else {
+      numHops += 1;
+      destNode = lastNode;
+    }
+
+    thisProxy[destNode].deliver(aid, idx, CkMarshalledMessage(msg));
   }
 
   inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
                                 CkMessage* msg) {
     if (((CkGroupID)interceptor_).isZero()) {
+      CkPrintf("warning> unable to deliver through interceptor.\n");
       // TODO ( is there a better function for this? )
       CProxyElement_ArrayBase::ckSendWrapper(aid, idx, msg,
                                              UsrToEnv(msg)->getEpIdx(), 0);
@@ -197,6 +213,7 @@ class interceptor_initializer_ : public CBase_interceptor_initializer_ {
  public:
   interceptor_initializer_(CkArgMsg* m) {
     interceptor_ = CProxy_interceptor::ckNew();
+    delete this;
   }
 
   interceptor_initializer_(CkMigrateMessage* m)

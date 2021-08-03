@@ -58,7 +58,7 @@ __msg__ *__msg__::unpack(void *buf) {
   __msg__ *msg = (__msg__ *)buf;
   const auto expected_size = std::size_t(msg->payload) - hdr_size;
   msg->payload = (char *)((size_t)msg->payload + (char *)msg);
-#if CMK_DEBUG
+#if CMK_VERBOSE
   auto str =
       hypercomm::utilities::buf2str((char *)msg + hdr_size, expected_size);
   CkPrintf("info@%d> unpacking a %lu byte port from: %s\n", CkMyPe(),
