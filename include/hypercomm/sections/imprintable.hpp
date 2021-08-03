@@ -11,7 +11,7 @@ class imprintable_base_ : public virtual comparable {
 };
 
 template <typename Index>
-class imprintable : public imprintable_base_ {
+class imprintable : public polymorph, public imprintable_base_ {
  public:
   using identity_ptr = std::shared_ptr<identity<Index>>;
   using locality_ptr = indexed_locality_<Index>*;

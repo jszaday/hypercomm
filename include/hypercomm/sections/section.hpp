@@ -6,7 +6,7 @@
 namespace hypercomm {
 
 template <typename Ordinal, typename Index>
-struct section : public polymorph, public imprintable<Index> {
+struct section : public imprintable<Index> {
   using ordinal_type = Ordinal;
   using this_type = section<Ordinal, Index>;
   using section_ptr = std::shared_ptr<this_type>;

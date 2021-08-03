@@ -200,14 +200,15 @@ class vil : public locality_bridge_<Base>,
     auto next = ident->next_reduction();
     auto ustream = ident->upstream();
     auto dstream = ident->downstream();
+    auto stamp = std::make_tuple(ident->get_imprintable(), next);
 
     const auto& rdcr = this->emplace_component<reducer>(
-        std::make_tuple(ident->get_imprintable(), next), fn, ustream.size() + 1,
+        stamp, fn, ustream.size() + 1,
         dstream.empty() ? 1 : dstream.size());
 
     auto count = 0;
     for (const auto& up : ustream) {
-      auto ours = std::make_shared<reduction_port<Index>>(next, up);
+      auto ours = std::make_shared<reduction_port<Index>>(stamp, up);
       this->connect(ours, rdcr, ++count);
     }
 
@@ -215,7 +216,7 @@ class vil : public locality_bridge_<Base>,
       this->connect(rdcr, 0, cb);
     } else {
       auto theirs =
-          std::make_shared<reduction_port<Index>>(next, ident->mine());
+          std::make_shared<reduction_port<Index>>(stamp, ident->mine());
 
       count = 0;
       for (const auto& down : dstream) {
