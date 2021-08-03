@@ -144,7 +144,7 @@ class interceptor : public CBase_interceptor {
     auto lastNode = CkNodeOf(lastPe);
 
     if (lastNode == CkMyNode()) {
-      auto* arr = CProxy_ArrayBase(aid).ckLocalBranchOther(CkRankOf(pe));
+      auto* arr = CProxy_ArrayBase(aid).ckLocalBranchOther(CkRankOf(lastPe));
       auto* elt = arr->lookup(idx);
 
       if (elt != nullptr) {
