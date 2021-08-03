@@ -26,7 +26,6 @@ class interceptor : public CBase_interceptor {
         lockCounts_(CkMyNodeSize())
 #endif
   {
-    CkPrintf("%d> interceptor init'd.\n", CkMyNode());
   }
 
  private:
@@ -174,12 +173,22 @@ class interceptor : public CBase_interceptor {
     thisProxy[nd].deliver(aid, idx, CkMarshalledMessage(msg));
   }
 
-  inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx, CkMessage* msg) {
+  inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
+                                CkMessage* msg) {
     if (((CkGroupID)interceptor_).isZero()) {
       // TODO ( is there a better function for this? )
-      CProxyElement_ArrayBase::ckSendWrapper(aid, idx, msg, UsrToEnv(msg)->getEpIdx(), 0);
+      CProxyElement_ArrayBase::ckSendWrapper(aid, idx, msg,
+                                             UsrToEnv(msg)->getEpIdx(), 0);
     } else {
       interceptor_[CkMyNode()].deliver(aid, idx, CkMarshalledMessage(msg));
+    }
+  }
+
+  inline static interceptor* local_branch() {
+    if (((CkGroupID)interceptor_).isZero()) {
+      return nullptr;
+    } else {
+      return interceptor_.ckLocalBranch();
     }
   }
 };

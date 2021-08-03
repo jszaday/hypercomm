@@ -19,10 +19,6 @@ struct intercept_msg {
     CmiSetHandler(this, handler());
   }
 
-  inline interceptor* ckLocalBranch(void) const {
-    return interceptor_.ckLocalBranch();
-  }
-
   static const int& handler(void);
 
   void* operator new(std::size_t count) { return CmiAlloc(count); }

@@ -11,7 +11,7 @@ namespace hypercomm {
 CProxy_interceptor interceptor_;
 
 // NOTE ( this may skip registration for non-SMP )
-const int& intercept_msg::handler(void) {
+const int &intercept_msg::handler(void) {
   CpvStaticDeclare(int, intercept_msg_handler_);
 
   if (!CpvInitialized(intercept_msg_handler_)) {
@@ -23,15 +23,15 @@ const int& intercept_msg::handler(void) {
   return CpvAccess(intercept_msg_handler_);
 }
 
-void intercept_msg::handler_(intercept_msg* msg) {
-  auto* arr = CProxy_ArrayBase(msg->aid).ckLocalBranch();
-  auto* elt = arr->lookup(msg->idx);
+void intercept_msg::handler_(intercept_msg *msg) {
+  auto *arr = CProxy_ArrayBase(msg->aid).ckLocalBranch();
+  auto *elt = arr->lookup(msg->idx);
   if (elt != nullptr) {
-    auto* usr = msg->msg;
+    auto *usr = msg->msg;
     elt->ckInvokeEntry(UsrToEnv(usr)->getEpIdx(), usr, true);
     delete msg;
   } else {
-    msg->ckLocalBranch()->redeliver(msg);
+    (interceptor::local_branch())->redeliver(msg);
   }
 }
 
