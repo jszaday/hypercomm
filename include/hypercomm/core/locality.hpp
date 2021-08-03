@@ -14,6 +14,7 @@
 
 #include "../messaging/packing.hpp"
 #include "../messaging/messaging.hpp"
+#include "../messaging/interceptor.hpp"
 
 #include "../components/comproxy.hpp"
 #include "../core/forwarding_callback.hpp"
@@ -275,7 +276,8 @@ template <typename Index>
 void deliver(const element_proxy<Index>& proxy, message* msg) {
   const auto& base =
       static_cast<const CProxyElement_locality_base_&>(proxy.c_proxy());
-  const_cast<CProxyElement_locality_base_&>(base).demux(msg);
+  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::demux(nullptr));
+  interceptor::send_async(base.ckGetArrayID(), base.ckGetIndex(), msg);
 }
 
 message* repack_to_port(const entry_port_ptr& port,
@@ -301,7 +303,8 @@ void generic_locality_::loopback(message* msg) {
   CkArrayID aid = UsrToEnv(msg)->getArrayMgr();
   auto id = ((CkArrayMessage*)msg)->array_element_id();
   auto idx = aid.ckLocalBranch()->getLocMgr()->lookupIdx(id);
-  (CProxy_locality_base_(aid))[idx].demux(msg);
+  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::demux(nullptr));
+  interceptor::send_async(aid, idx, msg);
 }
 
 template <typename Proxy,
@@ -310,7 +313,8 @@ template <typename Proxy,
 inline void send2port(const Proxy& proxy, const entry_port_ptr& port,
                       component::value_type&& value) {
   auto* msg = repack_to_port(port, std::move(value));
-  const_cast<CProxyElement_locality_base_&>(proxy).demux(msg);
+  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::demux(nullptr));
+  interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(), msg);
 }
 
 // NOTE this should always be used for invalidations

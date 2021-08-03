@@ -3,5 +3,17 @@ module messaging {
         namespace messaging {
             message __msg__;
         }
+
+        nodegroup interceptor {
+            entry interceptor(void);
+            entry void deliver(const CkArrayID&, const CkArrayIndex&, CkMarshalledMessage);
+            entry void forward(const CkArrayID&, const CkArrayIndex&, const CkArrayIndex&);
+        };
+
+        readonly CProxy_interceptor interceptor_;
+
+        mainchare interceptor_initializer_ {
+            entry [nokeep] interceptor_initializer_(CkArgMsg*);
+        };
     }
 }

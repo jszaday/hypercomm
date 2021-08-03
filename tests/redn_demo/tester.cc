@@ -131,7 +131,7 @@ typename my_redn_com::value_set my_redn_com::action(value_set&& accepted) {
   auto cb = forward_to(self->thisProxy[idx], self->redn_port);
   // then do numIters reductions, each with empty messages
   for (auto it = 0; it < numIters; it++) {
-#if CMK_DEBUG
+#if CMK_VERBOSE
     CkPrintf("com%lu@%d> contributing a value\n", this->id, self->__index__());
 #endif
     auto val = hypercomm::make_unit_value();

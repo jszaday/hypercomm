@@ -1,4 +1,5 @@
 #include <hypercomm/messaging/packing.hpp>
+#include <hypercomm/messaging/interceptor.hpp>
 
 #include <hypercomm/core/locality.decl.h>
 #include <hypercomm/core/config.hpp>
@@ -6,6 +7,33 @@
 #include <hypercomm/utilities.hpp>
 
 namespace hypercomm {
+
+CProxy_interceptor interceptor_;
+
+// NOTE ( this may skip registration for non-SMP )
+const int &intercept_msg::handler(void) {
+  CpvStaticDeclare(int, intercept_msg_handler_);
+
+  if (!CpvInitialized(intercept_msg_handler_)) {
+    CpvInitialize(int, intercept_msg_handler_);
+    CpvAccess(intercept_msg_handler_) =
+        CmiRegisterHandler((CmiHandler)intercept_msg::handler_);
+  }
+
+  return CpvAccess(intercept_msg_handler_);
+}
+
+void intercept_msg::handler_(intercept_msg *msg) {
+  auto *arr = CProxy_ArrayBase(msg->aid).ckLocalBranch();
+  auto *elt = arr->lookup(msg->idx);
+  if (elt != nullptr) {
+    auto *usr = msg->msg;
+    elt->ckInvokeEntry(UsrToEnv(usr)->getEpIdx(), usr, true);
+    delete msg;
+  } else {
+    (interceptor::local_branch())->redeliver(msg);
+  }
+}
 
 namespace messaging {
 
@@ -30,7 +58,7 @@ __msg__ *__msg__::unpack(void *buf) {
   __msg__ *msg = (__msg__ *)buf;
   const auto expected_size = std::size_t(msg->payload) - hdr_size;
   msg->payload = (char *)((size_t)msg->payload + (char *)msg);
-#if CMK_DEBUG
+#if CMK_VERBOSE
   auto str =
       hypercomm::utilities::buf2str((char *)msg + hdr_size, expected_size);
   CkPrintf("info@%d> unpacking a %lu byte port from: %s\n", CkMyPe(),
