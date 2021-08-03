@@ -1,11 +1,9 @@
 #ifndef __HYPERCOMM_SECTIONS_GENERIC_HPP__
 #define __HYPERCOMM_SECTIONS_GENERIC_HPP__
 
-#include "section.hpp"
+#include "../utilities/hash.hpp"
 
-#include <cstdint>
-#include <vector>
-#include <type_traits>
+#include "section.hpp"
 
 namespace hypercomm {
 
@@ -33,26 +31,28 @@ struct vector_section : public section<std::int64_t, Index> {
     new (const_cast<indices_type*>(&index_vector_)) indices_type(_1.members());
   }
 
-  virtual const indices_type& members(void) const override {
+  virtual const indices_type& members(void) const {
     return this->index_vector_;
   }
 
-  virtual bool equals(const std::shared_ptr<comparable>& _1) const override {
+  virtual hash_code hash(void) const {
+    auto hasher = utilities::hash<indices_type>();
+    return hasher(this->members());
+  }
+
+  virtual bool equals(const std::shared_ptr<comparable>& _1) const {
     const auto& other = std::dynamic_pointer_cast<vector_section<Index>>(_1);
     return other && this->members() == other->members();
   }
 
-  virtual void __pup__(serdes& s) override {
+  virtual void __pup__(serdes& s) {
     s | const_cast<indices_type&>(index_vector_);
   }
 
-  virtual typename section<std::int64_t, Index>::section_ptr clone(void) const override {
+  virtual typename section<std::int64_t, Index>::section_ptr clone(void) const {
     return std::make_shared<vector_section<Index>>(*this);
   }
 };
-
-template <typename Index>
-using generic_section = vector_section<Index>;
 
 template <typename T>
 std::shared_ptr<vector_section<T>> sectionify(std::vector<T>&& data) {

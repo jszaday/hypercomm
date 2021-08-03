@@ -17,7 +17,7 @@ void enroll_polymorphs(void) {
     hypercomm::enroll<persistent_port>();
     hypercomm::enroll<reduction_port<int>>();
     hypercomm::enroll<broadcaster<CkArrayIndex, int>>();
-    hypercomm::enroll<generic_section<int>>();
+    hypercomm::enroll<vector_section<int>>();
   }
 }
 
