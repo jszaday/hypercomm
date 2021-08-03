@@ -26,6 +26,7 @@ class interceptor : public CBase_interceptor {
         lockCounts_(CkMyNodeSize())
 #endif
   {
+    CkPrintf("%d> interceptor init'd.\n", CkMyNode());
   }
 
  private:
@@ -174,7 +175,12 @@ class interceptor : public CBase_interceptor {
   }
 
   inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx, CkMessage* msg) {
-    interceptor_[CkMyNode()].deliver(aid, idx, CkMarshalledMessage(msg));
+    if (((CkGroupID)interceptor_).isZero()) {
+      // TODO ( is there a better function for this? )
+      CProxyElement_ArrayBase::ckSendWrapper(aid, idx, msg, UsrToEnv(msg)->getEpIdx(), 0);
+    } else {
+      interceptor_[CkMyNode()].deliver(aid, idx, CkMarshalledMessage(msg));
+    }
   }
 };
 
