@@ -9,6 +9,7 @@
 #include "generic_locality.hpp"
 #include "locality_map.hpp"
 
+#include "future.hpp"
 #include "broadcaster.hpp"
 #include "port_opener.hpp"
 
@@ -18,18 +19,6 @@
 
 #include "../components/comproxy.hpp"
 #include "../core/forwarding_callback.hpp"
-
-struct locality_base_ : public CBase_locality_base_ {
-  locality_base_(void) {}
-
-  virtual void demux(hypercomm_msg* msg) {
-    throw std::runtime_error("you should never see this!");
-  }
-
-  virtual void execute(CkMessage* msg) {
-    throw std::runtime_error("you should never see this!");
-  }
-};
 
 namespace hypercomm {
 
@@ -78,41 +67,23 @@ class indexed_locality_ : public generic_locality_ {
   }
 };
 
-template <typename Base, typename Enable = void>
-class locality_bridge_;
+struct future_manager_ {
+  future_id_t future_authority = 0;
 
-template <typename Base>
-class locality_bridge_<Base,
-                       typename std::enable_if<is_array_element<Base>()>::type>
-    : public Base {
-  using this_ptr_ = locality_bridge_<Base>*;
+  virtual future make_future(void) = 0;
 
- public:
-  using base_index_type = CkArrayIndex;
-
-  inline const CkArrayIndex& __base_index__(void) const {
-    return this->ckGetArrayIndex();
-  }
-
-  inline collective_ptr<CkArrayIndex> __proxy__(void) const {
-    return hypercomm::make_proxy(const_cast<this_ptr_>(this)->thisProxy);
-  }
-
-  inline element_ptr<CkArrayIndex> __element__(void) const {
-    return hypercomm::make_proxy(
-        (const_cast<this_ptr_>(this)->thisProxy)[this->__base_index__()]);
-  }
+  virtual void request_future(const future& f, const callback_ptr& cb) = 0;
 };
 
 template <typename Base, typename Index>
-class vil : public locality_bridge_<Base>,
+class vil : public Base,
             public indexed_locality_<Index>,
             public future_manager_ {
   using idx_locality_ = indexed_locality_<Index>;
 
  public:
   using index_type = Index;
-  using base_index_type = typename locality_bridge_<Base>::base_index_type;
+  using base_index_type = typename locality_base_::base_index_type;
 
   using section_ptr = typename idx_locality_::section_ptr;
   using identity_ptr = typename idx_locality_::identity_ptr;
@@ -262,10 +233,10 @@ void send_action(const std::shared_ptr<generic_element_proxy>& p,
   constexpr auto is_gen = std::is_base_of<generic_locality_, arg_type>::value;
   static_assert(is_act || is_gen, "unrecognized action type");
 
-  auto& c_proxy = const_cast<CProxy&>(p->c_proxy());
+  auto& base = static_cast<const CProxyElement_locality_base_&>(p->c_proxy());
   auto msg = hypercomm::pack(is_act, a);
-
-  (static_cast<CProxyElement_locality_base_&>(c_proxy)).execute(msg);
+  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::idx_execute_CkMessage());
+  interceptor::send_async(base, msg);
 }
 
 template <typename BaseIndex, typename Action>
@@ -278,8 +249,8 @@ template <typename Index>
 void deliver(const element_proxy<Index>& proxy, message* msg) {
   const auto& base =
       static_cast<const CProxyElement_locality_base_&>(proxy.c_proxy());
-  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::demux(nullptr));
-  interceptor::send_async(base.ckGetArrayID(), base.ckGetIndex(), msg);
+  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
+  interceptor::send_async(base, msg);
 }
 
 message* repack_to_port(const entry_port_ptr& port,
@@ -305,7 +276,7 @@ void generic_locality_::loopback(message* msg) {
   CkArrayID aid = UsrToEnv(msg)->getArrayMgr();
   auto id = ((CkArrayMessage*)msg)->array_element_id();
   auto idx = aid.ckLocalBranch()->getLocMgr()->lookupIdx(id);
-  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::demux(nullptr));
+  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
   interceptor::send_async(aid, idx, msg);
 }
 
@@ -315,8 +286,8 @@ template <typename Proxy,
 inline void send2port(const Proxy& proxy, const entry_port_ptr& port,
                       component::value_type&& value) {
   auto* msg = repack_to_port(port, std::move(value));
-  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::demux(nullptr));
-  interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(), msg);
+  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
+  interceptor::send_async(proxy, msg);
 }
 
 // NOTE this should always be used for invalidations
@@ -368,7 +339,7 @@ void generic_locality_::receive_message(hypercomm_msg* msg) {
   auto* env = UsrToEnv(msg);
   auto idx = env->getEpIdx();
 
-  if (idx == CkIndex_locality_base_::demux(nullptr)) {
+  if (idx == CkIndex_locality_base_::idx_demux_CkMessage()) {
     this->receive_value(msg->dst, msg2value(msg));
   } else {
     _entryTable[idx]->call(msg, dynamic_cast<CkMigratable*>(this));
@@ -413,7 +384,5 @@ void forwarding_callback<Index>::send(callback::value_type&& value) {
   send2port(this->proxy, this->port, std::move(value));
 }
 }
-
-#include <hypercomm/core/locality.def.h>
 
 #endif

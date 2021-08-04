@@ -1,7 +1,6 @@
 #ifndef __HYPERCOMM_CORE_COMMON_HPP__
 #define __HYPERCOMM_CORE_COMMON_HPP__
 
-#include "future.hpp"
 #include "callback.hpp"
 #include "entry_port.hpp"
 
@@ -56,12 +55,6 @@ template <typename BaseIndex, typename Action>
 void send_action(
     const collective_ptr<BaseIndex>& p, const BaseIndex& i,
     const Action& a);
-
-struct future_manager_ {
-  virtual future make_future(void) = 0;
-
-  virtual void request_future(const future& f, const callback_ptr& cb) = 0;
-};
 
 }
 

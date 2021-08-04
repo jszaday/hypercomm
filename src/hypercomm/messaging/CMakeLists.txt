@@ -8,8 +8,6 @@ add_custom_command(
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/hypercomm/messaging
 )
 
-add_dependencies(hypercomm-messaging locality_header)
-
 target_include_directories(
     hypercomm-messaging PUBLIC "${CMAKE_BINARY_DIR}/include"
 )

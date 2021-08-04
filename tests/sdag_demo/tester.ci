@@ -4,9 +4,7 @@ mainmodule tester {
         entry [threaded] void run(CkArrayCreatedMsg*);
     };
 
-    extern module locality;
-
-    array [Max] locality : locality_base_ {
+    array [Max] locality : hypercomm::locality_base_ {
         entry locality(int);
         entry [threaded] void run(const int&);
     };
