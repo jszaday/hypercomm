@@ -4,4 +4,4 @@ HYPERCOMM_HOME=${CMAKE_SOURCE_DIR}
 HYPERCOMM_BUILD=${CMAKE_BINARY_DIR}
 
 INCLUDES=-I$(HYPERCOMM_BUILD)/include -I$(HYPERCOMM_HOME)/include
-LIBS=-L$(HYPERCOMM_BUILD)/lib -lhypercomm-components -lhypercomm-utilities -lhypercomm-serialization -lhypercomm-core -lhypercomm-messaging
+LIBS=-L$(HYPERCOMM_BUILD)/lib -lhypercomm-components -lhypercomm-utilities -lhypercomm-serialization -lhypercomm-core -lhypercomm-messaging -lhypercomm-serialization
