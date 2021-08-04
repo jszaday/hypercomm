@@ -24,7 +24,7 @@ void enroll_polymorphs(void) {
     hypercomm::enroll<managed_imprintable<int>>();
     hypercomm::enroll<reduction_port<int>>();
 
-    _registertree_builder();
+    hypercomm::tree_builder::initialize();
   }
 }
 
