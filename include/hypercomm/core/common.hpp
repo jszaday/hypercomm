@@ -8,6 +8,8 @@
 
 #include "../components/component.hpp"
 
+#define NOT_IMPLEMENTED CkAbort("not yet implemented")
+
 namespace hypercomm {
 
 template <typename T>

@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include "../messaging/messaging.hpp"
+#include "../tree_builder/manageable_base.hpp"
 
 namespace hypercomm {
 
@@ -11,6 +12,7 @@ class CkIndex_locality_base_ {
   static int __idx;
   static const int& idx_demux_CkMessage(void);
   static const int& idx_execute_CkMessage(void);
+  static const int& idx_replace_downstream_CkMessage(void);
 };
 
 // NOTE ( hypercomm claims absolute control over these )
@@ -22,12 +24,15 @@ namespace core {
 void initialize(void);
 }  // namespace core
 
-class locality_base_: public ArrayElement {
+class locality_base_: public manageable_base_ {
  public:
   using base_index_type = CkArrayIndex;
 
-  virtual void demux(hypercomm_msg* msg) = 0;
   virtual void execute(CkMessage* msg) = 0;
+  virtual void demux(hypercomm_msg* msg) = 0;
+  virtual void replace_downstream(CkMessage* msg) {
+    NOT_IMPLEMENTED;
+  }
 
   inline const CkArrayIndex& __base_index__(void) const {
     return this->ckGetArrayIndex();

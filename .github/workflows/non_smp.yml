@@ -67,3 +67,6 @@ jobs:
         cd ../avalanche
         echo "avalanche"
         TESTOPTS="++local 65" DEBUG=1 make test
+        echo "<!-- tree_demo --!>"
+        cd ../tree_demo
+        TESTOPTS="++local" make test
