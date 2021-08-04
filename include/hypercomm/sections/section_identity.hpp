@@ -1,17 +1,19 @@
 #ifndef __HYPERCOMM_SECTIONS_SECTION_IDENTITY_HPP__
 #define __HYPERCOMM_SECTIONS_SECTION_IDENTITY_HPP__
 
-#include "section.hpp"
 #include "identity.hpp"
 
 namespace hypercomm {
+
+template <typename Ordinal, typename Index>
+struct section;
 
 template <typename Index>
 class section_identity : public identity<Index> {
  public:
   // TODO this should be a more generic thing
   //      (e.g., incorporate proxies for cross-array sections)
-  using ordinal_type = typename vector_section<Index>::ordinal_type;
+  using ordinal_type = std::int64_t;
   using index_type = Index;
 
   using section_type = section<ordinal_type, index_type>;

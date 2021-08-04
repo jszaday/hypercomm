@@ -6,6 +6,8 @@
 
 #include "polymorph.hpp"
 
+#include "../utilities.hpp"
+
 namespace hypercomm {
 
 using allocator_fn = std::function<polymorph*(void)>;
@@ -27,6 +29,12 @@ polymorph_id_t identify(const polymorph&);
 polymorph_id_t identify(const polymorph_ptr&);
 
 polymorph* instantiate(const polymorph_id_t&);
+
+template<typename T>
+hash_code hash_type(void) {
+  utilities::hash<polymorph_id_t> hasher;
+  return hasher(identify(typeid(T)));
+}
 
 }
 

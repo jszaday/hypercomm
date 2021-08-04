@@ -1,7 +1,7 @@
 #ifndef __HYPERCOMM_SECTIONS_BASE_HPP__
 #define __HYPERCOMM_SECTIONS_BASE_HPP__
 
-#include "imprintable.hpp"
+#include "section_identity.hpp"
 
 namespace hypercomm {
 
@@ -47,8 +47,9 @@ struct section : public imprintable<Index> {
     }
   }
 
-  virtual const identity_ptr& imprint(const locality_ptr& loc) const {
-    return loc->identity_for(this->clone());
+ protected:
+  virtual identity_ptr imprint(const locality_ptr& loc) const {
+    return std::make_shared<section_identity<Index>>(*this, loc->__index__());
   }
 };
 }

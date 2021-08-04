@@ -16,6 +16,8 @@ class imprintable : public polymorph, public imprintable_base_ {
   using identity_ptr = std::shared_ptr<identity<Index>>;
   using locality_ptr = indexed_locality_<Index>*;
 
+  friend class indexed_locality_<Index>;
+
   virtual bool is_member(const Index&) const = 0;
 
   virtual bool is_member(const CkArrayIndex& idx) const {
@@ -26,8 +28,9 @@ class imprintable : public polymorph, public imprintable_base_ {
   virtual const Index& pick_root(const proxy_ptr&,
                                  const Index* = nullptr) const = 0;
 
+ protected:
   // apply this imprintable to a locality (generating an identity)
-  virtual const identity_ptr& imprint(const locality_ptr&) const = 0;
+  virtual identity_ptr imprint(const locality_ptr&) const = 0;
 };
 }
 
