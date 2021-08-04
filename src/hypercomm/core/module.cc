@@ -11,6 +11,8 @@ void call_demux_(CkMessage* msg, locality_base_* obj) {
 
 void call_execute_(CkMessage* msg, locality_base_* obj) { obj->execute(msg); }
 
+void call_replace_downstream_(CkMessage* msg, locality_base_* obj) { obj->replace_downstream(msg); }
+
 const int& CkIndex_locality_base_::idx_demux_CkMessage(void) {
   static int epIdx =
       CkRegisterEp("hypercomm::locality_base_::demux(CkMessage*)",
@@ -23,6 +25,14 @@ const int& CkIndex_locality_base_::idx_execute_CkMessage(void) {
   static int epIdx =
       CkRegisterEp("hypercomm::locality_base_::execute(CkMessage*)",
                    reinterpret_cast<CkCallFnPtr>(call_execute_),
+                   CMessage_CkMessage::__idx, CkIndex_locality_base_::__idx, 0);
+  return epIdx;
+}
+
+const int& CkIndex_locality_base_::idx_replace_downstream_CkMessage(void) {
+  static int epIdx =
+      CkRegisterEp("hypercomm::locality_base_::replace_downstream(CkMessage*)",
+                   reinterpret_cast<CkCallFnPtr>(call_replace_downstream_),
                    CMessage_CkMessage::__idx, CkIndex_locality_base_::__idx, 0);
   return epIdx;
 }
@@ -44,6 +54,8 @@ void initialize(void) {
   CkIndex_locality_base_::idx_demux_CkMessage();
 
   CkIndex_locality_base_::idx_execute_CkMessage();
+
+  CkIndex_locality_base_::idx_replace_downstream_CkMessage();
 
   // register the messaging module
   _registermessaging();

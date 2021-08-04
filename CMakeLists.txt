@@ -21,6 +21,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/hypercomm/core)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/hypercomm/messaging)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/hypercomm/tree_builder)
 
 add_subdirectory(src)
 

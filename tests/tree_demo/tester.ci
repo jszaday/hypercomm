@@ -1,0 +1,22 @@
+mainmodule tester {
+  mainchare Main {
+    entry [nokeep] Main(CkArgMsg*);
+    entry [threaded] void run(void);
+    entry void done(CkMessage*);
+  };
+
+  using namespace hypercomm;
+
+  array [Max] Test : hypercomm::locality_base_ {
+    entry Test(void);
+    entry Test(association_ptr_, const reduction_id_t&);
+    entry void make_contribution();
+    entry void replace_downstream(CkMessage*);
+  };
+
+  readonly int numElements;
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_tree_builder locProxy;
+
+  initproc void enroll_polymorphs(void);
+}

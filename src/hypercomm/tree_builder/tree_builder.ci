@@ -1,0 +1,23 @@
+module tree_builder {
+  extern module completion;
+
+  namespace hypercomm {
+    nodegroup tree_builder {
+      entry tree_builder();
+
+      entry void reg_array(const CProxy_CompletionDetector&, const CkArrayID&, const CkCallback&);
+      entry void unreg_array(const CkArrayID&, const CkCallback&);
+
+      entry void receive_upstream(const int&, const CkArrayID&, const CkArrayIndex&);
+      entry void receive_downstream(const int&, const CkArrayID&, const CkArrayIndex&);
+
+      entry void make_endpoint(const CkArrayID&, const CkArrayIndex&);
+
+      entry void begin_inserting(const CkArrayID &aid, const CkCallback &start, const CkCallback &finish);
+      entry void done_inserting(const CkArrayID&);
+
+  // private:
+      entry void insertion_complete_(const CkArrayID&, const CkCallback&);
+    };
+  }
+}

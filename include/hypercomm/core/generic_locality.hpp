@@ -61,7 +61,7 @@ class destination_ {
   }
 };
 
-class generic_locality_ {
+class generic_locality_: public virtual common_functions_ {
  private:
   template<typename A, typename Enable>
   friend class comproxy;
@@ -86,6 +86,10 @@ class generic_locality_ {
   using entry_port_iterator = typename decltype(entry_ports)::iterator;
 
   generic_locality_(void) { this->update_context(); }
+
+  virtual stamp_type __stamp__(void) const {
+    NOT_IMPLEMENTED;
+  }
 
   void activate_component(const component_id_t& id) {
     auto search = this->components.find(id);
