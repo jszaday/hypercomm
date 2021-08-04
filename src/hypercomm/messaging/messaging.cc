@@ -2,7 +2,7 @@
 #include <hypercomm/messaging/interceptor.hpp>
 
 #include <hypercomm/core/config.hpp>
-// #include <hypercomm/core/module.hpp>
+#include <hypercomm/core/module.hpp>
 
 #include <hypercomm/utilities.hpp>
 
@@ -23,8 +23,7 @@ void *__msg__::pack(__msg__ *msg) {
     hypercomm::pup(packer, msg->dst);
     return (void *)msg;
   } else {
-    // TODO introduce HYPERCOMM_NO_COPYING and abort, then copy in the other
-    // case
+    // TODO introduce HYPERCOMM_NO_COPYING and abort only when undefined
     CkAbort("increase HYPERCOMM_PORT_SIZE to at least %lu bytes", real_size);
   }
 }
@@ -46,10 +45,10 @@ __msg__ *__msg__::unpack(void *buf) {
   return msg;
 }
 
-// bool locality_registered_(void) {
-//   static bool registered_ = (CkGetChareIdx("hypercomm::locality_base_") != -1);
-//   return registered_;
-// }
+bool locality_registered_(void) {
+  static bool registered_ = (CkGetChareIdx("hypercomm::locality_base_") != -1);
+  return registered_;
+}
 
 __msg__ *__msg__::make_message(const std::size_t &user_size,
                                const entry_port_ptr &dst) {
@@ -61,9 +60,10 @@ __msg__ *__msg__::make_message(const std::size_t &user_size,
   auto *msg = new (raw) __msg__;
   msg->dst = dst;
   msg->payload = (char *)msg + hdr_size + port_size;
-  // if (locality_registered_()) {
-  //   UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
-  // }
+  if (locality_registered_()) {
+    // NOTE ( this is occasionally relied on, but probably shouldn't be )
+    UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
+  }
   return msg;
 }
 
