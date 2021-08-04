@@ -4,7 +4,7 @@ module messaging {
             message __msg__;
         }
 
-        nodegroup interceptor {
+        group interceptor {
             entry interceptor(void);
             entry void deliver(const CkArrayID&, const CkArrayIndex&, CkMarshalledMessage);
             entry void forward(const CkArrayID&, const CkArrayIndex&, const CkArrayIndex&);
