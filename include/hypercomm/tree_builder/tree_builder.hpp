@@ -219,6 +219,10 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 #endif
       }
     }
+
+#if !CMK_SMP
+    this->contribute(cb);
+#endif
   }
 
   ArrayElement *lookup(const CkArrayID &aid, const index_type &idx) {
