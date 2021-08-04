@@ -18,13 +18,13 @@ namespace ck {
 }
 
 void enroll_polymorphs(void) {
-  _registertree_builder();
-
   hypercomm::init_polymorph_registry();
 
   if (CkMyRank() == 0) {
     hypercomm::enroll<managed_imprintable<int>>();
     hypercomm::enroll<reduction_port<int>>();
+
+    _registertree_builder();
   }
 }
 
