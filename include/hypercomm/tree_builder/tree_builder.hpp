@@ -3,6 +3,10 @@
 
 #include <completion.h>
 
+#if CMK_SMP
+#include <atomic>
+#endif
+
 #include "manageable.hpp"
 #include "back_inserter.hpp"
 
@@ -33,13 +37,13 @@ class tree_builder : public CBase_tree_builder, public array_listener {
   friend class back_inserter;
 
   static void initialize(void) {
-    CkAssertMsg(CkMyRank() == 0, "initialize can only be called on rank 0");
-
 #if CMK_SMP
     back_inserter::handler();
 #endif
 
-    _registertree_builder();
+    if (CkMyRank() == 0) {
+      _registertree_builder();
+    }
   }
 
  protected:
@@ -55,6 +59,17 @@ class tree_builder : public CBase_tree_builder, public array_listener {
   std::unordered_map<CkArrayID, detector_type, array_id_hasher> arrays_;
   std::unordered_map<CkArrayID, elements_type, array_id_hasher> elements_;
   std::unordered_map<CkArrayID, bool, array_id_hasher> insertion_statuses_;
+
+#if CMK_SMP
+  struct counter_helper_ {
+    std::atomic<int> count;
+    CkCallback cb;
+
+    counter_helper_(const CkCallback &_1) : count(CkMyNodeSize()), cb(_1) {}
+  };
+
+  std::unordered_map<CkArrayID, counter_helper_, array_id_hasher> startup_;
+#endif
 
   inline CompletionDetector *detector_for(const CkArrayID &aid) const {
 #if CMK_ERROR_CHECKING
@@ -128,7 +143,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
   inline void lock(void) {
 #if CMK_SMP
-    auto& count = this->lockCounts_[CkMyRank()];
+    auto &count = this->lockCounts_[CkMyRank()];
     if ((count++) == 0) {
       CmiLock(this->lock_);
     }
@@ -137,9 +152,25 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
   inline void unlock(void) {
 #if CMK_SMP
-    auto& count = this->lockCounts_[CkMyRank()];
+    auto &count = this->lockCounts_[CkMyRank()];
     if ((--count) == 0) {
       CmiUnlock(this->lock_);
+    }
+#endif
+  }
+
+  void startup_process_(const CkArrayID &aid) {
+    auto *local = this->spin_to_win(aid, CkMyRank());
+    auto &elems = local->*detail::get(detail::backstage_pass());
+    for (auto &elem : elems) {
+      this->ckElementCreated((ArrayElement *)elem);
+    }
+    local->addListener(this);
+#if CMK_SMP
+    auto &entry = this->startup_.at(aid);
+    if (--entry.count <= 0) {
+      this->contribute(entry.cb);
+      this->startup_.erase(aid);
     }
 #endif
   }
@@ -147,6 +178,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
  public:
   tree_builder(void) : CkArrayListener(0) {
 #if CMK_SMP
+    this->lockCounts_.resize(CkMyNodeSize());
     this->lock_ = CmiCreateLock();
 #endif
   }
@@ -167,27 +199,26 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     auto search = this->arrays_.find(aid);
     if (search == std::end(this->arrays_)) {
       this->arrays_[aid] = detector;
+      this->insertion_statuses_[aid] = true;
+#if CMK_SMP
+      this->startup_.emplace(aid, cb);
+#endif
     } else {
       CkAbort("array registered twice!");
     }
     this->unlock();
 
-    // NOTE ( this will probably fail if there's simultaneous activity )
     for (auto i = 0; i < CkMyNodeSize(); i += 1) {
+      if (i == CkMyRank()) {
+        this->startup_process_(aid);
+      } else {
 #if CMK_SMP
-      CmiPushPE(i, new back_inserter(this->ckGetGroupID(), aid));
-      detector.ckLocalBranch()->produce();
+        CmiPushPE(i, new back_inserter(this->ckGetGroupID(), aid));
 #else
-      auto *local = this->spin_to_win(aid, i);
-      auto &elems = local->*detail::get(detail::backstage_pass());
-      for (auto &elem : elems) {
-        this->ckElementCreated((ArrayElement *)elem);
-      }
-      local->addListener(this);
+        NOT_IMPLEMENTED;
 #endif
+      }
     }
-
-    this->contribute(cb);
   }
 
   ArrayElement *lookup(const CkArrayID &aid, const index_type &idx) {
@@ -508,16 +539,7 @@ const int &back_inserter::handler(void) {
 
 void back_inserter::handler_(back_inserter *msg) {
   auto *builder = CProxy_tree_builder(msg->gid).ckLocalBranch();
-  auto *local = CProxy_ArrayBase(msg->aid).ckLocalBranch();
-  auto &elems = local->*detail::get(detail::backstage_pass());
-
-  for (auto &elem : elems) {
-    builder->ckElementCreated((ArrayElement *)elem);
-  }
-
-  local->addListener(builder);
-  builder->detector_for(msg->aid)->consume();
-
+  builder->startup_process_(msg->aid);
   delete msg;
 }
 #endif
