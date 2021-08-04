@@ -3,14 +3,28 @@
 
 #include <completion.h>
 
+#if CMK_SMP
+#include <atomic>
+#endif
+
 #include "manageable.hpp"
+#include "back_inserter.hpp"
 
 #include "../core/math.hpp"
 #include "../messaging/interceptor.hpp"
+#include "../utilities/backstage_pass.hpp"
 
 #include <hypercomm/tree_builder/tree_builder.decl.h>
 
 namespace hypercomm {
+
+namespace detail {
+std::vector<CkMigratable *> CkArray::*get(backstage_pass);
+
+// Explicitly instantiating the class generates the fn declared above.
+template class access_bypass<std::vector<CkMigratable *> CkArray::*,
+                             &CkArray::localElemVec, backstage_pass>;
+}
 
 class tree_builder : public CBase_tree_builder, public array_listener {
  public:
@@ -20,8 +34,23 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
   bool set_endpoint_ = false;
 
+  friend class back_inserter;
+
+  static void initialize(void) {
+#if CMK_SMP
+    back_inserter::handler();
+#endif
+
+    if (CkMyRank() == 0) {
+      _registertree_builder();
+    }
+  }
+
  protected:
+#if CMK_SMP
   CmiNodeLock lock_;
+  std::vector<int> lockCounts_;
+#endif
 
   using record_type = std::pair<element_type, int>;
   using elements_type =
@@ -30,6 +59,17 @@ class tree_builder : public CBase_tree_builder, public array_listener {
   std::unordered_map<CkArrayID, detector_type, array_id_hasher> arrays_;
   std::unordered_map<CkArrayID, elements_type, array_id_hasher> elements_;
   std::unordered_map<CkArrayID, bool, array_id_hasher> insertion_statuses_;
+
+#if CMK_SMP
+  struct counter_helper_ {
+    std::atomic<int> count;
+    CkCallback cb;
+
+    counter_helper_(const CkCallback &_1) : count(CkMyNodeSize()), cb(_1) {}
+  };
+
+  std::unordered_map<CkArrayID, counter_helper_, array_id_hasher> startup_;
+#endif
 
   inline CompletionDetector *detector_for(const CkArrayID &aid) const {
 #if CMK_ERROR_CHECKING
@@ -101,8 +141,53 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     }
   };
 
+  inline void lock(void) {
+#if CMK_SMP
+    auto &count = this->lockCounts_[CkMyRank()];
+    if ((count++) == 0) {
+      CmiLock(this->lock_);
+    }
+#endif
+  }
+
+  inline void unlock(void) {
+#if CMK_SMP
+    auto &count = this->lockCounts_[CkMyRank()];
+    if ((--count) == 0) {
+      CmiUnlock(this->lock_);
+    }
+#endif
+  }
+
+  void startup_process_(const CkArrayID &aid) {
+    auto *local = this->spin_to_win(aid, CkMyRank());
+    auto &elems = local->*detail::get(detail::backstage_pass());
+    for (auto &elem : elems) {
+      this->ckElementCreated((ArrayElement *)elem);
+    }
+    local->addListener(this);
+#if CMK_SMP
+    auto &entry = this->startup_.at(aid);
+    if (--entry.count <= 0) {
+      this->contribute(entry.cb);
+      this->startup_.erase(aid);
+    }
+#endif
+  }
+
  public:
-  tree_builder(void) : CkArrayListener(0), lock_(CmiCreateLock()) {}
+  tree_builder(void) : CkArrayListener(0) {
+#if CMK_SMP
+    this->lockCounts_.resize(CkMyNodeSize());
+    this->lock_ = CmiCreateLock();
+#endif
+  }
+
+  ~tree_builder() {
+#if CMK_SMP
+    CmiDestroyLock(this->lock_);
+#endif
+  }
 
   virtual const PUP::able::PUP_ID &get_PUP_ID(void) const { NOT_IMPLEMENTED; }
 
@@ -110,22 +195,34 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
   void reg_array(const detector_type &detector, const CkArrayID &aid,
                  const CkCallback &cb) {
-    CmiLock(lock_);
+    this->lock();
     auto search = this->arrays_.find(aid);
     if (search == std::end(this->arrays_)) {
       this->arrays_[aid] = detector;
+      this->insertion_statuses_[aid] = true;
+#if CMK_SMP
+      this->startup_.emplace(aid, cb);
+#endif
     } else {
       CkAbort("array registered twice!");
     }
-    CmiUnlock(lock_);
+    this->unlock();
 
-    // TODO this won't work if there's any simultaneous activity
     for (auto i = 0; i < CkMyNodeSize(); i += 1) {
-      // TODO copy existing members into our table!
-      spin_to_win(aid, i)->addListener(this);
+      if (i == CkMyRank()) {
+        this->startup_process_(aid);
+      } else {
+#if CMK_SMP
+        CmiPushPE(i, new back_inserter(this->ckGetGroupID(), aid));
+#else
+        NOT_IMPLEMENTED;
+#endif
+      }
     }
 
+#if !CMK_SMP
     this->contribute(cb);
+#endif
   }
 
   ArrayElement *lookup(const CkArrayID &aid, const index_type &idx) {
@@ -142,14 +239,14 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
   std::pair<association_ptr_, stamp_type> create_child(
       const CkArrayID &aid, const index_type &parent, const index_type &child) {
-    CmiLock(this->lock_);
+    this->lock();
     auto &rec = this->record_for(aid, parent, false);
     auto last = rec.first->__stamp__();
     rec.first->put_downstream_(child);
     // this avoids un/locking the individual record
     CkAssertMsg(rec.second == CkMyRank(),
                 "a child must be created on the same pe as its parent");
-    CmiUnlock(this->lock_);
+    this->unlock();
     association_ptr_ a(new hypercomm::association_);
     a->valid_upstream_ = true;
     a->upstream_.emplace_back(parent);
@@ -176,7 +273,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
   }
 
   void make_endpoint(const CkArrayID &aid, const CkArrayIndex &idx) {
-    CmiLock(lock_);
+    this->lock();
     auto *elt = this->lookup(aid, idx, false);
     if (elt) {
       this->make_endpoint(elt);
@@ -186,7 +283,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
       auto pe = aid.ckLocalBranch()->lastKnown(idx);
       this->thisProxy[CkNodeOf(pe)].make_endpoint(aid, idx);
     }
-    CmiUnlock(lock_);
+    this->unlock();
   }
 
   void receive_upstream(const int &node, const CkArrayID &aid,
@@ -195,10 +292,10 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     CkPrintf("nd%d> received upstream from %d, idx=%s.\n", CkMyNode(), node,
              utilities::idx2str(idx).c_str());
 #endif
-    CmiLock(lock_);
+    this->lock();
     this->reg_upstream(endpoint_(node), aid, idx);
     this->detector_for(aid)->consume();
-    CmiUnlock(lock_);
+    this->unlock();
   }
 
   void receive_downstream(const int &node, const CkArrayID &aid,
@@ -207,7 +304,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     CkPrintf("nd%d> received downstream from %d, idx=%s.\n", CkMyNode(), node,
              utilities::idx2str(idx).c_str());
 #endif
-    CmiLock(lock_);
+    this->lock();
     auto target = this->reg_downstream(endpoint_(node), aid, idx);
     if (target != nullptr) {
       // we implicitly produce (1) at this point
@@ -217,7 +314,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
       // so we only consume (1) in the else branch
       this->detector_for(aid)->consume();
     }
-    CmiUnlock(lock_);
+    this->unlock();
   }
 
   inline bool is_inserting(const CkArrayID &aid) const {
@@ -229,19 +326,19 @@ class tree_builder : public CBase_tree_builder, public array_listener {
  protected:
   record_type &record_for(const CkArrayID &aid, const index_type &idx,
                           const bool &lock) {
-    if (lock) CmiLock(lock_);
+    if (lock) this->lock();
     auto &rec = this->elements_[aid].find(idx)->second;
-    if (lock) CmiUnlock(lock_);
+    if (lock) this->unlock();
     return rec;
   }
 
   element_type lookup(const CkArrayID &aid, const index_type &idx,
                       const bool &lock) {
-    if (lock) CmiLock(lock_);
+    if (lock) this->lock();
     auto &elements = this->elements_[aid];
     auto search = elements.find(idx);
     auto *elt = (search == std::end(elements)) ? nullptr : search->second.first;
-    if (lock) CmiUnlock(lock_);
+    if (lock) this->unlock();
     return elt;
   }
 
@@ -385,24 +482,24 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     auto cast = dynamic_cast<element_type>(elt);
     auto &aid = cast->ckGetArrayID();
     auto &idx = cast->ckGetArrayIndex();
-    CmiLock(lock_);
+    this->lock();
     if (created) associate(aid, cast);
     this->elements_[aid][idx] = std::make_pair(cast, CkMyRank());
-    CmiUnlock(lock_);
+    this->unlock();
   }
 
   void unreg_element(ArrayElement *elt, const bool &died) {
     auto cast = dynamic_cast<element_type>(elt);
     auto &aid = cast->ckGetArrayID();
     auto &idx = cast->ckGetArrayIndex();
-    CmiLock(lock_);
+    this->lock();
     auto &elements = this->elements_[aid];
     auto search = elements.find(idx);
     if (search != std::end(elements)) {
       elements.erase(search);
     }
     if (died) disassociate(aid, cast);
-    CmiUnlock(lock_);
+    this->unlock();
   }
 
  public:
@@ -430,6 +527,26 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
   virtual void pup(PUP::er &p) override { CBase_tree_builder::pup(p); }
 };
+
+#if CMK_SMP
+const int &back_inserter::handler(void) {
+  CpvStaticDeclare(int, back_inserter_handler_);
+
+  if (!CpvInitialized(back_inserter_handler_)) {
+    CpvInitialize(int, back_inserter_handler_);
+    CpvAccess(back_inserter_handler_) =
+        CmiRegisterHandler((CmiHandler)back_inserter::handler_);
+  }
+
+  return CpvAccess(back_inserter_handler_);
+}
+
+void back_inserter::handler_(back_inserter *msg) {
+  auto *builder = CProxy_tree_builder(msg->gid).ckLocalBranch();
+  builder->startup_process_(msg->aid);
+  delete msg;
+}
+#endif
 }
 
 // TODO ( move to library )
