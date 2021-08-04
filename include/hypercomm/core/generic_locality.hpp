@@ -1,7 +1,7 @@
 #ifndef __HYPERCOMM_CORE_GENLOC_HPP__
 #define __HYPERCOMM_CORE_GENLOC_HPP__
 
-#include "common.hpp"
+#include "module.hpp"
 
 namespace hypercomm {
 
@@ -81,7 +81,6 @@ class generic_locality_ {
   component_map components;
   message_queue<entry_port_ptr> port_queue;
   std::vector<component_id_t> invalidations;
-  future_id_t future_authority = 0;
   component_id_t component_authority = 0;
 
   using entry_port_iterator = typename decltype(entry_ports)::iterator;

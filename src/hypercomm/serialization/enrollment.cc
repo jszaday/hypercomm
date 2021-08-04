@@ -1,6 +1,6 @@
 #include <hypercomm/serialization/construction.hpp>
 #include <hypercomm/serialization/enrollment.hpp>
-#include <hypercomm/messaging/messaging.decl.h>
+#include <hypercomm/core/module.hpp>
 
 namespace hypercomm {
 using type_registry_t = std::map<std::type_index, polymorph_id_t>;
@@ -10,9 +10,7 @@ CsvDeclare(type_registry_t, type_registry_);
 CsvDeclare(alloc_registry_t, alloc_registry_);
 
 void init_polymorph_registry(void) {
-  if (CkMyRank() == 0) {
-    _registermessaging();
-  }
+  if (CkMyRank() == 0) { core::initialize(); }
 
   CsvInitialize(type_registry_t, type_registry_);
   CsvInitialize(alloc_registry_t, alloc_registry_);

@@ -7,14 +7,12 @@ mainmodule tester {
         entry [threaded] void run(void);
     };
 
-    extern module locality;
-
-    array [Max] receiver : locality_base_ {
+    array [Max] receiver : hypercomm::locality_base_ {
         entry receiver(const int&);
         entry void run(void);
     };
 
-    array [Max] sender : locality_base_ {
+    array [Max] sender : hypercomm::locality_base_ {
         entry sender(const int&, const CProxy_receiver&);
         entry void run(void);
     };

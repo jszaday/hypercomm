@@ -129,6 +129,10 @@ class interceptor : public CBase_interceptor {
     thisProxy[destPe].deliver(aid, idx, CkMarshalledMessage(msg));
   }
 
+  inline static void send_async(const CProxyElement_ArrayElement& proxy, CkMessage* msg) {
+    interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(), msg);
+  }
+
   inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
                                 CkMessage* msg) {
     if (((CkGroupID)interceptor_).isZero()) {
