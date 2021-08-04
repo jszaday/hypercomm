@@ -1,13 +1,17 @@
 #ifndef __HYPERCOMM_SECTIONS_IDENTITY_HPP__
 #define __HYPERCOMM_SECTIONS_IDENTITY_HPP__
 
-#include "../components/identifiers.hpp"
-#include <vector>
+#include "imprintable.hpp"
 
 namespace hypercomm {
 
+class identity_base_ {
+ public:
+  virtual std::shared_ptr<imprintable_base_> get_imprintable(void) const = 0;
+};
+
 template <typename Index>
-class identity {
+class identity: public identity_base_ {
  protected:
   reduction_id_t gen_count_;
 

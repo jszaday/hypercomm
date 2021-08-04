@@ -29,7 +29,7 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
     auto collective = std::dynamic_pointer_cast<collective_proxy<BaseIndex>>(
         locality->__gencon__());
 
-    const auto& identity = this->imprintable_->imprint(locality);
+    const auto& identity = locality->identity_for(imprintable_);
 
     auto mine = identity->mine();
     auto upstream = identity->upstream();

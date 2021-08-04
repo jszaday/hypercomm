@@ -1,12 +1,12 @@
 #ifndef __HYPERCOMM_SECTIONS_BASE_HPP__
 #define __HYPERCOMM_SECTIONS_BASE_HPP__
 
-#include "imprintable.hpp"
+#include "section_identity.hpp"
 
 namespace hypercomm {
 
 template <typename Ordinal, typename Index>
-struct section : public polymorph, public imprintable<Index> {
+struct section : public imprintable<Index> {
   using ordinal_type = Ordinal;
   using this_type = section<Ordinal, Index>;
   using section_ptr = std::shared_ptr<this_type>;
@@ -47,8 +47,9 @@ struct section : public polymorph, public imprintable<Index> {
     }
   }
 
-  virtual const identity_ptr& imprint(const locality_ptr& loc) const {
-    return loc->identity_for(this->clone());
+ protected:
+  virtual identity_ptr imprint(const locality_ptr& loc) const {
+    return std::make_shared<section_identity<Index>>(*this, loc->__index__());
   }
 };
 }

@@ -36,11 +36,18 @@ namespace hypercomm {
 template <typename Index>
 class indexed_locality_ : public generic_locality_ {
  public:
-  using section_ptr = typename section_identity<Index>::section_ptr;
-  using section_type = typename section_ptr::element_type;
 
   using identity_type = identity<Index>;
   using identity_ptr = std::shared_ptr<identity_type>;
+
+  using imprintable_type = imprintable<Index>;
+  using imprintable_ptr = std::shared_ptr<imprintable_type>;
+
+  using section_ptr = typename section_identity<Index>::section_ptr;
+  using section_type = typename section_identity<Index>::section_type;
+
+  using identity_map_t = comparable_map<imprintable_ptr, identity_ptr>;
+  identity_map_t identities;
 
   using action_type =
       std::shared_ptr<immediate_action<void(indexed_locality_<Index>*)>>;
@@ -48,9 +55,19 @@ class indexed_locality_ : public generic_locality_ {
   using generic_action_type =
       std::shared_ptr<immediate_action<void(generic_locality_*)>>;
 
+  virtual const Index& __index__(void) const = 0;
+
   virtual std::shared_ptr<proxy> __gencon__(void) const = 0;
 
-  virtual const identity_ptr& identity_for(const section_ptr& which) = 0;
+  inline const identity_ptr& identity_for(const imprintable_ptr& which) {
+    auto search = identities.find(which);
+    if (search == identities.end()) {
+      auto ins = identities.emplace(which, which->imprint(this));
+      return (ins.first)->second;
+    } else {
+      return search->second;
+    }
+  }
 
   inline const identity_ptr& identity_for(const section_type& src) {
     return this->identity_for(std::move(src.clone()));
@@ -99,9 +116,7 @@ class vil : public locality_bridge_<Base>,
 
   using section_ptr = typename idx_locality_::section_ptr;
   using identity_ptr = typename idx_locality_::identity_ptr;
-
-  using identity_map_t = comparable_map<section_ptr, identity_ptr>;
-  identity_map_t identities;
+  using imprintable_ptr = typename idx_locality_::imprintable_ptr;
 
   template <typename T, typename... Args>
   comproxy<T> emplace_component(Args... args) {
@@ -148,7 +163,7 @@ class vil : public locality_bridge_<Base>,
     this->receive_value(_1->dst, std::move(msg));
   }
 
-  const Index& __index__(void) const {
+  virtual const Index& __index__(void) const {
     return reinterpret_index<Index>(this->__base_index__());
   }
 
@@ -164,8 +179,6 @@ class vil : public locality_bridge_<Base>,
     ptr->action(this);
   }
 
-  using imprintable_ptr = std::shared_ptr<imprintable<Index>>;
-
   void broadcast(const imprintable_ptr&, hypercomm_msg*);
 
   inline void broadcast(const imprintable_ptr& section, const int& epIdx,
@@ -177,20 +190,7 @@ class vil : public locality_bridge_<Base>,
   template <typename T>
   void local_contribution(const T& which, component::value_type&& value,
                           const combiner_ptr& fn, const callback_ptr& cb) {
-    local_contribution(which->imprint(this), std::move(value), fn, cb);
-  }
-
-  virtual const identity_ptr& identity_for(const section_ptr& which) override {
-    auto search = identities.find(which);
-    if (search == identities.end()) {
-      auto mine = this->__index__();
-      auto iter = identities.emplace(
-          which, std::make_shared<section_identity<Index>>(which, mine));
-      CkAssert(iter.second && "section should be unique!");
-      return (iter.first)->second;
-    } else {
-      return search->second;
-    }
+    local_contribution(this->identity_for(which), std::move(value), fn, cb);
   }
 
  protected:
@@ -200,13 +200,15 @@ class vil : public locality_bridge_<Base>,
     auto next = ident->next_reduction();
     auto ustream = ident->upstream();
     auto dstream = ident->downstream();
+    auto stamp = std::make_tuple(ident->get_imprintable(), next);
 
-    const auto& rdcr = this->emplace_component<hypercomm::reducer>(
-        next, fn, ustream.size() + 1, dstream.empty() ? 1 : dstream.size());
+    const auto& rdcr = this->emplace_component<reducer>(
+        stamp, fn, ustream.size() + 1,
+        dstream.empty() ? 1 : dstream.size());
 
     auto count = 0;
     for (const auto& up : ustream) {
-      auto ours = std::make_shared<reduction_port<Index>>(next, up);
+      auto ours = std::make_shared<reduction_port<Index>>(stamp, up);
       this->connect(ours, rdcr, ++count);
     }
 
@@ -214,7 +216,7 @@ class vil : public locality_bridge_<Base>,
       this->connect(rdcr, 0, cb);
     } else {
       auto theirs =
-          std::make_shared<reduction_port<Index>>(next, ident->mine());
+          std::make_shared<reduction_port<Index>>(stamp, ident->mine());
 
       count = 0;
       for (const auto& down : dstream) {
