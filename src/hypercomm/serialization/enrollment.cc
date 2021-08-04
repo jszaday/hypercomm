@@ -1,10 +1,6 @@
 #include <hypercomm/serialization/construction.hpp>
 #include <hypercomm/serialization/enrollment.hpp>
-
-#include <charm++.h>
-#include <map>
-
-#include <hypercomm/messaging/intercept_msg.hpp>
+#include <hypercomm/messaging/messaging.decl.h>
 
 namespace hypercomm {
 using type_registry_t = std::map<std::type_index, polymorph_id_t>;
@@ -17,9 +13,6 @@ void init_polymorph_registry(void) {
   if (CkMyRank() == 0) {
     _registermessaging();
   }
-
-  auto& idx = intercept_msg::handler();
-  CkAssertMsg(idx >= 0, "could not register handler");
 
   CsvInitialize(type_registry_t, type_registry_);
   CsvInitialize(alloc_registry_t, alloc_registry_);

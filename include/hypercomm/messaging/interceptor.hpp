@@ -1,9 +1,11 @@
 #ifndef __HYPERCOMM_MESSAGING_INTERCEPTOR_MSG_HPP__
 #define __HYPERCOMM_MESSAGING_INTERCEPTOR_MSG_HPP__
 
-#include "intercept_msg.hpp"
+#include <hypercomm/messaging/messaging.decl.h>
 
 namespace hypercomm {
+
+extern CProxy_interceptor interceptor_;
 
 class interceptor : public CBase_interceptor {
   using queue_type =
@@ -14,44 +16,8 @@ class interceptor : public CBase_interceptor {
   std::unordered_map<CkArrayID, req_map_type, ArrayIDHasher> fwdReqs_;
   std::unordered_map<CkArrayID, queue_type, ArrayIDHasher> queued_;
 
-#if CMK_SMP
-  CmiNodeLock lock_;
-  std::vector<int> lockCounts_;
-#endif
-
  public:
-  interceptor(void)
-#if CMK_SMP
-      : lock_(CmiCreateLock()),
-        lockCounts_(CkMyNodeSize())
-#endif
-  {
-  }
-
- private:
-  ~interceptor() {
-#if CMK_SMP
-    CmiDestroyLock(this->lock_);
-#endif
-  }
-
-  inline void lock(void) {
-#if CMK_SMP
-    auto& count = this->lockCounts_[CkMyRank()];
-    if ((count++) == 0) {
-      CmiLock(this->lock_);
-    }
-#endif
-  }
-
-  inline void unlock(void) {
-#if CMK_SMP
-    auto& count = this->lockCounts_[CkMyRank()];
-    if ((--count) == 0) {
-      CmiUnlock(this->lock_);
-    }
-#endif
-  }
+  interceptor(void) = default;
 
   void resync_queue(const CkArrayID& aid, const CkArrayIndex& idx) {
     auto& queue = this->queued_[aid];
@@ -73,13 +39,7 @@ class interceptor : public CBase_interceptor {
   inline std::pair<int, int> lastKnown(const CkArrayID& aid,
                                        const CkArrayIndex& idx) {
     auto locMgr = CProxy_ArrayBase(aid).ckLocMgr();
-    auto homePe = locMgr->homePe(idx);
-    if (CkNodeOf(homePe) == CkMyNode()) {
-      locMgr = CProxy_ArrayBase(aid)
-                   .ckLocalBranchOther(CkRankOf(homePe))
-                   ->getLocMgr();
-    }
-    return std::make_pair(homePe, locMgr->whichPe(idx));
+    return std::make_pair(locMgr->homePe(idx), locMgr->whichPe(idx));
   }
 
   const CkArrayIndex& dealias(const CkArrayID& aid,
@@ -98,15 +58,14 @@ class interceptor : public CBase_interceptor {
  public:
   void forward(const CkArrayID& aid, const CkArrayIndex& from,
                const CkArrayIndex& to) {
-    this->lock();
     auto* locMgr = CProxy_ArrayBase(aid).ckLocMgr();
-    auto homeNode = CkNodeOf(locMgr->homePe(from));
-    if (homeNode == CkMyNode()) {
+    auto homePe = locMgr->homePe(from);
+    if (homePe == CkMyPe()) {
       auto& reqMap = this->fwdReqs_[aid];
       auto search = reqMap.find(from);
       if (search == std::end(reqMap)) {
 #if CMK_VERBOSE
-        CkPrintf("%d> forwarding from %d to %d.\n", CkMyNode(), *(from.data()),
+        CkPrintf("%d> forwarding from %d to %d.\n", CkMyPe(), *(from.data()),
                  *(to.data()));
 #endif  // CMK_VERBOSE
         reqMap.emplace(from, to);
@@ -115,13 +74,8 @@ class interceptor : public CBase_interceptor {
         CkAbort("duplicate forwarding request");
       }
     } else {
-      thisProxy[homeNode].forward(aid, from, to);
+      thisProxy[homePe].forward(aid, from, to);
     }
-    this->unlock();
-  }
-
-  inline void redeliver(intercept_msg* msg) {
-    this->deliver(msg->aid, msg->idx, msg->msg);
   }
 
   inline void deliver(const CkArrayID& aid, const CkArrayIndex& raw,
@@ -134,58 +88,45 @@ class interceptor : public CBase_interceptor {
     env->setMsgtype(ForArrayEltMsg);
     auto& numHops = env->getsetArrayHops();
 
-    this->lock();
-
     auto& idx = this->dealias(aid, raw);
     auto pair = this->lastKnown(aid, idx);
     auto& homePe = pair.first;
     auto& lastPe = (pair.second >= 0) ? pair.second : homePe;
-    auto homeNode = CkNodeOf(homePe);
-    auto lastNode = CkNodeOf(lastPe);
 
-    if (lastNode == CkMyNode()) {
+    if (lastPe == CkMyPe()) {
       auto* arr = CProxy_ArrayBase(aid).ckLocalBranchOther(CkRankOf(lastPe));
       auto* elt = arr->lookup(idx);
 
       if (elt != nullptr) {
-        if (lastPe == CkMyPe()) {
-          elt->ckInvokeEntry(UsrToEnv(msg)->getEpIdx(), msg, true);
-        } else {
-          CmiPushPE(CkRankOf(lastPe), new intercept_msg(aid, idx, msg));
-        }
-
-        this->unlock();
+        elt->ckInvokeEntry(UsrToEnv(msg)->getEpIdx(), msg, true);
         return;
-      } else if (homeNode == CkMyNode()) {
+      } else if (homePe == CkMyPe()) {
         this->queued_[aid][idx].push_back(msg);
 
 #if CMK_ERROR_CHECKING
         auto& reqMap = this->fwdReqs_[aid];
         if (reqMap.find(idx) != std::end(reqMap)) {
-          CkAbort("%d> refusing to create (1) for %d.\n", CkMyNode(),
+          CkAbort("%d> refusing to create (1) for %d.\n", CkMyPe(),
                   *(idx.data()));
         }
 #endif  // CMK_ERROR_CHECKING
 
         QdCreate(1);
 
-        this->unlock();
         return;
       }
     }
 
-    this->unlock();
-
-    int destNode;
-    if (numHops > 1 && (homeNode != CkMyNode())) {
+    int destPe;
+    if (numHops > 1 && (homePe != CkMyPe())) {
       numHops = 0;
-      destNode = homeNode;
+      destPe = homePe;
     } else {
       numHops += 1;
-      destNode = lastNode;
+      destPe = lastPe;
     }
 
-    thisProxy[destNode].deliver(aid, idx, CkMarshalledMessage(msg));
+    thisProxy[destPe].deliver(aid, idx, CkMarshalledMessage(msg));
   }
 
   inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
@@ -198,7 +139,7 @@ class interceptor : public CBase_interceptor {
       CProxyElement_ArrayBase::ckSendWrapper(aid, idx, msg,
                                              UsrToEnv(msg)->getEpIdx(), 0);
     } else {
-      interceptor_[CkMyNode()].deliver(aid, idx, CkMarshalledMessage(msg));
+      interceptor_[CkMyPe()].deliver(aid, idx, CkMarshalledMessage(msg));
     }
   }
 
