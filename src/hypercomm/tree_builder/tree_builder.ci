@@ -18,9 +18,10 @@ module tree_builder {
           serial {
             auto *lcount = &this->arrays_[aid];
             this->contribute(sizeof(std::int64_t), lcount, CkReduction::sum_long_long,
-                             CkCallback(CkReductionTarget(tree_builder, recv_count_), thisProxy));
+                             CkCallback(CkReductionTarget(tree_builder, recv_count_), thisProxy),
+                             compress(aid));
           }
-          when recv_count_(const std::int64_t& gcount) serial {
+          when recv_count_[compress(aid)](const std::int64_t& gcount) serial {
             if (gcount == 0) {
               this->insertion_statuses_[aid] = false;
             }

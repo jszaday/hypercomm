@@ -1,24 +1,33 @@
 #ifndef __HYPERCOMM_UTIL_HPP__
 #define __HYPERCOMM_UTIL_HPP__
 
+#include <charm++.h>
+
 #include <cmath>
 #include <memory>
-#include <charm++.h>
 #include <type_traits>
 
 #include "utilities/hash.hpp"
 
 namespace hypercomm {
+
 namespace utilities {
 
-std::string idx2str(const CkArrayIndex &idx);
+// source ( https://stackoverflow.com/a/28703383/1426075 )
+template <typename R>
+static constexpr R bitmask(const unsigned int& onecount) {
+  return static_cast<R>(-(onecount != 0)) &
+         (static_cast<R>(-1) >> ((sizeof(R) * (sizeof(char) * 8)) - onecount));
+}
+
+std::string idx2str(const CkArrayIndex& idx);
 std::string buf2str(const char* data, const std::size_t& size);
 std::string env2str(const envelope* env);
 
 void pack_message(CkMessage*);
 void unpack_message(CkMessage*);
 
-template<typename T>
+template <typename T>
 CkMessage* unwrap_message(std::shared_ptr<T>&& msg) {
   auto msg_raw = msg.get();
   if (msg.use_count() == 1) {
@@ -34,19 +43,18 @@ std::shared_ptr<CkMessage> wrap_message(CkMessage*);
 CkMessage* copy_message(const CkMessage*);
 std::shared_ptr<CkMessage> copy_message(const std::shared_ptr<CkMessage>&);
 
-char *get_message_buffer(const CkMessage* msg);
+char* get_message_buffer(const CkMessage* msg);
 
-inline char *get_message_buffer(const std::shared_ptr<CkMessage>& msg) {
-    return get_message_buffer(msg.get());
+inline char* get_message_buffer(const std::shared_ptr<CkMessage>& msg) {
+  return get_message_buffer(msg.get());
 }
+}  // namespace utilities
 
-}
-
-template < template <typename...> class Template, typename T >
+template <template <typename...> class Template, typename T>
 struct is_specialization_of : std::false_type {};
 
-template < template <typename...> class Template, typename... Args >
-struct is_specialization_of< Template, Template<Args...> > : std::true_type {};
+template <template <typename...> class Template, typename... Args>
+struct is_specialization_of<Template, Template<Args...> > : std::true_type {};
 
 using dimension_type = decltype(CkArrayIndexBase::dimension);
 
@@ -56,8 +64,11 @@ struct dimensionality_of {
 };
 
 template <class T>
-struct dimensionality_of<T, typename std::enable_if<is_specialization_of<std::tuple, T>::value>::type> {
-  static constexpr dimension_type value = static_cast<dimension_type>(std::tuple_size<T>::value);
+struct dimensionality_of<
+    T,
+    typename std::enable_if<is_specialization_of<std::tuple, T>::value>::type> {
+  static constexpr dimension_type value =
+      static_cast<dimension_type>(std::tuple_size<T>::value);
 };
 
 // TODO (offer versions for non-array index)
@@ -78,14 +89,16 @@ inline Index conv2idx(const T& ord) {
   idx.nInts = (dimension_type)ceil(sizeof(T) / (float)sizeof(int));
 #if CMK_ERROR_CHECKING
   if (idx.nInts > CK_ARRAYINDEX_MAXLEN) {
-    CkAbort("max array index size exceeded, please increase CK_ARRAYINDEX_MAXLEN to %d", (int)idx.nInts);
+    CkAbort(
+        "max array index size exceeded, please increase CK_ARRAYINDEX_MAXLEN "
+        "to %d",
+        (int)idx.nInts);
   }
 #endif
   idx.dimension = dimensionality_of<T>::value;
   reinterpret_index<T>(idx) = ord;
   return idx;
 }
-
-}
+}  // namespace hypercomm
 
 #endif

@@ -122,6 +122,21 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 #endif
   }
 
+  using refnum_t = CMK_REFNUM_TYPE;
+
+  // source ( https://stackoverflow.com/a/3058296/1426075 )
+  static refnum_t compress(const CkArrayID &aid) {
+    constexpr auto prime = 34283;
+    constexpr auto nbits = 8 * sizeof(refnum_t);
+    auto hash = array_id_hasher()(aid);
+    constexpr auto mask = utilities::bitmask<decltype(hash)>(nbits);
+    hash = ((hash >> nbits) ^ ((hash & mask) * prime)) & mask;
+#if CMK_VERBOSE
+    CkPrintf("info> compressed aid %d to %lx.\n", ((CkGroupID)aid).idx, hash);
+#endif
+    return (refnum_t)hash;
+  }
+
  public:
   tree_builder(void) : CkArrayListener(0) {
 #if CMK_SMP
