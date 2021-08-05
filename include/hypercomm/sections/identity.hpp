@@ -10,8 +10,11 @@ class identity_base_ {
   virtual std::shared_ptr<imprintable_base_> get_imprintable(void) const = 0;
 };
 
+/* identities track the upstream/downstream connections of a chare for a
+ * given (imprintable), along with the counters for broadcasts/reductions
+ */
 template <typename Index>
-class identity: public identity_base_ {
+class identity : public identity_base_ {
  protected:
   reduction_id_t gen_count_;
 
@@ -27,6 +30,6 @@ class identity: public identity_base_ {
   virtual std::vector<Index> upstream(void) const = 0;
   virtual std::vector<Index> downstream(void) const = 0;
 };
-}
+}  // namespace hypercomm
 
 #endif

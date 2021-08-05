@@ -10,6 +10,11 @@ class imprintable_base_ : public virtual comparable {
   virtual bool is_member(const CkArrayIndex&) const = 0;
 };
 
+/* imprintables define a list of members for collective
+ * operations. they can be "imprinted" onto a chare to
+ * generate an "identity", and can also select roots for
+ * out-of-tree collective operations (namely, b/c's).
+ */
 template <typename Index>
 class imprintable : public polymorph, public imprintable_base_ {
  public:
@@ -18,6 +23,8 @@ class imprintable : public polymorph, public imprintable_base_ {
 
   friend class indexed_locality_<Index>;
 
+  // determine whether an index is a member of this imprintable
+  // TODO ( expand to consider collective proxies as well )
   virtual bool is_member(const Index&) const = 0;
 
   virtual bool is_member(const CkArrayIndex& idx) const {
@@ -32,6 +39,6 @@ class imprintable : public polymorph, public imprintable_base_ {
   // apply this imprintable to a locality (generating an identity)
   virtual identity_ptr imprint(const locality_ptr&) const = 0;
 };
-}
+}  // namespace hypercomm
 
 #endif

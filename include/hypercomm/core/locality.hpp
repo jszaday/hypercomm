@@ -46,7 +46,7 @@ class indexed_locality_ : public generic_locality_ {
 
   virtual const Index& __index__(void) const = 0;
 
-  virtual std::shared_ptr<proxy> __gencon__(void) const = 0;
+  virtual std::shared_ptr<generic_element_proxy> __element_at__(const Index&) const = 0;
 
   inline const identity_ptr& identity_for(const imprintable_ptr& which) {
     auto search = identities.find(which);
@@ -98,8 +98,11 @@ class vil : public Base,
   }
 
   // NOTE ( generic collective proxy accessor method )
-  virtual std::shared_ptr<proxy> __gencon__(void) const {
-    return std::static_pointer_cast<proxy>(this->__proxy__());
+  virtual std::shared_ptr<generic_element_proxy> __element_at__(const Index& idx) const {
+    return make_proxy(CProxyElement_locality_base_(
+      this->ckGetArrayID(),
+      conv2idx<base_index_type>(idx)
+    ));
   }
 
   // NOTE ( this is a mechanism for remote task invocation )
