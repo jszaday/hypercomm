@@ -21,6 +21,9 @@ struct section : public imprintable<Index> {
     return (this->members())[ord];
   }
 
+  // a member's ordinal is its position in the list of members
+  // assumes all instances of the list are identically ordered
+  // ( returns -1 when the member is not found )
   virtual Ordinal ordinal_for(const Index& idx) const {
     const auto& indices = this->members();
     const auto search = std::find(indices.begin(), indices.end(), idx);
@@ -28,10 +31,12 @@ struct section : public imprintable<Index> {
   }
 
   virtual bool is_valid_ordinal(const Ordinal& ord) const {
+    // a valid ordinal is positive and within the list of members
     return (ord >= 0) && (ord < this->num_members());
   }
 
   virtual bool is_member(const Index& idx) const {
+    // a member of this section has a valid ordinal
     return this->is_valid_ordinal(this->ordinal_for(idx));
   }
 
@@ -52,6 +57,6 @@ struct section : public imprintable<Index> {
     return std::make_shared<section_identity<Index>>(*this, loc->__index__());
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

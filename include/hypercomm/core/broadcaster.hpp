@@ -10,6 +10,7 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
   using imprintable_ptr = std::shared_ptr<imprintable<Index>>;
 
  private:
+  // TODO ( add a "progenitor" field to ensure b/c's aren't delivered twice )
   Index last_;
   imprintable_ptr imprintable_;
   std::shared_ptr<hypercomm::message> msg_;
@@ -22,35 +23,41 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
 
   broadcaster(const Index& _1, const imprintable_ptr& _2,
               hypercomm::message* _3)
-      : broadcaster(_1, _2, std::static_pointer_cast<hypercomm::message>(
-                                utilities::wrap_message(_3))) {}
+      : broadcaster(_1, _2,
+                    std::static_pointer_cast<hypercomm::message>(
+                        utilities::wrap_message(_3))) {}
 
   virtual void action(indexed_locality_<Index>* locality) override {
-    auto collective = std::dynamic_pointer_cast<collective_proxy<BaseIndex>>(
-        locality->__gencon__());
-
+    // gather all the information for this broadcaster's imprintable
     const auto& identity = locality->identity_for(imprintable_);
-
     auto mine = identity->mine();
     auto upstream = identity->upstream();
     auto downstream = identity->downstream();
 
-    std::vector<Index> children;
-    auto helper = [&](const Index& idx) { return this->last_ != idx; };
+    auto helper = [&](const std::vector<Index>& indices) {
+      // for all the indices in the list
+      for (const auto& idx : indices) {
+        if (this->last_ == idx) {
+          continue;  // besides the element that created this
+                     // broadcaster (to prevent recurrences)
+        } else {
+          // copy the broadcasted message
+          auto copy = std::static_pointer_cast<hypercomm_msg>(
+              utilities::copy_message(this->msg_));
+          // use it to create the broadcaster for the next element
+          auto next = std::make_shared<broadcaster<BaseIndex, Index>>(
+              mine, this->imprintable_, std::move(copy));
+          // then send it along, remotely executing it
+          send_action(locality->__element_at__(idx), std::move(next));
+        }
+      }
+    };
 
-    std::copy_if(std::begin(upstream), std::end(upstream),
-                 std::back_inserter(children), helper);
-    std::copy_if(std::begin(downstream), std::end(downstream),
-                 std::back_inserter(children), helper);
+    // apply the helper function to all incoming/outgoing edges
+    helper(downstream);
+    helper(upstream);
 
-    for (const auto& child : children) {
-      auto copy = std::static_pointer_cast<hypercomm_msg>(
-          utilities::copy_message(msg_));
-      auto next = std::make_shared<broadcaster<BaseIndex, Index>>(
-          mine, this->imprintable_, std::move(copy));
-      send_action(collective, conv2idx<BaseIndex>(child), std::move(next));
-    }
-
+    // after that is done, send the message to this element
     locality->receive_message(static_cast<hypercomm::message*>(
         utilities::unwrap_message(std::move(msg_))));
   }
@@ -61,6 +68,6 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
     s | this->msg_;
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

@@ -8,6 +8,7 @@ namespace hypercomm {
 template <typename Ordinal, typename Index>
 struct section;
 
+// algebraically defines a spanning tree over a bounded list of members
 template <typename Index>
 class section_identity : public identity<Index> {
  public:
@@ -65,6 +66,6 @@ class section_identity : public identity<Index> {
     return std::static_pointer_cast<imprintable_base_>(this->sect_);
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

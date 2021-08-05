@@ -27,6 +27,6 @@ struct polymorph : virtual virtual_enable_shared_from_this_base {
 };
 
 using polymorph_ptr = std::shared_ptr<polymorph>;
-}
+}  // namespace hypercomm
 
 #endif

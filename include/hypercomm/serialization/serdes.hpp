@@ -2,8 +2,8 @@
 #define __HYPERCOMM_SERDES_HPP__
 
 #include <algorithm>
-#include <memory>
 #include <map>
+#include <memory>
 
 namespace hypercomm {
 
@@ -11,14 +11,19 @@ using ptr_id_t = std::size_t;
 using polymorph_id_t = std::size_t;
 struct ptr_record;
 
-struct serdes {
+class serdes {
+  template<typename K, typename V>
+  using owner_less_map = std::map<K, V, std::owner_less<K>>;
+
+ public:
   enum state_t { SIZING, PACKING, UNPACKING };
 
   const std::weak_ptr<void> source;
   const char* start;
   char* current;
   const state_t state;
-  std::map<std::weak_ptr<void>, ptr_id_t, std::owner_less<std::weak_ptr<void>>> records;
+  
+  owner_less_map<std::weak_ptr<void>, ptr_id_t> records;
   std::map<ptr_id_t, std::weak_ptr<void>> instances;
 
   inline bool packing() const { return state == state_t::PACKING; }
@@ -30,12 +35,12 @@ struct serdes {
   template <typename T>
   inline void copy(T* data, std::size_t n = 1) {
     const auto nBytes = n * sizeof(T);
-    const auto nAlign = 0; // CK_ALIGN(nBytes, sizeof(T));
+    // TODO test whether we need: CK_ALIGN(nBytes, sizeof(T));
+    const auto nAlign = 0;
     switch (state) {
       case PACKING:
         std::copy(reinterpret_cast<char*>(data),
-                  reinterpret_cast<char*>(data) + nBytes,
-                  current + nAlign);
+                  reinterpret_cast<char*>(data) + nBytes, current + nAlign);
         break;
       case UNPACKING:
         std::copy(current + nAlign, current + nAlign + nBytes,
@@ -81,6 +86,7 @@ struct serdes {
   }
 };
 
+// records whether a ptr-type is a back-reference or an instance
 struct ptr_record {
   union data_t {
     struct s_reference {
@@ -92,20 +98,15 @@ struct ptr_record {
     } instance;
   };
 
-  enum type_t: std::uint8_t {
-    UNKNOWN,
-    IGNORE,
-    REFERENCE,
-    INSTANCE
-  };
+  enum type_t : std::uint8_t { UNKNOWN, IGNORE, REFERENCE, INSTANCE };
 
   data_t d;
   type_t t;
 
-  ptr_record(): t(UNKNOWN) {}
-  ptr_record(std::nullptr_t): t(IGNORE) {}
-  ptr_record(const ptr_id_t &id): t(REFERENCE) { d.reference.id = id; }
-  ptr_record(const ptr_id_t &id, const polymorph_id_t& ty): t(INSTANCE) {
+  ptr_record() : t(UNKNOWN) {}
+  ptr_record(std::nullptr_t) : t(IGNORE) {}
+  ptr_record(const ptr_id_t& id) : t(REFERENCE) { d.reference.id = id; }
+  ptr_record(const ptr_id_t& id, const polymorph_id_t& ty) : t(INSTANCE) {
     d.instance.id = id;
     d.instance.ty = ty;
   }
@@ -115,6 +116,6 @@ struct ptr_record {
   inline bool is_reference() const { return t == REFERENCE; }
 };
 
-}
+}  // namespace hypercomm
 
 #endif

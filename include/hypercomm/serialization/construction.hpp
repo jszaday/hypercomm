@@ -5,6 +5,9 @@
 
 namespace hypercomm {
 
+// reconstruct(ers) call placement new on a deserialized obj
+
+// reconstructer for types that use PUP::reconstruct
 template <typename T>
 inline typename std::enable_if<
     std::is_constructible<T, PUP::reconstruct>::value>::type
@@ -12,6 +15,7 @@ reconstruct(T* p) {
   ::new (p) T(PUP::reconstruct());
 }
 
+// reconstructer for chare-types that use CkMigrateMessage*
 template <typename T>
 inline typename std::enable_if<
     std::is_constructible<T, CkMigrateMessage*>::value &&
@@ -20,6 +24,7 @@ reconstruct(T* p) {
   ::new (p) T(nullptr);
 }
 
+// reconstructor for default constructible types
 template <typename T>
 inline typename std::enable_if<
     !std::is_constructible<T, PUP::reconstruct>::value &&
@@ -29,15 +34,14 @@ reconstruct(T* p) {
   ::new (p) T();
 }
 
+// temporary storage for an object of a given type
 template <typename T>
 struct temporary {
   typename std::aligned_storage<sizeof(T), alignof(T)>::type data;
 
   temporary(void) { reconstruct(&(this->value())); }
 
-  temporary(const T& value) : temporary() {
-    this->value() = value;
-  }
+  temporary(const T& value) : temporary() { this->value() = value; }
 
   ~temporary() { value().~T(); }
 
@@ -45,6 +49,6 @@ struct temporary {
 
   T& value(void) { return *(reinterpret_cast<T*>(&data)); }
 };
-}
+}  // namespace hypercomm
 
 #endif
