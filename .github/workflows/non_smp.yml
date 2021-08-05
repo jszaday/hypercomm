@@ -70,3 +70,4 @@ jobs:
         echo "<!-- tree_demo --!>"
         cd ../tree_demo
         TESTOPTS="++local" make test
+        TESTOPTS="++local --initialize" make test
