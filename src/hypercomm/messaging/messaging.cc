@@ -72,7 +72,7 @@ __msg__ *__msg__::make_null_message(const entry_port_ptr &dst) {
   UsrToEnv(msg)->setRef(__null_msg__);
   return msg;
 }
-}
-}
+}  // namespace messaging
+}  // namespace hypercomm
 
 #include <hypercomm/messaging/messaging.def.h>

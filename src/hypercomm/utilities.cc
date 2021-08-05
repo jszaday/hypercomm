@@ -24,8 +24,8 @@ char* get_message_buffer(const CkMessage* _1) {
   }
 }
 
-std::string idx2str(const CkArrayIndex &idx) {
-  auto &nDims = idx.dimension;
+std::string idx2str(const CkArrayIndex& idx) {
+  auto& nDims = idx.dimension;
   if (nDims == 1) {
     return std::to_string(idx.data()[0]);
   } else {
@@ -47,7 +47,8 @@ std::string buf2str(const char* data, const std::size_t& size) {
   std::stringstream ss;
   ss << "[ ";
   for (auto i = 0; i < size; i++) {
-    ss << std::hex << std::uppercase << std::setfill('0') << std::setw(2) << (unsigned short)(0xFF & data[i]) << " ";
+    ss << std::hex << std::uppercase << std::setfill('0') << std::setw(2)
+       << (unsigned short)(0xFF & data[i]) << " ";
   }
   ss << "]";
   return ss.str();
@@ -57,12 +58,14 @@ std::string env2str(const envelope* env) {
   auto* bytes = reinterpret_cast<const char*>(env);
   std::stringstream ss;
   ss << buf2str(bytes, sizeof(envelope)) << "|";
-  ss << buf2str(bytes + sizeof(envelope), env->getTotalsize() - sizeof(envelope));
+  ss << buf2str(bytes + sizeof(envelope),
+                env->getTotalsize() - sizeof(envelope));
   return ss.str();
 }
 
 std::shared_ptr<CkMessage> wrap_message(CkMessage* msg) {
-  return std::shared_ptr<CkMessage>(msg, [](CkMessage* msg) { CkFreeMsg(msg); });
+  return std::shared_ptr<CkMessage>(msg,
+                                    [](CkMessage* msg) { CkFreeMsg(msg); });
 }
 
 CkMessage* copy_message(const CkMessage* msg) {
@@ -90,5 +93,5 @@ void unpack_message(CkMessage* msg) {
   }
 }
 
-}
-}
+}  // namespace utilities
+}  // namespace hypercomm

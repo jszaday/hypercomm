@@ -139,4 +139,4 @@ void component::receive_value(const port_type& port, value_type&& value) {
     }
   }
 }
-}
+}  // namespace hypercomm
