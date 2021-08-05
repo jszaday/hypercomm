@@ -119,7 +119,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     }
 
     static void finish_action_(contribute_helper_ *self, void *msg) {
-      self->manager_.insertion_complete_(self->aid_, self->cb_);
+      self->manager_.done_inserting(self->aid_, self->cb_);
       delete self;
       CkFreeMsg(msg);
     }
@@ -267,7 +267,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
   void done_inserting(const CkArrayID &aid) { this->detector_for(aid)->done(); }
 
-  void insertion_complete_(const CkArrayID &aid, const CkCallback &cb) {
+  void done_inserting(const CkArrayID &aid, const CkCallback& cb) {
     this->insertion_statuses_[aid] = false;
     this->contribute(cb);
   }

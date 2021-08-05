@@ -80,16 +80,30 @@ class Test : public manageable<vil<CBase_Test, int>> {
 
 class Main : public CBase_Main {
   CProxy_Test testProxy;
+  bool setNumInitial = false;
 
  public:
   Main(CkArgMsg* msg) {
-    int mult =
-        (msg->argc >= 2) ? atoi(msg->argv[1])
-                         : kMultiplier;
+    int mult = kMultiplier;
+    for (auto i = 1; i < msg->argc; i += 1) {
+      if (strcmp(msg->argv[i], "--initialize") == 0) {
+        setNumInitial = true;
+      } else {
+        mult = atoi(msg->argv[i]);
+      }
+    }
+
     mainProxy = thisProxy;
-    testProxy = CProxy_Test::ckNew();
     locProxy = CProxy_tree_builder::ckNew();
     numElements = mult * CkNumPes();
+
+    CkArrayOptions opts;
+    if (setNumInitial) {
+      opts.setNumInitial(numElements).setBounds(numElements * 2);
+    }
+    testProxy = CProxy_Test::ckNew(opts);
+
+    CkPrintf("main> numElements=%d, setNumInitial=%s\n", numElements, setNumInitial ? "true" : "false");
 
     // each array requires its own completion detector for static
     // insertions, ensuring the spanning tree is ready before completion
@@ -98,18 +112,25 @@ class Main : public CBase_Main {
   }
 
   void run(void) {
-    // initiate a phase of static insertion, suspending the thread
-    // and resuming when we can begin. insertions are allowed when
-    // all nodes have called "done_inserting"
-    locProxy.begin_inserting(
-        testProxy, CkCallbackResumeThread(),
-        CkCallback(CkIndex_Test::make_contribution(), testProxy));
+    if (setNumInitial) {
+      // wait for the tree building to complete
+      CkWaitQD();
 
-    for (auto i = 0; i < numElements; i += 1) {
-      testProxy[conv2idx<CkArrayIndex>(i)].insert();
+      locProxy.done_inserting(testProxy, CkCallback(CkIndex_Test::make_contribution(), testProxy));
+    } else {
+      // initiate a phase of static insertion, suspending the thread
+      // and resuming when we can begin. insertions are allowed when
+      // all nodes have called "done_inserting"
+      locProxy.begin_inserting(
+          testProxy, CkCallbackResumeThread(),
+          CkCallback(CkIndex_Test::make_contribution(), testProxy));
+
+      for (auto i = 0; i < numElements; i += 1) {
+        testProxy[conv2idx<CkArrayIndex>(i)].insert();
+      }
+
+      locProxy.done_inserting(testProxy);
     }
-
-    locProxy.done_inserting(testProxy);
   }
 
   inline int expected(void) const {

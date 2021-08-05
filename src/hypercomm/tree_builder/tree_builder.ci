@@ -14,10 +14,9 @@ module tree_builder {
       entry void make_endpoint(const CkArrayID&, const CkArrayIndex&);
 
       entry void begin_inserting(const CkArrayID &aid, const CkCallback &start, const CkCallback &finish);
-      entry void done_inserting(const CkArrayID&);
 
-  // private:
-      entry void insertion_complete_(const CkArrayID&, const CkCallback&);
+      entry void done_inserting(const CkArrayID&);
+      entry void done_inserting(const CkArrayID&, const CkCallback&);
     };
   }
 }
