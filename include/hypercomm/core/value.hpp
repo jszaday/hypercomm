@@ -34,7 +34,7 @@ inline void try_return(value_ptr&& value) {
       return;
     }
   }
-#if HYPERCOMM_VERBOSE
+#if CMK_VERBOSE
   CkError("warning> unable to return value %p.\n", value.get());
 #endif
 }
