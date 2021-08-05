@@ -52,7 +52,8 @@ class mailbox : public component {
   virtual std::size_t n_outputs(void) const override { return 0; }
   virtual bool keep_alive(void) const override { return true; }
 
-  inline request_type put_request(const predicate_type& pred, const callback_ptr& cb) {
+  inline request_type put_request(const predicate_type& pred,
+                                  const callback_ptr& cb) {
     auto search = this->find_in_buffer(pred);
     if (search == std::end(this->buffer_)) {
       auto req = std::make_shared<request>(this, pred, cb);
@@ -66,7 +67,9 @@ class mailbox : public component {
     }
   }
 
-  inline void put_request_to(const predicate_type& pred, const component_id_t& com, const component::port_type& port) {
+  inline void put_request_to(const predicate_type& pred,
+                             const component_id_t& com,
+                             const component::port_type& port) {
     auto cb = local_connector_(com, port);
     auto req = this->put_request(pred, cb);
     if (req) {
@@ -127,6 +130,6 @@ class mailbox : public component {
     return search;
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

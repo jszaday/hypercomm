@@ -24,6 +24,6 @@ struct entry_port : public virtual polymorph,
 };
 
 using entry_port_ptr = std::shared_ptr<entry_port>;
-}
+}  // namespace hypercomm
 
 #endif

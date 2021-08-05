@@ -8,7 +8,7 @@ struct persistent_port : public entry_port {
   components::port_id_t id = 0;
 
   persistent_port(PUP::reconstruct) {}
-  persistent_port(const decltype(id)& _1): id(_1) {}
+  persistent_port(const decltype(id)& _1) : id(_1) {}
 
   virtual std::string to_string(void) const override {
     std::stringstream ss;
@@ -23,14 +23,10 @@ struct persistent_port : public entry_port {
     return theirs && this->id == theirs->id;
   }
 
-  virtual hash_code hash(void) const override  {
-    return hash_code(id);
-  }
+  virtual hash_code hash(void) const override { return hash_code(id); }
 
-  virtual void __pup__(serdes& s) override  {
-    s | id;
-  }
+  virtual void __pup__(serdes& s) override { s | id; }
 };
-}
+}  // namespace hypercomm
 
 #endif

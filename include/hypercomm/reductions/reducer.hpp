@@ -45,6 +45,6 @@ struct reducer : public hypercomm::component {
     return {std::make_pair(0, this->combiner->send(std::move(args)))};
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

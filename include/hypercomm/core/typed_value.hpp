@@ -53,6 +53,6 @@ std::shared_ptr<typed_value<T>> value2typed(
     throw std::runtime_error("invalid cast!");
   }
 }
-}
+}  // namespace hypercomm
 
 #endif

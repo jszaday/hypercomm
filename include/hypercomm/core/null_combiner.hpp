@@ -11,6 +11,6 @@ struct null_combiner : public core::combiner {
 
   virtual void __pup__(hypercomm::serdes&) override {}
 };
-}
+}  // namespace hypercomm
 
 #endif

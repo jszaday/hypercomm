@@ -164,11 +164,11 @@ template <typename... Args>
 struct hash<std::tuple<Args...>> {
   std::size_t operator()(const std::tuple<Args...>& t) const {
     size_t seed = 0;
-    hash_tuple_impl<sizeof...(Args)-1>(seed, t);
+    hash_tuple_impl<sizeof...(Args) - 1>(seed, t);
     return seed;
   }
 };
-}
-}
+}  // namespace utilities
+}  // namespace hypercomm
 
 #endif

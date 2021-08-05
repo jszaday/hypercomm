@@ -8,7 +8,7 @@ namespace components {
 
 struct threaded_component : public virtual component {};
 
-template<int N>
+template <int N>
 struct n_input_component : public virtual component {
   virtual int num_expected(void) const { return N; }
 };
@@ -19,7 +19,7 @@ struct passthru_component : public virtual n_input_component<1> {
   }
 };
 
-}
-}
+}  // namespace components
+}  // namespace hypercomm
 
 #endif

@@ -19,7 +19,7 @@ class common_functions_ {
   virtual stamp_type __stamp__(void) const = 0;
 };
 
-class manageable_base_: public ArrayElement, public virtual common_functions_ {
+class manageable_base_ : public ArrayElement, public virtual common_functions_ {
   friend class tree_builder;
 
   template <typename T>
@@ -34,7 +34,6 @@ class manageable_base_: public ArrayElement, public virtual common_functions_ {
   manageable_base_(void) : association_(nullptr) {}
 
  private:
-
   inline void set_association_(association_ptr_&& value) {
     this->association_.reset(value.release());
   }
@@ -65,6 +64,6 @@ class manageable_base_: public ArrayElement, public virtual common_functions_ {
     }
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

@@ -17,9 +17,9 @@ struct hash;
 }
 
 template <class T>
-inline std::size_t hash_iterable(const T& t) {
+inline std::size_t hash_iterable(const T &t) {
   hash_code seed = 0x0;
-  for (const auto& i : t) {
+  for (const auto &i : t) {
     using element_type = typename std::decay<decltype(i)>::type;
     seed = hash_combine(seed, utilities::hash<element_type>()(i));
   }
@@ -46,7 +46,7 @@ template <typename T>
 inline int num_leaves(const T &n) {
   return int(n + 1) / 2;
 }
-}
-}
+}  // namespace binary_tree
+}  // namespace hypercomm
 
 #endif

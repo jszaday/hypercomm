@@ -28,6 +28,6 @@ class comproxy<
     return (this->id != std::numeric_limits<id_t>::max());
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

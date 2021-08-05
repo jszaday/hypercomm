@@ -12,7 +12,7 @@ using polymorph_id_t = std::size_t;
 struct ptr_record;
 
 class serdes {
-  template<typename K, typename V>
+  template <typename K, typename V>
   using owner_less_map = std::map<K, V, std::owner_less<K>>;
 
  public:
@@ -22,7 +22,7 @@ class serdes {
   const char* start;
   char* current;
   const state_t state;
-  
+
   owner_less_map<std::weak_ptr<void>, ptr_id_t> records;
   std::map<ptr_id_t, std::weak_ptr<void>> instances;
 

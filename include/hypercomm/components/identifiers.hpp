@@ -22,8 +22,8 @@ struct port_handle {
   inline bool is_output(void) const { return dir == OUTPUT; }
   inline bool is_input(void) const { return dir == INPUT; }
 };
-}
-}
+}  // namespace components
+}  // namespace hypercomm
 
 PUPbytes(hypercomm::components::port_direction);
 PUPbytes(hypercomm::components::port_handle);

@@ -137,6 +137,6 @@ class component : virtual public impermanent {
 
   void unspool_values(value_set&);
 };
-}
+}  // namespace hypercomm
 
 #endif

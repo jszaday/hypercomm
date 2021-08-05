@@ -8,7 +8,7 @@
 #include <cstdint>
 
 namespace hypercomm {
-  constexpr std::size_t kMinPortSize = HYPERCOMM_PORT_SIZE;
+constexpr std::size_t kMinPortSize = HYPERCOMM_PORT_SIZE;
 }
 
 #endif

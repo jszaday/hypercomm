@@ -8,7 +8,8 @@ template <typename Ret, typename... Args>
 struct immediate_action;
 
 template <typename Ret, typename... Args>
-struct immediate_action<Ret(Args...)> : virtual public core::action<false, true> {
+struct immediate_action<Ret(Args...)>
+    : virtual public core::action<false, true> {
   static_assert(sizeof...(Args) == 1,
                 "multi-args unsupported outside of C++17");
 
@@ -33,6 +34,6 @@ struct immediate_action<Ret(Args...)> : virtual public core::action<false, true>
     // return value_type(rmsg);
   }
 };
-}
+}  // namespace hypercomm
 
 #endif
