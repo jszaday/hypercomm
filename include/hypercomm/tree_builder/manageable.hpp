@@ -1,9 +1,8 @@
 #ifndef __HYPERCOMM_TREE_BUILDER_MANAGEABLE_HPP__
 #define __HYPERCOMM_TREE_BUILDER_MANAGEABLE_HPP__
 
-#include "managed_imprintable.hpp"
-
 #include "../core/locality.hpp"
+#include "managed_imprintable.hpp"
 
 namespace hypercomm {
 template <typename T>
@@ -188,6 +187,6 @@ const Index& managed_imprintable<Index>::pick_root(const proxy_ptr& proxy,
     NOT_IMPLEMENTED;
   }
 }
-}
+}  // namespace hypercomm
 
 #endif

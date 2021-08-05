@@ -3,24 +3,25 @@
 #define __HYPERCOMM_TREE_BUILDER_MANAGED_IDENTITY_HPP__
 
 #include "../sections/identity.hpp"
-
 #include "manageable_base.hpp"
 
 namespace hypercomm {
-template<typename Index>
-class managed_identity: public identity<Index> {
+template <typename Index>
+class managed_identity : public identity<Index> {
   const manageable_base_* inst_;
 
-  inline static std::vector<Index> reinterpret_vector(const std::vector<CkArrayIndex>& src) {
+  inline static std::vector<Index> reinterpret_vector(
+      const std::vector<CkArrayIndex>& src) {
     std::vector<Index> dst(src.size());
-    std::transform(std::begin(src), std::end(src), std::begin(dst),
-                  [](const CkArrayIndex& val) { return reinterpret_index<Index>(val); });
+    std::transform(
+        std::begin(src), std::end(src), std::begin(dst),
+        [](const CkArrayIndex& val) { return reinterpret_index<Index>(val); });
     return dst;
   }
 
  public:
-  managed_identity(const manageable_base_ *inst, const reduction_id_t& seed = 0)
-  : inst_(inst), identity<Index>(seed) {}
+  managed_identity(const manageable_base_* inst, const reduction_id_t& seed = 0)
+      : inst_(inst), identity<Index>(seed) {}
 
   virtual const Index& mine(void) const override {
     return reinterpret_index<Index>(inst_->ckGetArrayIndex());
@@ -39,6 +40,6 @@ class managed_identity: public identity<Index> {
 
   virtual std::shared_ptr<imprintable_base_> get_imprintable(void) const;
 };
-}
+}  // namespace hypercomm
 
 #endif

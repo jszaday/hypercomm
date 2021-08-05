@@ -2,7 +2,6 @@
 #define __HYPERCOMM_CORE_TYPED_VALUE_HPP__
 
 #include "../messaging/packing.hpp"
-
 #include "value.hpp"
 
 namespace hypercomm {
@@ -53,6 +52,6 @@ std::shared_ptr<typed_value<T>> value2typed(
     throw std::runtime_error("invalid cast!");
   }
 }
-}
+}  // namespace hypercomm
 
 #endif

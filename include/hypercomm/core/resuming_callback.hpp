@@ -36,6 +36,6 @@ struct resuming_callback : public core::callback {
     throw std::runtime_error("not yet implemented");
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

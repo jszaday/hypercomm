@@ -55,6 +55,6 @@ class reduction_port : public entry_port {
     s | index;
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

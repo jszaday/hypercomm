@@ -1,8 +1,8 @@
 #ifndef __HYPERCOMM_CORE_INTERCB_HPP__
 #define __HYPERCOMM_CORE_INTERCB_HPP__
 
-#include "callback.hpp"
 #include "../serialization/pup.hpp"
+#include "callback.hpp"
 
 namespace hypercomm {
 
@@ -24,6 +24,6 @@ inline callback_ptr intercall(const CkCallback& cb) {
   return std::make_shared<inter_callback>(cb);
 }
 
-}
+}  // namespace hypercomm
 
 #endif

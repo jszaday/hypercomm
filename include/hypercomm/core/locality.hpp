@@ -1,31 +1,26 @@
 #ifndef __HYPERCOMM_CORE_LOCALITY_HPP__
 #define __HYPERCOMM_CORE_LOCALITY_HPP__
 
-#include "../sections.hpp"
 #include "../components.hpp"
-#include "../utilities.hpp"
-#include "../reductions.hpp"
-
-#include "generic_locality.hpp"
-#include "locality_map.hpp"
-
-#include "future.hpp"
-#include "broadcaster.hpp"
-#include "port_opener.hpp"
-
-#include "../messaging/packing.hpp"
-#include "../messaging/messaging.hpp"
-#include "../messaging/interceptor.hpp"
-
 #include "../components/comproxy.hpp"
 #include "../core/forwarding_callback.hpp"
+#include "../messaging/interceptor.hpp"
+#include "../messaging/messaging.hpp"
+#include "../messaging/packing.hpp"
+#include "../reductions.hpp"
+#include "../sections.hpp"
+#include "../utilities.hpp"
+#include "broadcaster.hpp"
+#include "future.hpp"
+#include "generic_locality.hpp"
+#include "locality_map.hpp"
+#include "port_opener.hpp"
 
 namespace hypercomm {
 
 template <typename Index>
 class indexed_locality_ : public generic_locality_ {
  public:
-
   using identity_type = identity<Index>;
   using identity_ptr = std::shared_ptr<identity_type>;
 
@@ -46,7 +41,8 @@ class indexed_locality_ : public generic_locality_ {
 
   virtual const Index& __index__(void) const = 0;
 
-  virtual std::shared_ptr<generic_element_proxy> __element_at__(const Index&) const = 0;
+  virtual std::shared_ptr<generic_element_proxy> __element_at__(
+      const Index&) const = 0;
 
   inline const identity_ptr& identity_for(const imprintable_ptr& which) {
     auto search = identities.find(which);
@@ -98,11 +94,10 @@ class vil : public Base,
   }
 
   // NOTE ( generic collective proxy accessor method )
-  virtual std::shared_ptr<generic_element_proxy> __element_at__(const Index& idx) const {
+  virtual std::shared_ptr<generic_element_proxy> __element_at__(
+      const Index& idx) const {
     return make_proxy(CProxyElement_locality_base_(
-      this->ckGetArrayID(),
-      conv2idx<base_index_type>(idx)
-    ));
+        this->ckGetArrayID(), conv2idx<base_index_type>(idx)));
   }
 
   // NOTE ( this is a mechanism for remote task invocation )
@@ -127,8 +122,8 @@ class vil : public Base,
   }
 
   /* NOTE ( this is a mechanism for demux'ing an incoming message
- *        to the appropriate entry port )
- */
+   *        to the appropriate entry port )
+   */
   virtual void demux(hypercomm_msg* _1) override {
     this->update_context();
     auto msg = _1->is_null() ? std::shared_ptr<hyper_value>(
@@ -177,8 +172,7 @@ class vil : public Base,
     auto stamp = std::make_tuple(ident->get_imprintable(), next);
 
     const auto& rdcr = this->emplace_component<reducer>(
-        stamp, fn, ustream.size() + 1,
-        dstream.empty() ? 1 : dstream.size());
+        stamp, fn, ustream.size() + 1, dstream.empty() ? 1 : dstream.size());
 
     auto count = 0;
     for (const auto& up : ustream) {
@@ -386,6 +380,6 @@ template <typename Index>
 void forwarding_callback<Index>::send(callback::value_type&& value) {
   send2port(this->proxy, this->port, std::move(value));
 }
-}
+}  // namespace hypercomm
 
 #endif

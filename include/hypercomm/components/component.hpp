@@ -2,7 +2,6 @@
 #define __HYPERCOMM_COMPONENTS_COMPONENT_HPP__
 
 #include "../core.hpp"
-
 #include "identifiers.hpp"
 #include "status_listener.hpp"
 
@@ -137,6 +136,6 @@ class component : virtual public impermanent {
 
   void unspool_values(value_set&);
 };
-}
+}  // namespace hypercomm
 
 #endif

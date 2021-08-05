@@ -46,6 +46,6 @@ std::shared_ptr<imprintable_base_> managed_identity<Index>::get_imprintable(
     void) const {
   return managed_imprintable<Index>::instance();
 }
-}
+}  // namespace hypercomm
 
 #endif

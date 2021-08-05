@@ -1,8 +1,8 @@
 #ifndef __HYPERCOMM_TREE_BUILDER_COMMON_HPP__
 #define __HYPERCOMM_TREE_BUILDER_COMMON_HPP__
 
-#include "../utilities.hpp"
 #include "../components/identifiers.hpp"
+#include "../utilities.hpp"
 
 namespace hypercomm {
 using array_listener = CkArrayListener;
@@ -28,6 +28,6 @@ struct association_ {
     p | this->valid_upstream_;
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

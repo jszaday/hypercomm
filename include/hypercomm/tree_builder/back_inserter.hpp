@@ -13,8 +13,7 @@ struct back_inserter {
   CkGroupID gid;
   CkArrayID aid;
 
-  back_inserter(const CkGroupID& _1, const CkArrayID& _2)
-  : gid(_1), aid(_2) {
+  back_inserter(const CkGroupID& _1, const CkArrayID& _2) : gid(_1), aid(_2) {
     CmiSetHandler(this, handler());
   }
 
@@ -27,7 +26,7 @@ struct back_inserter {
  private:
   static void handler_(back_inserter* msg);
 };
-}
+}  // namespace hypercomm
 
 #endif
 

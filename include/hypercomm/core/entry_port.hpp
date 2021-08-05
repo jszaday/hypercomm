@@ -2,10 +2,9 @@
 #define __HYPERCOMM_ENTRY_PORT_HPP__
 
 #include "../components/status_listener.hpp"
-
-#include "value.hpp"
 #include "comparable.hpp"
 #include "impermanent.hpp"
+#include "value.hpp"
 
 namespace hypercomm {
 
@@ -24,6 +23,6 @@ struct entry_port : public virtual polymorph,
 };
 
 using entry_port_ptr = std::shared_ptr<entry_port>;
-}
+}  // namespace hypercomm
 
 #endif

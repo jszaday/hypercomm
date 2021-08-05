@@ -61,9 +61,9 @@ class destination_ {
   }
 };
 
-class generic_locality_: public virtual common_functions_ {
+class generic_locality_ : public virtual common_functions_ {
  private:
-  template<typename A, typename Enable>
+  template <typename A, typename Enable>
   friend class comproxy;
 
   template <typename A>
@@ -87,9 +87,7 @@ class generic_locality_: public virtual common_functions_ {
 
   generic_locality_(void) { this->update_context(); }
 
-  virtual stamp_type __stamp__(void) const {
-    NOT_IMPLEMENTED;
-  }
+  virtual stamp_type __stamp__(void) const { NOT_IMPLEMENTED; }
 
   void activate_component(const component_id_t& id) {
     auto search = this->components.find(id);
@@ -358,6 +356,6 @@ void entry_port::on_completion(const component&) {
 void entry_port::on_invalidation(const component&) {
   access_context_()->invalidate_port(this->shared_from_this());
 }
-}
+}  // namespace hypercomm
 
 #endif

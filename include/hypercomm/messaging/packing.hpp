@@ -1,9 +1,9 @@
 #ifndef __HYPERCOMM_MESSAGING_PACKING_HPP__
 #define __HYPERCOMM_MESSAGING_PACKING_HPP__
 
-#include "messaging.hpp"
-#include "../utilities.hpp"
 #include "../serialization/pup.hpp"
+#include "../utilities.hpp"
+#include "messaging.hpp"
 
 namespace hypercomm {
 template <typename... Args>
@@ -45,6 +45,6 @@ hypercomm_msg* pack_to_port(const entry_port_ptr& dst, const Args&... _args) {
   return msg;
 }
 
-}
+}  // namespace hypercomm
 
 #endif

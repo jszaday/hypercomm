@@ -35,7 +35,7 @@ struct demux_component : public virtual passthru_component {
   }
 };
 
-}
-}
+}  // namespace components
+}  // namespace hypercomm
 
 #endif

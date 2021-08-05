@@ -34,6 +34,6 @@ inline callback_ptr forward_to(const Proxy& elt, const entry_port_ptr& port) {
   using proxy_type = element_ptr<impl_index_t<Proxy>>;
   return forward_to((proxy_type)make_proxy(elt), port);
 }
-}
+}  // namespace hypercomm
 
 #endif

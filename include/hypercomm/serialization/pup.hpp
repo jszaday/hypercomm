@@ -58,7 +58,7 @@ struct puper<chare_t> {
 
   inline static void impl(serdes& s, chare_t& t) {
     auto& impl = reinterpret_cast<impl_type&>(t);
-    auto smol = (std::uint8_t)impl; // shrink the enum
+    auto smol = (std::uint8_t)impl;  // shrink the enum
 
     s | smol;
 

@@ -5,14 +5,14 @@
 
 namespace hypercomm {
 
-struct port_opener: public immediate_action<void(generic_locality_*)> {
+struct port_opener : public immediate_action<void(generic_locality_*)> {
   entry_port_ptr port;
   callback_ptr cb;
 
   port_opener(PUP::reconstruct) {}
 
   port_opener(const entry_port_ptr& _1, const callback_ptr& _2)
-  : port(_1), cb(_2) {}
+      : port(_1), cb(_2) {}
 
   virtual void action(generic_locality_* loc) override {
     auto& fport = *(dynamic_cast<future_port*>(port.get()));
@@ -24,6 +24,6 @@ struct port_opener: public immediate_action<void(generic_locality_*)> {
     s | cb;
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

@@ -1,18 +1,17 @@
 #ifndef __HYPERCOMM_CORE_FUTURE_HPP__
 #define __HYPERCOMM_CORE_FUTURE_HPP__
 
+#include "../core/entry_port.hpp"
 #include "../core/math.hpp"
 #include "../core/proxy.hpp"
-#include "../core/entry_port.hpp"
 #include "../core/value.hpp"
-
 #include "../serialization/pup.hpp"
 
 namespace hypercomm {
 
 struct future;
 
-inline void send2future(const future& f, value_ptr &&value);
+inline void send2future(const future& f, value_ptr&& value);
 
 using future_id_t = std::uint32_t;
 
@@ -32,7 +31,7 @@ struct future {
 
   inline void set(message* msg) { send2future(*this, msg2value(msg)); }
 
-  inline void set(value_ptr &&value) { send2future(*this, std::move(value)); }
+  inline void set(value_ptr&& value) { send2future(*this, std::move(value)); }
 
   inline hash_code hash(void) const {
     return hash_combine(source->hash(), hash_code(id));
@@ -51,11 +50,11 @@ struct puper<future> {
   }
 };
 
-struct future_port: public entry_port {
+struct future_port : public entry_port {
   future f;
 
   future_port(PUP::reconstruct) {}
-  future_port(const future& _1): f(_1) {}
+  future_port(const future& _1) : f(_1) {}
 
   virtual bool keep_alive(void) const override { return false; }
 
@@ -64,13 +63,9 @@ struct future_port: public entry_port {
     return other && this->f.equals(other->f);
   }
 
-  virtual hash_code hash(void) const override {
-    return f.hash();
-  }
+  virtual hash_code hash(void) const override { return f.hash(); }
 
-  virtual void __pup__(serdes& s) override  {
-    s | f;
-  }
+  virtual void __pup__(serdes& s) override { s | f; }
 
   virtual std::string to_string(void) const override {
     std::stringstream ss;
@@ -79,6 +74,6 @@ struct future_port: public entry_port {
   }
 };
 
-}
+}  // namespace hypercomm
 
 #endif

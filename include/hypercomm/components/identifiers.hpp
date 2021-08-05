@@ -1,8 +1,9 @@
 #ifndef __HYPERCOMM_COMPONENTS_IDENTIFIERS_HPP__
 #define __HYPERCOMM_COMPONENTS_IDENTIFIERS_HPP__
 
-#include <cstdint>
 #include <pup.h>
+
+#include <cstdint>
 
 namespace hypercomm {
 
@@ -22,8 +23,8 @@ struct port_handle {
   inline bool is_output(void) const { return dir == OUTPUT; }
   inline bool is_input(void) const { return dir == INPUT; }
 };
-}
-}
+}  // namespace components
+}  // namespace hypercomm
 
 PUPbytes(hypercomm::components::port_direction);
 PUPbytes(hypercomm::components::port_handle);

@@ -10,7 +10,7 @@ class access_bypass {
 };
 
 struct backstage_pass {};
-}
-}
+}  // namespace detail
+}  // namespace hypercomm
 
 #endif
