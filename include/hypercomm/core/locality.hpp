@@ -309,7 +309,7 @@ inline void send2port(const std::shared_ptr<generic_element_proxy>& proxy,
 
 inline void send2future(const future& f, component::value_type&& value) {
   auto src = std::dynamic_pointer_cast<generic_element_proxy>(f.source);
-  CkAssert(src && "future must be from a locality!");
+  CkAssertMsg(src, "future must be from a locality!");
   auto port = std::make_shared<future_port>(f);
   send2port(src, port, std::move(value));
 }

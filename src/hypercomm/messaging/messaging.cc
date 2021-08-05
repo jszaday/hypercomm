@@ -41,7 +41,7 @@ __msg__ *__msg__::unpack(void *buf) {
   auto unpacker = hypercomm::serdes::make_unpacker(std::shared_ptr<void>{},
                                                    (char *)msg + hdr_size);
   hypercomm::pup(unpacker, msg->dst);
-  CkAssert(expected_size >= unpacker.size() && "entry port size changed");
+  CkAssertMsg(expected_size >= unpacker.size(), "entry port size changed");
   return msg;
 }
 

@@ -38,8 +38,8 @@ class section_identity : public identity<Index> {
 
   virtual std::vector<Index> downstream(void) const override {
     const auto ord = sect_->ordinal_for(mine_);
-    CkAssert((sect_->is_valid_ordinal(ord)) &&
-             "identity> index must be member of section");
+    CkAssertMsg((sect_->is_valid_ordinal(ord)),
+                "identity> index must be member of section");
     const auto parent = binary_tree::parent(ord);
     auto rval = std::vector<Index>{};
     if (sect_->is_valid_ordinal(parent))
@@ -49,8 +49,8 @@ class section_identity : public identity<Index> {
 
   virtual std::vector<Index> upstream(void) const override {
     const auto ord = sect_->ordinal_for(mine_);
-    CkAssert((sect_->is_valid_ordinal(ord)) &&
-             "identity> index must be member of section");
+    CkAssertMsg((sect_->is_valid_ordinal(ord)),
+                "identity> index must be member of section");
     const auto left = binary_tree::left_child(ord);
     const auto right = binary_tree::right_child(ord);
     auto rval = std::vector<Index>{};

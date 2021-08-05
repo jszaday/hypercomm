@@ -347,7 +347,7 @@ class puper<std::unique_ptr<T>,
       t.reset(dynamic_cast<T*>(p));
     } else {
       auto* p = cast_to_packable(t, skip_cast<T>());
-      CkAssert(p != nullptr && "expected a non-null unique ptr");
+      CkAssertMsg(p != nullptr, "expected a non-null unique ptr");
       auto tid = hypercomm::identify(*p);
       s | tid;
       p->__pup__(s);

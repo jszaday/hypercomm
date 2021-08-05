@@ -92,7 +92,7 @@ struct manager {
 
   inline typename thread_map::mapped_type& find_(const id_t& tid) {
     auto search = this->threads_.find(tid);
-    CkAssert(search != std::end(this->threads_) && "could not find thread");
+    CkAssertMsg(search != std::end(this->threads_), "could not find thread");
     return search->second;
   }
 
