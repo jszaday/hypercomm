@@ -1,20 +1,17 @@
 #ifndef __HYPERCOMM_TREE_BUILDER_TREE_BUILDER_HPP__
 #define __HYPERCOMM_TREE_BUILDER_TREE_BUILDER_HPP__
 
-#include <completion.h>
-
 #if CMK_SMP
 #include <atomic>
 #endif
 
-#include "manageable.hpp"
-#include "back_inserter.hpp"
+#include <hypercomm/tree_builder/tree_builder.decl.h>
 
 #include "../core/math.hpp"
 #include "../messaging/interceptor.hpp"
 #include "../utilities/backstage_pass.hpp"
-
-#include <hypercomm/tree_builder/tree_builder.decl.h>
+#include "back_inserter.hpp"
+#include "manageable.hpp"
 
 namespace hypercomm {
 
@@ -24,13 +21,14 @@ std::vector<CkMigratable *> CkArray::*get(backstage_pass);
 // Explicitly instantiating the class generates the fn declared above.
 template class access_bypass<std::vector<CkMigratable *> CkArray::*,
                              &CkArray::localElemVec, backstage_pass>;
-}
+}  // namespace detail
 
 class tree_builder : public CBase_tree_builder, public array_listener {
+  tree_builder_SDAG_CODE;
+
  public:
   using index_type = CkArrayIndex;
   using element_type = manageable_base_ *;
-  using detector_type = CProxy_CompletionDetector;
 
   bool set_endpoint_ = false;
 
@@ -56,7 +54,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
   using elements_type =
       std::unordered_map<index_type, record_type, array_index_hasher>;
 
-  std::unordered_map<CkArrayID, detector_type, array_id_hasher> arrays_;
+  std::unordered_map<CkArrayID, std::int64_t, array_id_hasher> arrays_;
   std::unordered_map<CkArrayID, elements_type, array_id_hasher> elements_;
   std::unordered_map<CkArrayID, bool, array_id_hasher> insertion_statuses_;
 
@@ -70,23 +68,6 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
   std::unordered_map<CkArrayID, counter_helper_, array_id_hasher> startup_;
 #endif
-
-  inline CompletionDetector *detector_for(const CkArrayID &aid) const {
-#if CMK_ERROR_CHECKING
-    CkAssertMsg(this->is_inserting(aid), "missing call to begin_inserting");
-    auto search = this->arrays_.find(aid);
-    CkAssertMsg(search != std::end(this->arrays_),
-                "missing completion detector");
-    const auto &proxy = search->second;
-#else
-    const auto &proxy = this->arrays_[aid];
-#endif
-    CompletionDetector *inst = nullptr;
-    while (nullptr == (inst = proxy.ckLocalBranch())) {
-      CsdScheduler(0);
-    }
-    return inst;
-  }
 
   CkArray *spin_to_win(const CkArrayID &aid, const int &rank) {
     if (rank == CkMyRank()) {
@@ -105,40 +86,6 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     element_type elt_;
     endpoint_(const int &node) : elt_(nullptr), node_(node) {}
     endpoint_(const element_type &elt) : elt_(elt), node_(-1) {}
-  };
-
-  struct contribute_helper_ {
-    CProxy_tree_builder manager_;
-    CkCallback cb_;
-    CkArrayID aid_;
-
-    static void start_action_(contribute_helper_ *self, void *msg) {
-      self->manager_.ckLocalBranch()->contribute(self->cb_);
-      delete self;
-      CkFreeMsg(msg);
-    }
-
-    static void finish_action_(contribute_helper_ *self, void *msg) {
-      self->manager_.done_inserting(self->aid_, self->cb_);
-      delete self;
-      CkFreeMsg(msg);
-    }
-
-    static CkCallback start_action(tree_builder *manager, const CkArrayID &aid,
-                                   const CkCallback &cb) {
-      auto instance = new contribute_helper_{
-          .manager_ = manager->thisProxy, .cb_ = cb, .aid_ = aid};
-      return CkCallback((CkCallbackFn)&contribute_helper_::start_action_,
-                        instance);
-    }
-
-    static CkCallback finish_action(tree_builder *manager, const CkArrayID &aid,
-                                    const CkCallback &cb) {
-      auto instance = new contribute_helper_{
-          .manager_ = manager->thisProxy, .cb_ = cb, .aid_ = aid};
-      return CkCallback((CkCallbackFn)&contribute_helper_::finish_action_,
-                        instance);
-    }
   };
 
   inline void lock(void) {
@@ -193,12 +140,11 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
   void unreg_array(const CkArrayID &, const CkCallback &) { NOT_IMPLEMENTED; }
 
-  void reg_array(const detector_type &detector, const CkArrayID &aid,
-                 const CkCallback &cb) {
+  void reg_array(const CkArrayID &aid, const CkCallback &cb) {
     this->lock();
     auto search = this->arrays_.find(aid);
     if (search == std::end(this->arrays_)) {
-      this->arrays_[aid] = detector;
+      this->arrays_[aid] = 0;
       this->insertion_statuses_[aid] = true;
 #if CMK_SMP
       this->startup_.emplace(aid, cb);
@@ -253,23 +199,11 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     return std::make_pair(std::move(a), last);
   }
 
-  void begin_inserting(const CkArrayID &aid, const CkCallback &start,
-                       const CkCallback &finish) {
+  void begin_inserting(const CkArrayID &aid, const CkCallback &cb) {
+    this->lock();
     this->insertion_statuses_[aid] = true;
-    if (thisIndex == 0) {
-      auto begin = contribute_helper_::start_action(this, aid, start);
-      auto end = contribute_helper_::finish_action(this, aid, finish);
-      this->arrays_[aid].start_detection(CkNumNodes(), begin, {}, end, 0);
-    } else {
-      this->contribute(start);
-    }
-  }
-
-  void done_inserting(const CkArrayID &aid) { this->detector_for(aid)->done(); }
-
-  void done_inserting(const CkArrayID &aid, const CkCallback& cb) {
-    this->insertion_statuses_[aid] = false;
     this->contribute(cb);
+    this->unlock();
   }
 
   void make_endpoint(const CkArrayID &aid, const CkArrayIndex &idx) {
@@ -277,7 +211,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     auto *elt = this->lookup(aid, idx, false);
     if (elt) {
       this->make_endpoint(elt);
-      this->detector_for(aid)->consume();
+      this->arrays_[aid] -= 1;
     } else {
       // element has migrated
       auto pe = aid.ckLocalBranch()->lastKnown(idx);
@@ -294,7 +228,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 #endif
     this->lock();
     this->reg_upstream(endpoint_(node), aid, idx);
-    this->detector_for(aid)->consume();
+    this->arrays_[aid] -= 1;
     this->unlock();
   }
 
@@ -312,7 +246,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
                                        target->ckGetArrayIndex());
     } else {
       // so we only consume (1) in the else branch
-      this->detector_for(aid)->consume();
+      this->arrays_[aid] -= 1;
     }
     this->unlock();
   }
@@ -356,13 +290,13 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     if (parent >= 0) {
       auto src = ep.elt_ != nullptr ? mine : ep.node_;
       thisProxy[parent].receive_downstream(src, aid, idx);
-      this->detector_for(aid)->produce();
+      this->arrays_[aid] += 1;
     } else if (ep.elt_ != nullptr) {
       this->make_endpoint(ep.elt_);
     } else {
       thisProxy[ep.node_].make_endpoint(aid, idx);
       this->set_endpoint_ = true;
-      this->detector_for(aid)->produce();
+      this->arrays_[aid] += 1;
     }
   }
 
@@ -547,7 +481,7 @@ void back_inserter::handler_(back_inserter *msg) {
   delete msg;
 }
 #endif
-}
+}  // namespace hypercomm
 
 // TODO ( move to library )
 #include <hypercomm/tree_builder/tree_builder.def.h>

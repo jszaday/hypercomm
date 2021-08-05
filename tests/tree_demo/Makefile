@@ -8,7 +8,7 @@ CMK_NUM_PES?=2
 CATCHSEGV?=$(shell which catchsegv)
 
 CHARMCFLAGS = $(OPTS)
-CHARMCLINKFLAGS = -language charm++ $(OPTS) $(LIBS) -module completion
+CHARMCLINKFLAGS = -language charm++ $(OPTS) $(LIBS)
 
 %.o: %.cc
 

@@ -12,9 +12,9 @@ constexpr int kMultiplier = 2;
 /* readonly */ CProxy_tree_builder locProxy;
 
 namespace ck {
-  inline const std::shared_ptr<imprintable<int>>& span_all(void) {
-    return managed_imprintable<int>::instance();
-  }
+inline const std::shared_ptr<imprintable<int>>& span_all(void) {
+  return managed_imprintable<int>::instance();
+}
 }
 
 void enroll_polymorphs(void) {
@@ -103,34 +103,27 @@ class Main : public CBase_Main {
     }
     testProxy = CProxy_Test::ckNew(opts);
 
-    CkPrintf("main> numElements=%d, setNumInitial=%s\n", numElements, setNumInitial ? "true" : "false");
+    CkPrintf("main> numElements=%d, setNumInitial=%s\n", numElements,
+             setNumInitial ? "true" : "false");
 
-    // each array requires its own completion detector for static
-    // insertions, ensuring the spanning tree is ready before completion
-    locProxy.reg_array(CProxy_CompletionDetector::ckNew(), testProxy,
-                       CkCallback(CkIndex_Main::run(), thisProxy));
+    // cb will be called when all nodes have registered the array
+    // note, arrays are registered as initially "inserting"
+    locProxy.reg_array(testProxy, CkCallback(CkIndex_Main::run(), thisProxy));
   }
 
   void run(void) {
-    if (setNumInitial) {
-      // wait for the tree building to complete
-      CkWaitQD();
-
-      locProxy.done_inserting(testProxy, CkCallback(CkIndex_Test::make_contribution(), testProxy));
-    } else {
-      // initiate a phase of static insertion, suspending the thread
-      // and resuming when we can begin. insertions are allowed when
-      // all nodes have called "done_inserting"
-      locProxy.begin_inserting(
-          testProxy, CkCallbackResumeThread(),
-          CkCallback(CkIndex_Test::make_contribution(), testProxy));
-
+    if (!setNumInitial) {
+      // run through a phase of out-of-tree insertions.
+      // these insertions are allowed until all nodes
+      // have called "done_inserting"
       for (auto i = 0; i < numElements; i += 1) {
         testProxy[conv2idx<CkArrayIndex>(i)].insert();
       }
-
-      locProxy.done_inserting(testProxy);
     }
+
+    // cb will be called when (internal) quiscence is reached
+    locProxy.done_inserting(
+        testProxy, CkCallback(CkIndex_Test::make_contribution(), testProxy));
   }
 
   inline int expected(void) const {
