@@ -1,9 +1,10 @@
 #ifndef __HYPERCOMM_UTIL_HPP__
 #define __HYPERCOMM_UTIL_HPP__
 
+#include <charm++.h>
+
 #include <cmath>
 #include <memory>
-#include <charm++.h>
 #include <type_traits>
 
 #include "utilities/hash.hpp"
@@ -47,7 +48,7 @@ char* get_message_buffer(const CkMessage* msg);
 inline char* get_message_buffer(const std::shared_ptr<CkMessage>& msg) {
   return get_message_buffer(msg.get());
 }
-}
+}  // namespace utilities
 
 template <template <typename...> class Template, typename T>
 struct is_specialization_of : std::false_type {};
@@ -98,6 +99,6 @@ inline Index conv2idx(const T& ord) {
   reinterpret_index<T>(idx) = ord;
   return idx;
 }
-}
+}  // namespace hypercomm
 
 #endif
