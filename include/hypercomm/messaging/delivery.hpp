@@ -6,7 +6,7 @@
 
 namespace hypercomm {
 
-template<typename Index>
+template <typename Index>
 void deliver(const element_proxy<Index>&, message* msg);
 
 }

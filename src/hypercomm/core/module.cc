@@ -11,7 +11,9 @@ void call_demux_(CkMessage* msg, locality_base_* obj) {
 
 void call_execute_(CkMessage* msg, locality_base_* obj) { obj->execute(msg); }
 
-void call_replace_downstream_(CkMessage* msg, locality_base_* obj) { obj->replace_downstream(msg); }
+void call_replace_downstream_(CkMessage* msg, locality_base_* obj) {
+  obj->replace_downstream(msg);
+}
 
 const int& CkIndex_locality_base_::idx_demux_CkMessage(void) {
   static int epIdx =
@@ -63,7 +65,7 @@ void initialize(void) {
   // register the locality module
   _registerlocality();
 }
-}
-}
+}  // namespace core
+}  // namespace hypercomm
 
 #include <hypercomm/core/locality.def.h>

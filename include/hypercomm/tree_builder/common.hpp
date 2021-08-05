@@ -28,6 +28,6 @@ struct association_ {
     p | this->valid_upstream_;
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

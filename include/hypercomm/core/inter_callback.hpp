@@ -24,6 +24,6 @@ inline callback_ptr intercall(const CkCallback& cb) {
   return std::make_shared<inter_callback>(cb);
 }
 
-}
+}  // namespace hypercomm
 
 #endif

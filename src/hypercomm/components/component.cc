@@ -68,10 +68,10 @@ void component::stage_action(incoming_type::reverse_iterator* search) {
 }
 
 void component::unspool_values(value_set& pairs) {
-  CkAssert(pairs.size() == this->n_outputs() && "invalid nbr of outputs");
+  CkAssertMsg(pairs.size() == this->n_outputs(), "invalid nbr of outputs");
   for (auto& pair : pairs) {
     auto& port = pair.first;
-    CkAssert(port < this->n_outputs() && "output out of range");
+    CkAssertMsg(port < this->n_outputs(), "output out of range");
     auto& clbk = this->routes[port];
     if (clbk.empty()) {
       this->outgoing[port].push_back(std::move(pair.second));
@@ -116,7 +116,7 @@ void component::on_invalidation(void) {
 }
 
 void component::receive_value(const port_type& port, value_type&& value) {
-  CkAssert(port < this->n_inputs() && "port must be within range");
+  CkAssertMsg(port < this->n_inputs(), "port must be within range");
 
   // if a component receives an unpermitted invalidation
   if (!value && !this->permissive()) {
@@ -139,4 +139,4 @@ void component::receive_value(const port_type& port, value_type&& value) {
     }
   }
 }
-}
+}  // namespace hypercomm

@@ -33,7 +33,7 @@ struct reducer : public hypercomm::component {
   virtual value_set action(value_set &&accepted) {
     // NOTE this can be corrected by duplicating the result of
     //      the combiner, but is it valid to do so?
-    CkAssert(this->n_dstream == 1 && "multi output unsupported");
+    CkAssertMsg(this->n_dstream == 1, "multi output unsupported");
     // TODO is there a more efficient way to do this?
     typename combiner::argument_type args;
     for (auto &pair : accepted) {
@@ -45,6 +45,6 @@ struct reducer : public hypercomm::component {
     return {std::make_pair(0, this->combiner->send(std::move(args)))};
   }
 };
-}
+}  // namespace hypercomm
 
 #endif

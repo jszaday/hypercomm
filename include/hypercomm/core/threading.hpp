@@ -22,7 +22,7 @@ using back_ref_ = T**;
 
 template <typename T>
 using member_fn = void (*)(T*&, CkMessage*);
-}
+}  // namespace
 
 class listener : public base_listener {
  public:
@@ -60,7 +60,7 @@ using free_pool_type = std::vector<int>;
 CpvDeclare(free_pool_type, free_ids_);
 
 CtvDeclare(void*, self_);
-}
+}  // namespace
 
 inline std::pair<CmiIsomallocContext, int> create_context(void);
 
@@ -92,7 +92,7 @@ struct manager {
 
   inline typename thread_map::mapped_type& find_(const id_t& tid) {
     auto search = this->threads_.find(tid);
-    CkAssert(search != std::end(this->threads_) && "could not find thread");
+    CkAssertMsg(search != std::end(this->threads_), "could not find thread");
     return search->second;
   }
 
@@ -124,7 +124,7 @@ struct manager {
   inline pair_type emplace(const member_fn<T>& fn, CkMessage* msg) {
     auto ctx = create_context();
     auto res = this->threads_.emplace(
-        ctx.second, std::make_pair(nullptr, (std::intptr_t) this->owner_));
+        ctx.second, std::make_pair(nullptr, (std::intptr_t)this->owner_));
     auto th =
         create(ctx.first, (back_ref_<T>)(&res.first->second.second), fn, msg);
     res.first->second.first = th;
@@ -225,7 +225,7 @@ inline type create(CmiIsomallocContext ctx, back_ref_<T> obj,
   return CthCreateMigratable((CthVoidFn)launch_pack<T>::action,
                              new launch_pack<T>(obj, fn, msg), 0, ctx);
 }
-}
-}
+}  // namespace thread
+}  // namespace hypercomm
 
 #endif

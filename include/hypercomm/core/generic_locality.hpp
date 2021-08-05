@@ -61,9 +61,9 @@ class destination_ {
   }
 };
 
-class generic_locality_: public virtual common_functions_ {
+class generic_locality_ : public virtual common_functions_ {
  private:
-  template<typename A, typename Enable>
+  template <typename A, typename Enable>
   friend class comproxy;
 
   template <typename A>
@@ -87,9 +87,7 @@ class generic_locality_: public virtual common_functions_ {
 
   generic_locality_(void) { this->update_context(); }
 
-  virtual stamp_type __stamp__(void) const {
-    NOT_IMPLEMENTED;
-  }
+  virtual stamp_type __stamp__(void) const { NOT_IMPLEMENTED; }
 
   void activate_component(const component_id_t& id) {
     auto search = this->components.find(id);
@@ -124,7 +122,7 @@ class generic_locality_: public virtual common_functions_ {
     switch (dest.type) {
       case destination_::type_::kCallback: {
         const auto& cb = dest.cb();
-        CkAssert(cb && "callback must be valid!");
+        CkAssertMsg(cb, "callback must be valid!");
         cb->send(std::move(value));
         break;
       }
@@ -211,8 +209,8 @@ class generic_locality_: public virtual common_functions_ {
       QdCreate(1);
     } else {
       // otherwise, try to deliver it
-      CkAssert(search->first && search->first->alive &&
-               "entry port must be alive");
+      CkAssertMsg(search->first && search->first->alive,
+                  "entry port must be alive");
       this->try_send(search->second, std::move(value));
     }
   }
@@ -338,7 +336,7 @@ inline void generic_locality_::update_context(void) {
 
 inline generic_locality_* access_context_(void) {
   auto& locality = *(&CpvAccess(locality_));
-  CkAssert(locality && "locality must be valid");
+  CkAssertMsg(locality, "locality must be valid");
   return locality;
 }
 
@@ -358,6 +356,6 @@ void entry_port::on_completion(const component&) {
 void entry_port::on_invalidation(const component&) {
   access_context_()->invalidate_port(this->shared_from_this());
 }
-}
+}  // namespace hypercomm
 
 #endif

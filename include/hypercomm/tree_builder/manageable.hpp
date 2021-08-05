@@ -188,6 +188,6 @@ const Index& managed_imprintable<Index>::pick_root(const proxy_ptr& proxy,
     NOT_IMPLEMENTED;
   }
 }
-}
+}  // namespace hypercomm
 
 #endif

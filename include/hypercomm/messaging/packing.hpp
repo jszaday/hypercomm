@@ -45,6 +45,6 @@ hypercomm_msg* pack_to_port(const entry_port_ptr& dst, const Args&... _args) {
   return msg;
 }
 
-}
+}  // namespace hypercomm
 
 #endif

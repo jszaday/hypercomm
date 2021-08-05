@@ -41,7 +41,7 @@ class component : virtual public impermanent {
       }
     }
 
-#if HYPERCOMM_VERBOSE
+#if CMK_VERBOSE
     // we have values but nowhere to send 'em
     auto n_outgoing = this->outgoing.size();
     if (n_outgoing > 0) {
@@ -137,6 +137,6 @@ class component : virtual public impermanent {
 
   void unspool_values(value_set&);
 };
-}
+}  // namespace hypercomm
 
 #endif

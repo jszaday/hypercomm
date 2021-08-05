@@ -15,7 +15,7 @@ struct hashable : public virtual polymorph::trait {
 struct comparable : public virtual hashable {
   virtual bool equals(const std::shared_ptr<comparable>& other) const = 0;
 };
-}
+}  // namespace hypercomm
 
 #include "../utilities.hpp"
 
@@ -31,6 +31,6 @@ struct comparable_comparator {
 template <typename Key, typename Value>
 using comparable_map = std::unordered_map<Key, Value, utilities::hash<Key>,
                                           comparable_comparator<Key>>;
-}
+}  // namespace hypercomm
 
 #endif

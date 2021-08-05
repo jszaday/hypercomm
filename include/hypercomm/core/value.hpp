@@ -28,13 +28,13 @@ using value_ptr = std::shared_ptr<hyper_value>;
 
 inline void try_return(value_ptr&& value) {
   if (value) {
-    auto &src = value->source;
+    auto& src = value->source;
     if (src) {
       src->take_back(std::move(value));
       return;
     }
   }
-#if HYPERCOMM_VERBOSE
+#if CMK_VERBOSE
   CkError("warning> unable to return value %p.\n", value.get());
 #endif
 }
@@ -72,6 +72,6 @@ inline std::shared_ptr<plain_value> msg2value(
   return std::make_shared<plain_value>(
       utilities::unwrap_message(std::move(msg)));
 }
-}
+}  // namespace hypercomm
 
 #endif

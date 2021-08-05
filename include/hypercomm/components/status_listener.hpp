@@ -14,7 +14,7 @@ class status_listener : virtual public polymorph::trait {
   virtual void on_completion(const component&) = 0;
   virtual void on_invalidation(const component&) = 0;
 };
-}
-}
+}  // namespace components
+}  // namespace hypercomm
 
 #endif

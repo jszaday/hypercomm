@@ -19,7 +19,6 @@ class sentinel : public component::status_listener,
   component::id_t id_;
 
  public:
-
   sentinel(const component::id_t& _1) : id_(_1) {}
 
   virtual void on_completion(const component& com) override {
@@ -99,6 +98,6 @@ class sentinel : public component::status_listener,
     this->n_expected_ += 1;
   }
 };
-}
+}  // namespace hypercomm
 
 #endif
