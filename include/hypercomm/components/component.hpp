@@ -27,20 +27,8 @@ class component : virtual public impermanent {
   component(const id_t& _1) : id(_1), activated(false) {}
 
   virtual ~component() {
-    // try to return all unused values
-    for (auto& set : this->incoming) {
-      for (auto& pair : set) {
-        try_return(std::move(pair.second));
-      }
-    }
-
-    // invalidate all unfulfilled routes
-    for (auto& pair : this->routes) {
-      for (auto& route : pair.second) {
-        route->send(value_type{});
-      }
-    }
-
+    // dumps all held values and propagates invalidations downstream
+    this->ret_inv_values();
 #if CMK_VERBOSE
     // we have values but nowhere to send 'em
     auto n_outgoing = this->outgoing.size();
@@ -136,6 +124,8 @@ class component : virtual public impermanent {
   void on_invalidation(void);
 
   void unspool_values(value_set&);
+
+  void ret_inv_values(void);
 };
 }  // namespace hypercomm
 

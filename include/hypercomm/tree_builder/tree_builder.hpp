@@ -397,7 +397,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     }
   }
 
-  // attempt to register an (upstream) member for the given chare
+  // attempt to find a downstream child for the given element
   // returns nullptr if a remote request had to be sent
   element_type reg_upstream(const endpoint_ &ep, const CkArrayID &aid,
                             const index_type &idx) {
@@ -406,23 +406,23 @@ class tree_builder : public CBase_tree_builder, public array_listener {
       this->send_downstream(ep, aid, idx);
       return nullptr;
     } else {
+      // set the element as the parent of the found target
       auto &target = search->second.first;
       target->put_upstream_(idx);
       return target;
     }
   }
 
-  // attempt to register an (downstream) member for the given chare
+  // attempt to find an upstream parent for the given element
   // returns nullptr if a remote request had to be sent
   element_type reg_downstream(const endpoint_ &ep, const CkArrayID &aid,
                               const index_type &idx) {
-    auto &elements = this->elements_[aid];
-    if (elements.empty()) {
+    auto search = this->find_target(aid, false);
+    if (search == std::end(this->elements_[aid])) {
       this->send_upstream(ep, aid, idx);
       return nullptr;
     } else {
-      auto search = this->find_target(aid, false);
-      CkAssert(search != std::end(elements));
+      // set the element as the child of the found target
       auto &target = search->second.first;
       target->put_downstream_(idx);
       return target;

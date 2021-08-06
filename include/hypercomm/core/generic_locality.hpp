@@ -215,6 +215,8 @@ class generic_locality_ : public virtual common_functions_ {
     }
   }
 
+  // called whenever a port is updated to force
+  // delivery of buffered messages
   void resync_port_queue(entry_port_iterator& it) {
     const auto port = it->first;
     auto search = port_queue.find(port);
@@ -223,7 +225,6 @@ class generic_locality_ : public virtual common_functions_ {
       while (port->alive && !buffer.empty()) {
         auto& msg = buffer.front();
         this->try_send(it->second, std::move(msg));
-        // this->try_collect(it);
         buffer.pop_front();
         QdProcess(1);
       }
