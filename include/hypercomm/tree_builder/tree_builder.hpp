@@ -30,8 +30,6 @@ class tree_builder : public CBase_tree_builder, public array_listener {
   using index_type = CkArrayIndex;
   using element_type = manageable_base_ *;
 
-  bool set_endpoint_ = false;
-
   friend class back_inserter;
 
   static void initialize(void) {
@@ -54,9 +52,17 @@ class tree_builder : public CBase_tree_builder, public array_listener {
   using elements_type =
       std::unordered_map<index_type, record_type, array_index_hasher>;
 
-  std::unordered_map<CkArrayID, std::int64_t, array_id_hasher> arrays_;
-  std::unordered_map<CkArrayID, elements_type, array_id_hasher> elements_;
-  std::unordered_map<CkArrayID, bool, array_id_hasher> insertion_statuses_;
+  template <typename Value>
+  using array_id_map = std::unordered_map<CkArrayID, Value, array_id_hasher>;
+
+  // tracks the quiscence status of each array (produce/consume counts)
+  array_id_map<std::int64_t> arrays_;
+  // tracks the pointers to an array's elements
+  array_id_map<elements_type> elements_;
+  // tracks whether an array currently permits static insertions
+  array_id_map<bool> insertion_statuses_;
+  // tracks whether the root of an array's spanning tree has been set
+  array_id_map<bool> set_endpoint_;
 
 #if CMK_SMP
   struct counter_helper_ {
@@ -66,21 +72,12 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     counter_helper_(const CkCallback &_1) : count(CkMyNodeSize()), cb(_1) {}
   };
 
-  std::unordered_map<CkArrayID, counter_helper_, array_id_hasher> startup_;
+  // tracks the callback and number of remaining contributors during
+  // registration
+  array_id_map<counter_helper_> startup_;
 #endif
 
-  CkArray *spin_to_win(const CkArrayID &aid, const int &rank) {
-    if (rank == CkMyRank()) {
-      return aid.ckLocalBranch();
-    } else {
-      CkArray *inst = nullptr;
-      while (nullptr == (inst = aid.ckLocalBranchOther(rank))) {
-        CsdScheduler(0);
-      }
-      return inst;
-    }
-  }
-
+  // indicates whether an element is local or remote
   struct endpoint_ {
     int node_;
     element_type elt_;
@@ -106,8 +103,12 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 #endif
   }
 
+  /* register existing members of the array with this tree_builder
+   * and subscribe it to array's updates. if smp, contribute to the
+   * startup reduction.
+   */
   void startup_process_(const CkArrayID &aid) {
-    auto *local = this->spin_to_win(aid, CkMyRank());
+    auto *local = aid.ckLocalBranch();
     auto &elems = local->*detail::get(detail::backstage_pass());
     for (auto &elem : elems) {
       this->ckElementCreated((ArrayElement *)elem);
@@ -124,6 +125,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
   using refnum_t = CMK_REFNUM_TYPE;
 
+  // compress an array id into a cmk refnum
   // source ( https://stackoverflow.com/a/3058296/1426075 )
   static refnum_t compress(const CkArrayID &aid) {
     constexpr auto prime = 34283;
@@ -151,10 +153,20 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 #endif
   }
 
+  /* this is not implemented because its behavior would be undefined.
+   * arrays assume their listeners are conventionally pup'able, which a
+   * node/group chare is not
+   */
   virtual const PUP::able::PUP_ID &get_PUP_ID(void) const { NOT_IMPLEMENTED; }
 
+  // this is not implemented because arrays do not permit removing listeners
   void unreg_array(const CkArrayID &, const CkCallback &) { NOT_IMPLEMENTED; }
 
+  /* register an array with this tree builder:
+   * 1) set it as inserting and start quiescence detection
+   * 2) run the start up process on all ranks of this node (smp)
+   * 3) "send" the callback when all nodes have finished
+   */
   void reg_array(const CkArrayID &aid, const CkCallback &cb) {
     this->lock();
     auto search = this->arrays_.find(aid);
@@ -186,55 +198,76 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 #endif
   }
 
+  // lookup an element through the registry
+  // returns nullptr if not found
   ArrayElement *lookup(const CkArrayID &aid, const index_type &idx) {
-    return dynamic_cast<ArrayElement *>(this->lookup(aid, idx, true));
+    return static_cast<ArrayElement *>(this->lookup(aid, idx, true));
   }
 
   using stamp_type = manageable_base_::stamp_type;
 
+  // overload of create_child
   std::pair<association_ptr_, stamp_type> create_child(
       const element_type &elt, const index_type &child) {
     return this->create_child(elt->ckGetArrayID(), elt->ckGetArrayIndex(),
                               child);
   }
 
+  // register the specified index as a child of the specified element
+  // returns an association and a stamp for constructing the child
   std::pair<association_ptr_, stamp_type> create_child(
       const CkArrayID &aid, const index_type &parent, const index_type &child) {
     this->lock();
     auto &rec = this->record_for(aid, parent, false);
     auto last = rec.first->__stamp__();
+    // add the child as a downstream member of future collective ops
     rec.first->put_downstream_(child);
     // this avoids un/locking the individual record
     CkAssertMsg(rec.second == CkMyRank(),
                 "a child must be created on the same pe as its parent");
     this->unlock();
+    // create an association for the child, with parent as its upstream
     association_ptr_ a(new hypercomm::association_);
     a->valid_upstream_ = true;
     a->upstream_.emplace_back(parent);
     return std::make_pair(std::move(a), last);
   }
 
+  // begin a phase of inserting for an already-registered array
+  // callback is triggered when all nodes are ready for insertions
+  // ( note, this specifically pertains to out-of-tree insertions )
   void begin_inserting(const CkArrayID &aid, const CkCallback &cb) {
     this->lock();
-    this->insertion_statuses_[aid] = true;
+    auto search = this->insertion_statuses_.find(aid);
+    CkAssertMsg(search != std::end(this->insertion_statuses_),
+                "could not find aid, was it registered?");
+    search->second = true;  // set is_inserting == true
     this->contribute(cb);
     this->unlock();
   }
 
+  // register the specified element as the endpoint of its spanning
+  // tree; as in, it has no upstream members, aka, root.
   void make_endpoint(const CkArrayID &aid, const CkArrayIndex &idx) {
     this->lock();
+    // try to lookup the specified element
     auto *elt = this->lookup(aid, idx, false);
+    // if we found it,
     if (elt) {
+      // make it the root
       this->make_endpoint(elt);
+      // qd consume (1)
       this->arrays_[aid] -= 1;
     } else {
-      // element has migrated
+      // otherwise, the desired elt has migrated, reroute
       auto pe = aid.ckLocalBranch()->lastKnown(idx);
       this->thisProxy[CkNodeOf(pe)].make_endpoint(aid, idx);
     }
     this->unlock();
   }
 
+  // receive a request to make idx an upstream member of a local chare,
+  // from the specified node
   void receive_upstream(const int &node, const CkArrayID &aid,
                         const index_type &idx) {
 #if CMK_VERBOSE
@@ -243,10 +276,12 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 #endif
     this->lock();
     this->reg_upstream(endpoint_(node), aid, idx);
-    this->arrays_[aid] -= 1;
+    this->arrays_[aid] -= 1;  // qd consume (1)
     this->unlock();
   }
 
+  // receive a request to make idx an downstream member of a local
+  // chare, from the specified node
   void receive_downstream(const int &node, const CkArrayID &aid,
                           const index_type &idx) {
 #if CMK_VERBOSE
@@ -255,17 +290,19 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 #endif
     this->lock();
     auto target = this->reg_downstream(endpoint_(node), aid, idx);
+    // if we fail to locally register the idx, we need to send it upstream
     if (target != nullptr) {
-      // we implicitly produce (1) at this point
+      // so we implicitly produce (1) at this point
       thisProxy[node].receive_upstream(CkMyNode(), aid,
                                        target->ckGetArrayIndex());
     } else {
-      // so we only consume (1) in the else branch
+      // thus, we only consume (1) in the else branch
       this->arrays_[aid] -= 1;
     }
     this->unlock();
   }
 
+  // determine whether aid is in a phase of static insertion
   inline bool is_inserting(const CkArrayID &aid) const {
     auto search = this->insertion_statuses_.find(aid);
     return (search == std::end(this->insertion_statuses_)) ? false
@@ -273,6 +310,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
   }
 
  protected:
+  // pull the record for the element, fails if not found
   record_type &record_for(const CkArrayID &aid, const index_type &idx,
                           const bool &lock) {
     if (lock) this->lock();
@@ -281,6 +319,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     return rec;
   }
 
+  // find the local pointer of an element, returns nullptr if not found
   element_type lookup(const CkArrayID &aid, const index_type &idx,
                       const bool &lock) {
     if (lock) this->lock();
@@ -291,27 +330,37 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     return elt;
   }
 
+  // helper to make a local element the root of the spanning tree
   void make_endpoint(const element_type &elt) {
-    CkAssertMsg(!this->set_endpoint_, "cannot register an endpoint twice");
-    this->set_endpoint_ = true;
+    auto &status = this->set_endpoint_[elt->ckGetArrayID()];
+    CkAssertMsg(!status, "cannot register an endpoint twice");
+    status = true;
     elt->set_endpoint_();
   }
 
+  // send the specified element ( upstream ) to find it a parent
   void send_upstream(const endpoint_ &ep, const CkArrayID &aid,
                      const index_type &idx) {
+    // determine our parent in the node spanning tree
     auto mine = CkMyNode();
     auto parent = binary_tree::parent(mine);
-
+    // if we are not at the root of the node spanning tree
     if (parent >= 0) {
+      // we can send it ( upstream ), this means it will be
+      // ( downstream ) relative to the receiver
       auto src = ep.elt_ != nullptr ? mine : ep.node_;
       thisProxy[parent].receive_downstream(src, aid, idx);
-      this->arrays_[aid] += 1;
+      this->arrays_[aid] += 1;  // qd create (1)
     } else if (ep.elt_ != nullptr) {
+      // otherwise, if the element is local and we are at the
+      // root, we need to make it the root
       this->make_endpoint(ep.elt_);
     } else {
+      // other-otherwise, if the element is remote, we need
+      // to send a request to its last known location
       thisProxy[ep.node_].make_endpoint(aid, idx);
-      this->set_endpoint_ = true;
-      this->arrays_[aid] += 1;
+      this->set_endpoint_[aid] = true;
+      this->arrays_[aid] += 1;  // qd create (1)
     }
   }
 
@@ -323,6 +372,9 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
   using iter_type = typename elements_type::iterator;
 
+  // find a target within the array, either:
+  // a) seeking a target without an upstream member, or:
+  // b) seeking the target with the fewest downstream members
   inline iter_type find_target(const CkArrayID &aid, const bool &up) {
     auto &elements = this->elements_[aid];
     using value_type = typename elements_type::value_type;
@@ -345,6 +397,8 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     }
   }
 
+  // attempt to register an (upstream) member for the given chare
+  // returns nullptr if a remote request had to be sent
   element_type reg_upstream(const endpoint_ &ep, const CkArrayID &aid,
                             const index_type &idx) {
     auto search = this->find_target(aid, true);
@@ -358,6 +412,8 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     }
   }
 
+  // attempt to register an (downstream) member for the given chare
+  // returns nullptr if a remote request had to be sent
   element_type reg_downstream(const endpoint_ &ep, const CkArrayID &aid,
                               const index_type &idx) {
     auto &elements = this->elements_[aid];
@@ -377,6 +433,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     CkError("warning> try_reassociate not implemented\n");
   }
 
+  // called when elements are initially created to (re)associate them
   void associate(const CkArrayID &aid, const element_type &elt) {
     auto &assoc = elt->association_;
     // if we are (statically) inserting an unassociated element
@@ -386,7 +443,9 @@ class tree_builder : public CBase_tree_builder, public array_listener {
       // and set its up/downstream
       auto target = this->reg_downstream(endpoint_(elt), elt->ckGetArrayID(),
                                          elt->ckGetArrayIndex());
+      // if the target is local,
       if (target != nullptr) {
+        // set this element as a target
         elt->put_upstream_(target->ckGetArrayIndex());
       }
     } else {
@@ -395,6 +454,8 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     }
   }
 
+  // called when elements are destroyed to disassociate them from the
+  // per-element spanning tree
   void disassociate(const CkArrayID &aid, const element_type &elt) {
     if (this->is_inserting(aid) || !elt->association_->valid_upstream_) {
       NOT_IMPLEMENTED;
@@ -409,24 +470,26 @@ class tree_builder : public CBase_tree_builder, public array_listener {
       auto &parent = *(std::begin(elt->association_->upstream_));
       auto &children = elt->association_->downstream_;
       auto interceptor = interceptor_[CkMyPe()];
-
+      // replace this elt with its children in its parent
+      // (there may be none! that is ok, effectively a "delete".)
       auto *msg = hypercomm::pack(curr, children, elt->__stamp__());
       UsrToEnv(msg)->setEpIdx(
           CkIndex_locality_base_::idx_replace_downstream_CkMessage());
       interceptor.deliver(aid, parent, msg);
-
+      // if we had children,
       if (!children.empty()) {
 #if CMK_VERBOSE
         CkPrintf("%s> forwarding messages to %s.\n",
                  utilities::idx2str(curr).c_str(),
                  utilities::idx2str(parent).c_str());
 #endif
-        // redirect downstream messages upstream
+        // redirect their downstream messages to our parent
         interceptor.forward(aid, curr, parent);
       }
     }
   }
 
+  // called whenever an element locally manifests
   void reg_element(ArrayElement *elt, const bool &created) {
     auto cast = dynamic_cast<element_type>(elt);
     auto &aid = cast->ckGetArrayID();
@@ -442,6 +505,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     this->unlock();
   }
 
+  // called whenever an element locally vanishes
   void unreg_element(ArrayElement *elt, const bool &died) {
     auto cast = dynamic_cast<element_type>(elt);
     auto &aid = cast->ckGetArrayID();
@@ -457,6 +521,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
   }
 
  public:
+  // interface layer for charm++
   virtual void ckRegister(CkArray *, int) override {}
 
   virtual bool ckElementCreated(ArrayElement *elt) override {
@@ -483,6 +548,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 };
 
 #if CMK_SMP
+// register the handler for the back_inserter, returning its index
 const int &back_inserter::handler(void) {
   CpvStaticDeclare(int, back_inserter_handler_);
 
@@ -495,6 +561,7 @@ const int &back_inserter::handler(void) {
   return CpvAccess(back_inserter_handler_);
 }
 
+// call the startup process for the given tree builder and aid
 void back_inserter::handler_(back_inserter *msg) {
   auto *builder = CProxy_tree_builder(msg->gid).ckLocalBranch();
   builder->startup_process_(msg->aid);
