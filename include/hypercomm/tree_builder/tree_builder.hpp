@@ -408,7 +408,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     } else {
       auto &parent = *(std::begin(elt->association_->upstream_));
       auto &children = elt->association_->downstream_;
-      auto interceptor = interceptor_[CkMyNode()];
+      auto interceptor = interceptor_[CkMyPe()];
 
       auto *msg = hypercomm::pack(curr, children, elt->__stamp__());
       UsrToEnv(msg)->setEpIdx(
@@ -432,7 +432,12 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     auto &aid = cast->ckGetArrayID();
     auto &idx = cast->ckGetArrayIndex();
     this->lock();
-    if (created) associate(aid, cast);
+    if (created) {
+      auto *loc = interceptor::local_branch();
+      loc->stop_forwarding(aid, idx);
+
+      this->associate(aid, cast);
+    }
     this->elements_[aid][idx] = std::make_pair(cast, CkMyRank());
     this->unlock();
   }
