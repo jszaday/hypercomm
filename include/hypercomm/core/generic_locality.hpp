@@ -326,6 +326,10 @@ namespace {
 CpvDeclare(generic_locality_*, locality_);
 }
 
+/* access the pointer of the currently executing locality
+ * call at the start of EPs and after resume-from-sleep
+ * NOTE ( this will be retired when mainline Charm PR#3426 is merged )
+ */
 inline void generic_locality_::update_context(void) {
   if (!CpvInitialized(locality_)) {
     CpvInitialize(generic_locality_*, locality_);

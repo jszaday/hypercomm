@@ -18,8 +18,9 @@ struct reducer : public hypercomm::component {
           const std::size_t &_5)
       : component(_1), stamp(_2), combiner(_3), n_ustream(_4), n_dstream(_5) {}
 
+  // a reducer is affected by a stamp when it was issued at or after it
   bool affected_by(const stamp_type &stamp) const {
-    return (std::get<1>(this->stamp) <= std::get<1>(this->stamp)) &&
+    return (std::get<1>(this->stamp) >= std::get<1>(this->stamp)) &&
            comparable_comparator<imprintable_ptr>()(std::get<0>(this->stamp),
                                                     std::get<0>(stamp));
   }

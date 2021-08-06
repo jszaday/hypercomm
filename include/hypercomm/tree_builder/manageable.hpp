@@ -23,6 +23,7 @@ class manageable : public T {
 
   enum transaction_type_ { kReplace, kDelete };
 
+  // a replace or delete event for downstream children
   struct transaction_ {
     transaction_type_ type;
     CkArrayIndex from;
@@ -39,6 +40,7 @@ class manageable : public T {
 
   std::vector<transaction_> staged_;
 
+  // call a function on all ports affected by the specified stamp
   template <typename Fn>
   void affect_ports(const index_type_& idx, const stamp_type& stamp,
                     const Fn& fn) {
@@ -51,6 +53,8 @@ class manageable : public T {
     }
   }
 
+  // attempt to resolve all staged transactions, recursing until none
+  // can be resolved (e.g., affected index not found)
   void resolve_transactions(void) {
     auto& ds = this->association_->downstream_;
     for (auto it = std::begin(this->staged_); it != std::end(this->staged_);
@@ -67,6 +71,7 @@ class manageable : public T {
                   CkPrintf("info> sending invalidation to %s.\n",
                            std::to_string(idx).c_str());
 #endif
+                  // deletions send an invalidation/null value to the reducer
                   this->receive_value(port, std::move(value_ptr{}));
                 });
             break;
@@ -81,6 +86,8 @@ class manageable : public T {
                            std::to_string(idx).c_str(),
                            std::to_string(next).c_str());
 #endif
+                  // replace events update the expected index of the port
+                  // NOTE ( if using C++17 there is a better way to do this )
                   auto iter = this->entry_ports.find(port);
                   auto value = iter->second;
                   this->entry_ports.erase(iter);
@@ -99,10 +106,13 @@ class manageable : public T {
     }
   }
 
+  // adds idx as a child of any collective operations that are underway,
+  // starting at the epoch number specified by stamp
   void add_downstream(const CkArrayIndex& idx, const stamp_type& stamp) {
+    // add the downstream member to future reductions
     auto& down = reinterpret_index<index_type_>(idx);
     this->association_->downstream_.emplace_back(idx);
-
+    // find the components that are affected by stamp
     for (auto& pair : this->components) {
       auto rdcr = dynamic_cast<reducer*>(pair.second.get());
       if (rdcr && rdcr->affected_by(stamp)) {
@@ -128,6 +138,7 @@ class manageable : public T {
     this->set_association_(std::forward<association_ptr_>(association));
   }
 
+  // version of replace_downstream that is callable as an EP
   virtual void replace_downstream(CkMessage* msg) override {
     CkArrayIndex from;
     std::vector<CkArrayIndex> to;
@@ -138,18 +149,28 @@ class manageable : public T {
     this->replace_downstream(from, std::move(to), std::move(stamp));
   }
 
+  /* replaces downstream child (from) with the members of (to),
+   * starting at the epoch number specified by (stamp).
+   *
+   * collectives before the stamp will remain unchanged, since
+   * we should expect a value from them.
+   */
   void replace_downstream(const CkArrayIndex& from,
                           std::vector<CkArrayIndex>&& to, stamp_type&& stamp) {
     this->update_context();
+    // if there are no children
     if (to.empty()) {
+      // stage a deletion event
       this->staged_.emplace_back(from, std::move(stamp));
     } else {
+      // otherwise, children 1:n, add them as downstream directly
       for (auto it = (std::begin(to) + 1); it != std::end(to); it += 1) {
         this->add_downstream(*it, stamp);
       }
-
+      // then replace (from) with child 0
       this->staged_.emplace_back(from, *(std::begin(to)), std::move(stamp));
     }
+    // resolve the staged transactions
     this->resolve_transactions();
   }
 
