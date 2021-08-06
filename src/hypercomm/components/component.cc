@@ -18,6 +18,7 @@ bool component::collectible(void) const {
 
 using incoming_type = component::incoming_type;
 
+// find any records that are ready, i.e., they have all the expected values
 inline incoming_type::reverse_iterator find_ready(incoming_type& incoming,
                                                   const int& n_needed) {
   auto search = incoming.rbegin();
@@ -29,19 +30,28 @@ inline incoming_type::reverse_iterator find_ready(incoming_type& incoming,
   return search;
 }
 
+// activates a component, enabling it to execute
 void component::activate(void) {
+  // set the "activated" and "alive" flags
+  // (a component is gc'd when activated=true, alive=false)
   this->activated = this->alive = true;
+  // check the number of expected values
   auto n_expt = this->n_expected();
   if (n_expt == 0) {
+    // if none, we can stage the action of the component
     this->stage_action(nullptr);
   } else {
-    auto search = find_ready(this->incoming, n_expt);
-    if (search != this->incoming.rend()) {
+    incoming_type::reverse_iterator search;
+    // otherwise, stage all ready values (while we are alive)
+    while (this->alive && (this->incoming.rend() !=
+                           (search = find_ready(this->incoming, n_expt)))) {
       this->stage_action(&search);
     }
   }
 }
 
+// find a value set that has a "gap", or missing value,
+// at the specified port
 inline incoming_type::reverse_iterator find_gap(
     incoming_type& incoming, const component::port_type& which) {
   auto search = incoming.rbegin();
@@ -53,7 +63,10 @@ inline incoming_type::reverse_iterator find_gap(
   return search;
 }
 
+// this should only be called with a ready value set,
+// this may be "nullptr" when components require no values.
 void component::stage_action(incoming_type::reverse_iterator* search) {
+  // when a component is alive:
   if (this->alive) {
     // act using available values, consuming them
     auto values = search ? this->action(std::move(**search)) : this->action({});
@@ -67,15 +80,21 @@ void component::stage_action(incoming_type::reverse_iterator* search) {
   }
 }
 
+// propagate a value set downstream to our consumers
 void component::unspool_values(value_set& pairs) {
   CkAssertMsg(pairs.size() == this->n_outputs(), "invalid nbr of outputs");
+  // for each (port, value) pair the value set
   for (auto& pair : pairs) {
     auto& port = pair.first;
     CkAssertMsg(port < this->n_outputs(), "output out of range");
+    // check whether we have callback(s) at the specified port
     auto& clbk = this->routes[port];
     if (clbk.empty()) {
+      // if not, buffer the value until a callback is set
       this->outgoing[port].push_back(std::move(pair.second));
     } else {
+      // otherwise, send the value to the callback, and pop it
+      // (so it doesn't receive multiple values from the same port)
       clbk.front()->send(std::move(pair.second));
       clbk.pop_front();
     }
@@ -84,40 +103,49 @@ void component::unspool_values(value_set& pairs) {
 
 void component::update_destination(const port_type& port,
                                    const callback_ptr& cb) {
-  auto& values = this->outgoing[port];
-  if (values.empty()) {
+  auto search = this->outgoing.find(port);
+  // if no values are available at this port
+  if ((search == std::end(this->outgoing)) || search->second.empty()) {
+    // add the callback to the list of outgoing routes
     this->routes[port].push_back(cb);
   } else {
+    auto& values = search->second;
+    // if a value is found, send it
     cb->send(std::move(values.front()));
+    // then discard it
     values.pop_front();
   }
 }
 
-// when a component expires, it:
-void component::on_invalidation(void) {
-  // dumps its values:
+void component::ret_inv_values(void) {
+  // try to return all unused values and
   for (auto& set : this->incoming) {
     for (auto& pair : set) {
-      auto& source = pair.second->source;
-      if (source) {
-        source->take_back(std::move(pair.second));
-      }
+      try_return(std::move(pair.second));
     }
   }
-  // then generates invalidations for each output
-  value_set values{};
-  for (auto i = 0; i < this->n_outputs(); i += 1) {
-    values[i] = {};
+  // clear values so they're not used again
+  this->incoming.clear();
+  // invalidate all unfulfilled routes
+  for (auto& pair : this->routes) {
+    for (auto& route : pair.second) {
+      route->send(value_type{});
+    }
   }
-  // then propagates them downstream, and:
-  this->unspool_values(values);
+  // clear routes so they're not used again
+  this->routes.clear();
+}
+
+// when a component expires, it:
+void component::on_invalidation(void) {
+  // dumps its values and propagates invalidations downstream:
+  this->ret_inv_values();
   // notifies its listeners
   this->notify_listeners<true>();
 }
 
 void component::receive_value(const port_type& port, value_type&& value) {
   CkAssertMsg(port < this->n_inputs(), "port must be within range");
-
   // if a component receives an unpermitted invalidation
   if (!value && !this->permissive()) {
     // it expires when it is not resilient, and:
@@ -125,16 +153,21 @@ void component::receive_value(const port_type& port, value_type&& value) {
     // if it expires, it goes through a routine:
     if (!this->alive) this->on_invalidation();
   } else {
+    // look for a value set missing a value for this port
     auto search = find_gap(this->incoming, port);
-
+    // if one is not found:
     if (search == this->incoming.rend()) {
+      // create a new set, and put it at the head of the buffer
       this->incoming.push_front({std::make_pair(port, std::move(value))});
+      // then, update the search iterator
       search = this->incoming.rbegin();
     } else {
+      // otherwise, update the found value set
       (*search)[port] = value;
     }
-
+    // if the value set at the iterator is ready
     if (search->size() == this->n_expected()) {
+      // then stage its action
       this->stage_action(&search);
     }
   }

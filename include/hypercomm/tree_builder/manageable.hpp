@@ -79,21 +79,25 @@ class manageable : public T {
           case kReplace: {
             *search = it->to;
             auto& next = reinterpret_index<index_type_>(it->to);
-            this->affect_ports(
-                idx, it->stamp, [&](const std::shared_ptr<port_type_>& port) {
+            this->affect_ports(idx, it->stamp,
+                               [&](const std::shared_ptr<port_type_>& port) {
 #if CMK_VERBOSE
-                  CkPrintf("info> replacing %s with %s.\n",
-                           std::to_string(idx).c_str(),
-                           std::to_string(next).c_str());
+                                 CkPrintf("info> replacing %s with %s.\n",
+                                          std::to_string(idx).c_str(),
+                                          std::to_string(next).c_str());
 #endif
-                  // replace events update the expected index of the port
-                  // NOTE ( if using C++17 there is a better way to do this )
-                  auto iter = this->entry_ports.find(port);
-                  auto value = iter->second;
-                  this->entry_ports.erase(iter);
-                  port->index = next;
-                  this->entry_ports.emplace(port, std::move(value));
-                });
+                                 // find the port within our map
+                                 auto iter = this->entry_ports.find(port);
+                                 // copy the old dest to keep it alive
+                                 auto value = iter->second;
+                                 // erase it from the port map
+                                 // ( could use C++17 extract for this)
+                                 this->entry_ports.erase(iter);
+                                 // update the index of the port
+                                 port->index = next;
+                                 // reopen the port with its updated index/hash
+                                 this->open(port, std::move(value));
+                               });
             break;
           }
           default:
