@@ -1,8 +1,16 @@
 <div align="center">
-
-<!--   ![Logo for hypercomm](logo.png) -->
+  <!--   ![Logo for hypercomm](logo.png) -->
   <img src="logo.png" width="320">
+
+  </br>
+
+  [![SMP](https://github.com/jszaday/hypercomm/actions/workflows/smp.yml/badge.svg)](https://github.com/jszaday/hypercomm/actions/workflows/smp.yml)
+  [![Non-SMP](https://github.com/jszaday/hypercomm/actions/workflows/non_smp.yml/badge.svg)](https://github.com/jszaday/hypercomm/actions/workflows/non_smp.yml)
+  [![Total alerts](https://img.shields.io/lgtm/alerts/g/jszaday/hypercomm.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/jszaday/hypercomm/alerts/)
+  [![Language grade: C/C++](https://img.shields.io/lgtm/grade/cpp/g/jszaday/hypercomm.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/jszaday/hypercomm/context:cpp)
+
 </div>
+
 
 # A Foreword Regarding Status
 
