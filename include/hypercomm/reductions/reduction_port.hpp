@@ -24,8 +24,9 @@ class reduction_port : public entry_port {
         count(std::get<1>(_1)),
         index(_2) {}
 
+  // a port is affected by a stamp if it was issued at or after it
   bool affected_by(const stamp_type& stamp) const {
-    return (this->count <= std::get<1>(stamp)) &&
+    return (this->count >= std::get<1>(stamp)) &&
            (this->identity ==
             utilities::hash<first_type>()(std::get<0>(stamp)));
   }
