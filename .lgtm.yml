@@ -1,0 +1,12 @@
+path_classifiers:
+  generated:
+    exclude: "include/hypercomm/**/*.de*.h"
+extraction:
+  cpp:
+    configure:
+      command: "./prepare_deps"
+    before_index: "export CHARM_HOME=$LGTM_SRC/charm"
+    index:
+      build_command:
+      - "cmake ."
+      - "make -j2"
