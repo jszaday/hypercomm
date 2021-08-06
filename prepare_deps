@@ -1,0 +1,15 @@
+#!/bin/bash
+set -euo pipefail
+IFS=$'\n\t'
+
+if [[ ! -z "${DEPLOY_ENV:-}" ]]; then
+  cd $LGTM_SRC
+fi
+
+git clone https://github.com/UIUC-PPL/charm.git
+
+pushd charm
+
+./build charm++ netlrts-linux-x86_64 smp -g3 -j2 --with-production --enable-error-checking
+
+popd
