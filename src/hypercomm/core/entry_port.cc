@@ -13,4 +13,4 @@ void entry_port::on_completion(const component&) {
 void entry_port::on_invalidation(const component&) {
   access_context_()->invalidate_port(this->shared_from_this());
 }
-}
+}  // namespace hypercomm
