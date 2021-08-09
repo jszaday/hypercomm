@@ -7,8 +7,6 @@ struct __msg__;
 }
 
 using message = messaging::__msg__;
-
-int message_index(void);
 }  // namespace hypercomm
 
 #endif

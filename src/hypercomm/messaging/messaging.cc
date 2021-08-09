@@ -11,10 +11,6 @@ namespace hypercomm {
 
 CProxy_interceptor interceptor_;
 
-int message_index(void) {
-  return messaging::__msg__::__idx;
-}
-
 namespace messaging {
 
 constexpr auto hdr_size = sizeof(__msg__);

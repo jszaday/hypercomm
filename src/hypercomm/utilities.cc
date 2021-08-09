@@ -11,7 +11,7 @@ char* get_message_buffer(const CkMessage* _1) {
   auto env = UsrToEnv(msg);
   auto idx = env->getMsgIdx();
 
-  if (idx == message_index()) {
+  if (idx == message::index()) {
     return static_cast<message*>(msg)->payload;
   } else if (idx == CMessage_CkMarshallMsg::__idx) {
     return static_cast<CkMarshallMsg*>(msg)->msgBuf;
