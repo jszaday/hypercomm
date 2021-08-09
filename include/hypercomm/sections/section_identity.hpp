@@ -30,11 +30,13 @@ class section_identity : public identity<Index> {
   virtual const Index &mine(void) const override { return this->mine_; }
 
   // TODO when can we avoid this clone?
-  section_identity(const section_type &_1, const Index &_2)
-      : section_identity(_1.clone(), _2) {}
+  section_identity(const reduction_id_t &_0, const section_type &_1,
+                   const Index &_2)
+      : section_identity(_0, _1.clone(), _2) {}
 
-  section_identity(const section_ptr &_1, const Index &_2)
-      : sect_(_1), mine_(_2){};
+  section_identity(const reduction_id_t &_0, const section_ptr &_1,
+                   const Index &_2)
+      : identity<Index>(_0), sect_(_1), mine_(_2) {}
 
   virtual std::vector<Index> downstream(void) const override {
     const auto ord = sect_->ordinal_for(mine_);

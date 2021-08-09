@@ -137,11 +137,11 @@ class manageable : public T {
 
     const identity_ptr_* res = nullptr;
     for (const auto& entry : stamp) {
-      auto cast =
-          std::dynamic_pointer_cast<imprintable<int>>(std::move(entry.first));
-      if (!entry.first->is_member(this->ckGetArrayIndex())) {
+      auto& gen = entry.first;
+      if (!gen->is_member(this->ckGetArrayIndex())) {
         continue;
       }
+      auto cast = std::dynamic_pointer_cast<imprintable<int>>(std::move(gen));
       auto& ins = this->emplace_identity(cast, std::move(entry.second));
       if (fn(seek, cast)) {
         res = &ins;
