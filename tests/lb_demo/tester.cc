@@ -38,7 +38,7 @@ struct locality : public CBase_locality {
     // enable sync load balancing
     this->usesAtSync = true;
     // create an empty message
-    auto msg = hypercomm_msg::make_message(0, {});
+    auto msg = message::make_message(0, {});
     // create a thread within the manager
     auto thp = thman.emplace(&locality::run_, msg);
     // register it

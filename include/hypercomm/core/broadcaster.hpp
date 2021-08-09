@@ -42,7 +42,7 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
                      // broadcaster (to prevent recurrences)
         } else {
           // copy the broadcasted message
-          auto copy = std::static_pointer_cast<hypercomm_msg>(
+          auto copy = std::static_pointer_cast<message>(
               utilities::copy_message(this->msg_));
           // use it to create the broadcaster for the next element
           auto next = std::make_shared<broadcaster<BaseIndex, Index>>(

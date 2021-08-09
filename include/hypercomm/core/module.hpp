@@ -29,7 +29,7 @@ class locality_base_ : public manageable_base_ {
   using base_index_type = CkArrayIndex;
 
   virtual void execute(CkMessage* msg) = 0;
-  virtual void demux(hypercomm_msg* msg) = 0;
+  virtual void demux(message* msg) = 0;
   virtual void replace_downstream(CkMessage* msg) { NOT_IMPLEMENTED; }
 
   inline const CkArrayIndex& __base_index__(void) const {

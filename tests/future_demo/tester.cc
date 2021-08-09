@@ -107,7 +107,7 @@ struct locality : public vil<CBase_locality, int> {
       // NOTE in the future, we can do something fancier here (i.e., iteration-based offset)
       auto g = future{.source = right, .id = f.id};
       // prepare and send a message
-      f.set(hypercomm_msg::make_message(0, {}));
+      f.set(message::make_message(0, {}));
       // request the remote value -> our callback
       auto cb = std::make_shared<resuming_callback<unit_type>>(CthSelf());
       self->request_future(g, cb);

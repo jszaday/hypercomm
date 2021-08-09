@@ -1,12 +1,9 @@
 #ifndef __HYPERCOMM_CORE_COMMON_HPP__
 #define __HYPERCOMM_CORE_COMMON_HPP__
 
-#include "callback.hpp"
-#include "entry_port.hpp"
-
-#include "../serialization/pup.hpp"
-
+#include "../messaging/common.hpp"
 #include "../components/component.hpp"
+#include "callback.hpp"
 
 #define NOT_IMPLEMENTED CkAbort("not yet implemented")
 
@@ -21,7 +18,7 @@ class comproxy;
 template <typename Index>
 class identity;
 
-class connector_;
+class entry_port;
 class destination;
 
 class generic_locality_;
@@ -29,6 +26,7 @@ class generic_locality_;
 template <typename Index>
 class indexed_locality_;
 
+using entry_port_ptr = std::shared_ptr<entry_port>;
 using entry_port_map = comparable_map<entry_port_ptr, destination>;
 using component_port_t = std::pair<component::id_t, component::port_type>;
 using component_map =
@@ -55,5 +53,7 @@ void send_action(const collective_ptr<BaseIndex>& p, const BaseIndex& i,
                  const Action& a);
 
 }  // namespace hypercomm
+
+#include "../serialization/pup.hpp"
 
 #endif

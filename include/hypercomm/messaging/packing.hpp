@@ -36,10 +36,10 @@ CkMessage* pack(const Args&... _args) {
 }
 
 template <typename... Args>
-hypercomm_msg* pack_to_port(const entry_port_ptr& dst, const Args&... _args) {
+message* pack_to_port(const entry_port_ptr& dst, const Args&... _args) {
   auto args = std::forward_as_tuple(const_cast<Args&>(_args)...);
   auto size = hypercomm::size(args);
-  auto msg = hypercomm_msg::make_message(size, dst);
+  auto msg = message::make_message(size, dst);
   auto real_size = pack_into(msg->payload, args);
   CkAssert(size == real_size);
   return msg;

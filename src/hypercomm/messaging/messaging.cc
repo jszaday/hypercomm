@@ -3,12 +3,17 @@
 
 #include <hypercomm/core/config.hpp>
 #include <hypercomm/core/module.hpp>
+#include <hypercomm/core/entry_port.hpp>
 
 #include <hypercomm/utilities.hpp>
 
 namespace hypercomm {
 
 CProxy_interceptor interceptor_;
+
+int message_index(void) {
+  return messaging::__msg__::__idx;
+}
 
 namespace messaging {
 

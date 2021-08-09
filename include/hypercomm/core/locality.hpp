@@ -10,6 +10,7 @@
 #include "locality_map.hpp"
 
 #include "future.hpp"
+#include "entry_port.hpp"
 #include "broadcaster.hpp"
 #include "port_opener.hpp"
 
@@ -128,7 +129,7 @@ class vil : public Base,
   /* NOTE ( this is a mechanism for demux'ing an incoming message
    *        to the appropriate entry port )
    */
-  virtual void demux(hypercomm_msg* _1) override {
+  virtual void demux(message* _1) override {
     this->update_context();
     auto msg = _1->is_null() ? std::shared_ptr<hyper_value>(
                                    nullptr, [_1](void*) { CkFreeMsg(_1); })
@@ -152,10 +153,10 @@ class vil : public Base,
     ptr->action(this);
   }
 
-  void broadcast(const imprintable_ptr&, hypercomm_msg*);
+  void broadcast(const imprintable_ptr&, message*);
 
   inline void broadcast(const imprintable_ptr& section, const int& epIdx,
-                        hypercomm_msg* msg) {
+                        message* msg) {
     UsrToEnv(msg)->setEpIdx(epIdx);
     this->broadcast(section, msg);
   }
@@ -257,7 +258,7 @@ void deliver(const element_proxy<Index>& proxy, message* msg) {
 message* repack_to_port(const entry_port_ptr& port,
                         component::value_type&& value) {
   auto msg = value ? static_cast<message*>(value->release())
-                   : hypercomm_msg::make_null_message(port);
+                   : message::make_null_message(port);
   auto env = UsrToEnv(msg);
   auto msgIdx = env->getMsgIdx();
   if (msgIdx == message::__idx) {
@@ -317,7 +318,7 @@ inline void send2future(const future& f, component::value_type&& value) {
 template <typename Index>
 inline void broadcast_to(const proxy_ptr& proxy,
                          const std::shared_ptr<imprintable<Index>>& section,
-                         const int& epIdx, hypercomm_msg* msg) {
+                         const int& epIdx, message* msg) {
   UsrToEnv(msg)->setEpIdx(epIdx);
   broadcast_to(proxy, section, msg);
 }
@@ -325,7 +326,7 @@ inline void broadcast_to(const proxy_ptr& proxy,
 template <typename Index>
 inline void broadcast_to(const proxy_ptr& proxy,
                          const std::shared_ptr<imprintable<Index>>& section,
-                         hypercomm_msg* msg) {
+                         message* msg) {
   // TODO ( do not assume array index )
   using base_index_type = CkArrayIndex;
   auto root = section->pick_root(proxy);
@@ -337,8 +338,7 @@ inline void broadcast_to(const proxy_ptr& proxy,
 }
 
 template <typename Base, typename Index>
-void vil<Base, Index>::broadcast(const imprintable_ptr& section,
-                                 hypercomm_msg* msg) {
+void vil<Base, Index>::broadcast(const imprintable_ptr& section, message* msg) {
   auto proxy = this->__proxy__();
   auto mine = this->__index__();
   auto root = section->pick_root(proxy, &mine);
@@ -372,6 +372,18 @@ void vil<Base, Index>::request_future(const future& f, const callback_ptr& cb) {
 template <typename Index>
 void forwarding_callback<Index>::send(callback::value_type&& value) {
   send2port(this->proxy, this->port, std::move(value));
+}
+
+void entry_port::on_completion(const component&) {
+  access_context_()->invalidate_port(this->shared_from_this());
+}
+
+void entry_port::on_invalidation(const component&) {
+  access_context_()->invalidate_port(this->shared_from_this());
+}
+
+void entry_port::take_back(std::shared_ptr<hyper_value>&& value) {
+  access_context_()->receive_value(this->shared_from_this(), std::move(value));
 }
 }  // namespace hypercomm
 
