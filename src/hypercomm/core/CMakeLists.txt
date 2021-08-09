@@ -1,4 +1,4 @@
-set ( CORE_SOURCES module.cc )
+set ( CORE_SOURCES locality.cc module.cc )
 
 add_library(hypercomm-core "${CORE_SOURCES}")
 

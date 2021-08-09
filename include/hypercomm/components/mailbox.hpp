@@ -2,7 +2,7 @@
 #define __HYPERCOMM_COMPONENTS_MAILBOX_HPP__
 
 #include "../core/typed_value.hpp"
-#include "../core/common.hpp"
+#include "../core/generic_locality.hpp"
 
 namespace hypercomm {
 
@@ -70,7 +70,7 @@ class mailbox : public component {
   inline void put_request_to(const predicate_type& pred,
                              const component_id_t& com,
                              const component::port_type& port) {
-    auto cb = local_connector_(com, port);
+    auto cb = access_context_()->make_connector(com, port);
     auto req = this->put_request(pred, cb);
     if (req) {
       (access_context_()->components[com])->add_listener(req);

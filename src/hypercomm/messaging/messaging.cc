@@ -3,6 +3,7 @@
 
 #include <hypercomm/core/config.hpp>
 #include <hypercomm/core/module.hpp>
+#include <hypercomm/core/entry_port.hpp>
 
 #include <hypercomm/utilities.hpp>
 

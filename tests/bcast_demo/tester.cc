@@ -85,7 +85,7 @@ struct locality : public vil<CBase_locality, int> {
   void run(CkMessage* input) {
     hypercomm::unpack(input, cb);
     auto epIdx = CkIndex_locality::recv_broadcast();
-    auto msg = hypercomm_msg::make_message(0x0, {});
+    auto msg = message::make_message(0x0, {});
     this->broadcast(this->section, epIdx, msg);
   }
 

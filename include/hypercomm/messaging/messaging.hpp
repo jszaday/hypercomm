@@ -2,7 +2,7 @@
 #define __HYPERCOMM_MESSAGING_MESSAGING_HPP__
 
 #include <hypercomm/messaging/messaging.decl.h>
-#include "../core/entry_port.hpp"
+#include "../core/common.hpp"
 
 namespace hypercomm {
 namespace messaging {
@@ -23,15 +23,11 @@ struct __msg__ : public CMessage___msg__ {
   inline bool is_null(void) const {
     return (UsrToEnv(this)->getRef() == __null_msg__);
   }
+
+  static inline const int &index(void) { return __idx; }
 };
+
 }  // namespace messaging
-
-using message = messaging::__msg__;
-using message_ptr = std::shared_ptr<message>;
-
 }  // namespace hypercomm
-
-using hypercomm_msg = hypercomm::message;
-using CMessage_hypercomm_msg = hypercomm::messaging::CMessage___msg__;
 
 #endif

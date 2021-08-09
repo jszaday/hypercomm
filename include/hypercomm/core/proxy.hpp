@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "../utilities.hpp"
-#include "../messaging/messaging.hpp"
+#include "../messaging/common.hpp"
 
 namespace hypercomm {
 using chare_t = ChareType;
