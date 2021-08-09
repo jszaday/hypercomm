@@ -22,14 +22,14 @@ template <typename Index>
 class identity;
 
 class connector_;
-class destination_;
+class destination;
 
 class generic_locality_;
 
 template <typename Index>
 class indexed_locality_;
 
-using entry_port_map = comparable_map<entry_port_ptr, destination_>;
+using entry_port_map = comparable_map<entry_port_ptr, destination>;
 using component_port_t = std::pair<component::id_t, component::port_type>;
 using component_map =
     std::unordered_map<component::id_t, std::unique_ptr<component>>;

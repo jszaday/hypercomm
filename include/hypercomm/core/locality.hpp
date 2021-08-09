@@ -336,17 +336,6 @@ inline void broadcast_to(const proxy_ptr& proxy,
   send_action(collective, conv2idx<base_index_type>(root), action);
 }
 
-void generic_locality_::receive_message(hypercomm_msg* msg) {
-  auto* env = UsrToEnv(msg);
-  auto idx = env->getEpIdx();
-
-  if (idx == CkIndex_locality_base_::idx_demux_CkMessage()) {
-    this->receive_value(msg->dst, msg2value(msg));
-  } else {
-    _entryTable[idx]->call(msg, dynamic_cast<CkMigratable*>(this));
-  }
-}
-
 template <typename Base, typename Index>
 void vil<Base, Index>::broadcast(const imprintable_ptr& section,
                                  hypercomm_msg* msg) {
