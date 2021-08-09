@@ -27,9 +27,9 @@ class managed_imprintable : public imprintable<Index> {
   using typename imprintable<Index>::locality_ptr;
 
   virtual identity_ptr imprint(const locality_ptr& self,
-                               const reduction_id_t& count) const {
+                               const reduction_id_t& seed) const {
     return std::make_shared<managed_identity<Index>>(
-        dynamic_cast<manageable_base_*>(self), count);
+        seed, dynamic_cast<manageable_base_*>(self));
   }
 
   virtual hash_code hash(void) const {
