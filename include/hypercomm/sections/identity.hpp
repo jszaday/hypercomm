@@ -19,7 +19,7 @@ class identity : public identity_base_ {
   reduction_id_t gen_count_;
 
  public:
-  identity(const reduction_id_t& seed = 0) : gen_count_(seed) {}
+  identity(const reduction_id_t& seed) : gen_count_(seed) {}
 
   // TODO incorporate tags, e.g., SOCK triplets!
   //     (i.e., should be next_reduction(const comparable&))

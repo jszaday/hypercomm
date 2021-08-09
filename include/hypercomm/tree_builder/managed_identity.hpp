@@ -21,8 +21,8 @@ class managed_identity : public identity<Index> {
   }
 
  public:
-  managed_identity(const manageable_base_* inst, const reduction_id_t& seed = 0)
-      : inst_(inst), identity<Index>(seed) {}
+  managed_identity(const reduction_id_t& _0, const manageable_base_* _1)
+      : identity<Index>(_0), inst_(_1) {}
 
   virtual const Index& mine(void) const override {
     return reinterpret_index<Index>(inst_->ckGetArrayIndex());

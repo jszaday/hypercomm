@@ -17,8 +17,11 @@ class manageable : public T {
   const identity_ptr_& identity_;
 
   virtual stamp_type __stamp__(void) const override {
-    return std::make_tuple(this->identity_->get_imprintable(),
-                           this->identity_->last_reduction());
+    stamp_type stamp;
+    for (const auto& entry : this->identities) {
+      stamp.emplace(entry.first, (entry.second)->last_reduction());
+    }
+    return std::move(stamp);
   }
 
   enum transaction_type_ { kReplace, kDelete };
@@ -121,24 +124,43 @@ class manageable : public T {
       auto rdcr = dynamic_cast<reducer*>(pair.second.get());
       if (rdcr && rdcr->affected_by(stamp)) {
         auto port =
-            std::make_shared<reduction_port<index_type_>>(rdcr->stamp, down);
+            std::make_shared<reduction_port<index_type_>>(rdcr->stamp(), down);
         // open another input port in the reducer (via increment)
         access_context_()->connect(port, rdcr->id, rdcr->n_ustream++);
       }
     }
   }
 
+  const identity_ptr_& initialize_identities(stamp_type&& stamp) {
+    auto fn = comparable_comparator<std::shared_ptr<imprintable<int>>>();
+    auto& seek = managed_imprintable<int>::instance();
+
+    const identity_ptr_* res = nullptr;
+    for (const auto& entry : stamp) {
+      auto& gen = entry.first;
+      if (!gen->is_member(this->ckGetArrayIndex())) {
+        continue;
+      }
+      auto cast = std::dynamic_pointer_cast<imprintable<int>>(std::move(gen));
+      auto& ins = this->emplace_identity(cast, std::move(entry.second));
+      if (fn(seek, cast)) {
+        res = &ins;
+      }
+    }
+
+    return *res;
+  }
+
  public:
   // used for static insertion, default initialize
   manageable(void)
-      : identity_(this->identities[managed_imprintable<int>::instance()] =
-                      std::make_shared<managed_identity<index_type_>>(this)) {}
+      : identity_(
+            this->emplace_identity(managed_imprintable<int>::instance(), {})) {}
 
   // used for dynamic insertion, imprints child with parent data
-  manageable(association_ptr_&& association, const reduction_id_t& seed)
+  manageable(association_ptr_&& association, stamp_type&& stamp)
       : identity_(
-            this->identities[managed_imprintable<int>::instance()] =
-                std::make_shared<managed_identity<index_type_>>(this, seed)) {
+            this->initialize_identities(std::forward<stamp_type>(stamp))) {
     this->set_association_(std::forward<association_ptr_>(association));
   }
 
