@@ -16,7 +16,7 @@ class tree_builder;
 class common_functions_ {
  public:
   using stamp_type = typename reducer::stamp_type;
-  virtual stamp_type __stamp__(void) const = 0;
+  virtual stamp_type __stamp__(const CkArrayIndex* = nullptr) const = 0;
 };
 
 class manageable_base_ : public ArrayElement, public virtual common_functions_ {

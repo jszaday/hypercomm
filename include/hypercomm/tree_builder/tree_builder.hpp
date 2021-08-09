@@ -219,7 +219,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
       const CkArrayID &aid, const index_type &parent, const index_type &child) {
     this->lock();
     auto &rec = this->record_for(aid, parent, false);
-    auto last = rec.first->__stamp__();
+    auto last = rec.first->__stamp__(&child);
     // add the child as a downstream member of future collective ops
     rec.first->put_downstream_(child);
     // this avoids un/locking the individual record
