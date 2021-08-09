@@ -42,10 +42,6 @@ message* repack_to_port(const entry_port_ptr& port,
 
 generic_locality_* access_context_(void);
 
-// TODO eliminate this
-callback_ptr local_connector_(const component_id_t&,
-                              const component::port_type&);
-
 using proxy_ptr = std::shared_ptr<hypercomm::proxy>;
 
 template <typename Index>
