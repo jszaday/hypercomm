@@ -49,13 +49,19 @@ class indexed_locality_ : public generic_locality_ {
   virtual std::shared_ptr<generic_element_proxy> __element_at__(
       const Index&) const = 0;
 
+  inline const identity_ptr& emplace_identity(const imprintable_ptr& which,
+                                              const reduction_id_t& seed) {
+    auto ins = this->identities.emplace(which, which->imprint(this, seed));
+    CkAssertMsg(ins.second, "insertion did not occur");
+    return (ins.first)->second;
+  }
+
   inline const identity_ptr& identity_for(const imprintable_ptr& which) {
-    auto search = identities.find(which);
-    if (search == identities.end()) {
-      auto ins = identities.emplace(which, which->imprint(this));
-      return (ins.first)->second;
-    } else {
+    auto search = this->identities.find(which);
+    if (search != std::end(this->identities)) {
       return search->second;
+    } else {
+      return this->emplace_identity(which, {});
     }
   }
 
@@ -174,7 +180,7 @@ class vil : public Base,
     auto next = ident->next_reduction();
     auto ustream = ident->upstream();
     auto dstream = ident->downstream();
-    auto stamp = std::make_tuple(ident->get_imprintable(), next);
+    auto stamp = std::make_pair(ident->get_imprintable(), next);
 
     const auto& rdcr = this->emplace_component<reducer>(
         stamp, fn, ustream.size() + 1, dstream.empty() ? 1 : dstream.size());

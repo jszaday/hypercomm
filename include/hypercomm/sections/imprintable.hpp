@@ -37,7 +37,8 @@ class imprintable : public polymorph, public imprintable_base_ {
 
  protected:
   // apply this imprintable to a locality (generating an identity)
-  virtual identity_ptr imprint(const locality_ptr&) const = 0;
+  virtual identity_ptr imprint(const locality_ptr&,
+                               const reduction_id_t&) const = 0;
 };
 }  // namespace hypercomm
 

@@ -21,7 +21,7 @@ class managed_identity : public identity<Index> {
   }
 
  public:
-  managed_identity(const manageable_base_* inst, const reduction_id_t& seed = 0)
+  managed_identity(const manageable_base_* inst, const reduction_id_t& seed)
       : inst_(inst), identity<Index>(seed) {}
 
   virtual const Index& mine(void) const override {

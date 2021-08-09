@@ -9,7 +9,7 @@ mainmodule tester {
 
   array [Max] Test : hypercomm::locality_base_ {
     entry Test(void);
-    entry Test(association_ptr_, const reduction_id_t&);
+    entry Test(association_ptr_, reducer::stamp_type);
     entry void make_contribution();
     entry void replace_downstream(CkMessage*);
   };

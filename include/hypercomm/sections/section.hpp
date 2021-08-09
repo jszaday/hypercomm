@@ -53,7 +53,8 @@ struct section : public imprintable<Index> {
   }
 
  protected:
-  virtual identity_ptr imprint(const locality_ptr& loc) const {
+  virtual identity_ptr imprint(const locality_ptr& loc,
+                               const reduction_id_t& seed) const {
     return std::make_shared<section_identity<Index>>(*this, loc->__index__());
   }
 };

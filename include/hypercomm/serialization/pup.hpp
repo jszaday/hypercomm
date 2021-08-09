@@ -499,6 +499,30 @@ template <typename... Ts>
 inline void pup(serdes& s, const std::tuple<Ts...>& t) {
   puper<std::tuple<Ts...>>::impl(s, const_cast<std::tuple<Ts...>&>(t));
 }
+
+template <typename K, typename V>
+struct puper<comparable_map<K, V>> {
+  inline static void impl(serdes& s, comparable_map<K, V>& t) {
+    if (s.unpacking()) {
+      std::size_t size;
+      s.copy(&size);
+      ::new (&t) comparable_map<K, V>(size);
+      for (auto i = 0; i < size; i++) {
+        std::tuple<K, V> pair;
+        pup(s, pair);
+        auto ins = t.emplace(std::get<0>(pair), std::move(std::get<1>(pair)));
+        CkAssert(ins.second);
+      }
+    } else {
+      auto size = t.size();
+      s.copy(&size);
+      for (auto& pair : t) {
+        pup(s, pair.first);
+        pup(s, pair.second);
+      }
+    }
+  }
+};
 }  // namespace hypercomm
 
 #endif

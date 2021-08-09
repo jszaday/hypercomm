@@ -1,3 +1,11 @@
+#include <hypercomm/reductions/reducer.hpp>
+
+namespace PUP {
+inline void operator|(er& p, hypercomm::reducer::stamp_type& t) {
+  hypercomm::interpup(p, t);
+}
+}
+
 #include <hypercomm/core/locality.hpp>
 #include <hypercomm/core/typed_value.hpp>
 #include <hypercomm/core/inter_callback.hpp>
@@ -50,8 +58,8 @@ class Test : public manageable<vil<CBase_Test, int>> {
  public:
   Test(void) = default;
 
-  Test(association_ptr_&& ptr, const reduction_id_t& seed)
-      : manageable(std::forward<association_ptr_>(ptr), seed) {
+  Test(association_ptr_&& ptr, reducer::stamp_type&& stamp)
+      : manageable(std::forward<association_ptr_>(ptr), std::forward<reducer::stamp_type>(stamp)) {
     auto& mine = this->__index__();
     CkAssertMsg(mine % 2 != 0, "expected an odd index");
     this->make_contribution();
@@ -64,7 +72,7 @@ class Test : public manageable<vil<CBase_Test, int>> {
     if (mine % 2 == 0) {
       auto next = conv2idx<CkArrayIndex>(mine + numElements + 1);
       auto child = locProxy.ckLocalBranch()->create_child(this, next);
-      thisProxy[next].insert(child.first, std::get<1>(child.second));
+      thisProxy[next].insert(child.first, child.second);
     } else if (mine < numElements) {
       thisProxy[conv2idx<CkArrayIndex>(mine)].ckDestroy();
       return;

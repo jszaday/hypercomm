@@ -9,27 +9,30 @@ namespace hypercomm {
 
 template <typename Index>
 class reduction_port : public entry_port {
-  using stamp_type = reducer::stamp_type;
-  using first_type = typename std::tuple_element<0, stamp_type>::type;
-  using second_type = typename std::tuple_element<1, stamp_type>::type;
-
  public:
+  using stamp_type = typename reducer::stamp_type;
+  using imprintable_ptr = typename reducer::imprintable_ptr;
+
   hash_code identity;  // TODO use something better here
-  second_type count;
+  reduction_id_t count;
   Index index;
 
   reduction_port(PUP::reconstruct) {}
 
-  reduction_port(const stamp_type& _1, const Index& _2)
-      : identity(utilities::hash<first_type>()(std::get<0>(_1))),
-        count(std::get<1>(_1)),
+  reduction_port(const reducer::pair_type& _1, const Index& _2)
+      : identity(utilities::hash<imprintable_ptr>()(_1.first)),
+        count(_1.second),
         index(_2) {}
 
   // a port is affected by a stamp if it was issued at or after it
   bool affected_by(const stamp_type& stamp) const {
-    return (this->count >= std::get<1>(stamp)) &&
-           (this->identity ==
-            utilities::hash<first_type>()(std::get<0>(stamp)));
+    auto fn = stamp.hash_function();
+    for (const auto& entry : stamp) {
+      if (this->identity == fn(entry.first)) {
+        return this->count >= entry.second;
+      }
+    }
+    return false;
   }
 
   virtual bool equals(const std::shared_ptr<comparable>& other) const override {
@@ -46,7 +49,7 @@ class reduction_port : public entry_port {
   }
 
   virtual hash_code hash(void) const override {
-    auto hashId = utilities::hash<second_type>()(this->count);
+    auto hashId = utilities::hash<reduction_id_t>()(this->count);
     auto hashIdx = utilities::hash<Index>()(this->index);
     return hash_combine(this->identity, hash_combine(hashId, hashIdx));
   }
