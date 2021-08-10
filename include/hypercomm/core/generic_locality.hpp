@@ -76,7 +76,7 @@ class generic_locality_ : public virtual common_functions_ {
   callback_ptr make_connector(const component_id_t& com,
                               const component::port_type& port);
 
-  virtual stamp_type __stamp__(void) const { NOT_IMPLEMENTED; }
+  virtual stamp_type __stamp__(const CkArrayIndex*) const { NOT_IMPLEMENTED; }
 
  protected:
   bool invalidated(const component::id_t& id);
