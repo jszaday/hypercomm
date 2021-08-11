@@ -56,13 +56,14 @@ class tree_builder : public CBase_tree_builder, public array_listener {
   using array_id_map = std::unordered_map<CkArrayID, Value, array_id_hasher>;
 
   // tracks the quiscence status of each array (produce/consume counts)
-  array_id_map<std::int64_t> arrays_;
+  using qd_count_t = std::int64_t;
+  array_id_map<qd_count_t> arrays_;
   // tracks the pointers to an array's elements
   array_id_map<elements_type> elements_;
   // tracks whether an array currently permits static insertions
   array_id_map<bool> insertion_statuses_;
   // tracks whether the root of an array's spanning tree has been set
-  array_id_map<bool> set_endpoint_;
+  array_id_map<CkArrayIndex> endpoints_;
 
 #if CMK_SMP
   struct counter_helper_ {
@@ -246,23 +247,31 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     this->unlock();
   }
 
+  void reg_endpoint(const int &src, const CkArrayID &aid,
+                    const CkArrayIndex &idx) {
+    this->reg_endpoint(endpoint_(src), aid, idx);
+  }
+
   // register the specified element as the endpoint of its spanning
   // tree; as in, it has no upstream members, aka, root.
-  void make_endpoint(const CkArrayID &aid, const CkArrayIndex &idx) {
+  void reg_endpoint(const endpoint_ &ep, const CkArrayID &aid,
+                    const CkArrayIndex &idx) {
     this->lock();
-    // try to lookup the specified element
-    auto *elt = this->lookup(aid, idx, false);
-    // if we found it,
-    if (elt) {
-      // make it the root
-      this->make_endpoint(elt);
-      // qd consume (1)
-      this->arrays_[aid] -= 1;
-    } else {
-      // otherwise, the desired elt has migrated, reroute
-      auto pe = aid.ckLocalBranch()->lastKnown(idx);
-      this->thisProxy[CkNodeOf(pe)].make_endpoint(aid, idx);
+    // set the endpoint in our registry
+    this->endpoints_[aid] = idx;
+    // attempt to lookup the specified element
+    auto *elt = ep.elt_ ? ep.elt_ : this->lookup(aid, idx, false);
+    CkAssert(!elt || idx == elt->ckGetArrayIndex());
+    // if we have it, set it as the endpoint
+    if (elt) elt->set_endpoint_();
+    // then propagate the root information downstream
+    auto &mine = this->thisIndex;
+    auto leaves = binary_tree::leaves(mine, CkNumNodes());
+    for (const auto &leaf : leaves) {
+      thisProxy[leaf].reg_endpoint(mine, aid, idx);
     }
+    // TODO stop including this in QD counts!
+    this->arrays_[aid] += qd_count_t(leaves.size()) - 1;
     this->unlock();
   }
 
@@ -309,6 +318,12 @@ class tree_builder : public CBase_tree_builder, public array_listener {
                                                            : search->second;
   }
 
+  // get the array's endpoint (last known root of spanning tree)
+  inline const index_type *endpoint_for(const CkArrayID &aid) const {
+    auto search = this->endpoints_.find(aid);
+    return (search == std::end(this->endpoints_)) ? nullptr : &(search->second);
+  }
+
  protected:
   // pull the record for the element, fails if not found
   record_type &record_for(const CkArrayID &aid, const index_type &idx,
@@ -330,14 +345,6 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     return elt;
   }
 
-  // helper to make a local element the root of the spanning tree
-  void make_endpoint(const element_type &elt) {
-    auto &status = this->set_endpoint_[elt->ckGetArrayID()];
-    CkAssertMsg(!status, "cannot register an endpoint twice");
-    status = true;
-    elt->set_endpoint_();
-  }
-
   // send the specified element ( upstream ) to find it a parent
   void send_upstream(const endpoint_ &ep, const CkArrayID &aid,
                      const index_type &idx) {
@@ -350,18 +357,11 @@ class tree_builder : public CBase_tree_builder, public array_listener {
       // ( downstream ) relative to the receiver
       auto src = ep.elt_ != nullptr ? mine : ep.node_;
       thisProxy[parent].receive_downstream(src, aid, idx);
-      this->arrays_[aid] += 1;  // qd create (1)
-    } else if (ep.elt_ != nullptr) {
-      // otherwise, if the element is local and we are at the
-      // root, we need to make it the root
-      this->make_endpoint(ep.elt_);
     } else {
-      // other-otherwise, if the element is remote, we need
-      // to send a request to its last known location
-      thisProxy[ep.node_].make_endpoint(aid, idx);
-      this->set_endpoint_[aid] = true;
-      this->arrays_[aid] += 1;  // qd create (1)
+      // we are at the root, so register the endpoint
+      this->reg_endpoint(ep, aid, idx);
     }
+    this->arrays_[aid] += 1;  // qd create (1)
   }
 
   void send_downstream(const endpoint_ &ep, const CkArrayID &aid,

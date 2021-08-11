@@ -159,4 +159,17 @@ class Main : public CBase_Main {
   }
 };
 
+
+namespace hypercomm {
+// TODO internalize this
+template <typename Index>
+const Index& managed_imprintable<Index>::pick_root(const proxy_ptr& proxy,
+                                                   const Index* favored) const {
+  auto aid = std::dynamic_pointer_cast<array_proxy>(proxy)->id();
+  auto *local = locProxy.ckLocalBranch();
+  // TODO validate the EP is present/ready
+  return reinterpret_index<Index>(*local->endpoint_for(aid));
+}
+}
+
 #include "tester.def.h"
