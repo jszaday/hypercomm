@@ -355,6 +355,14 @@ class puper<std::unique_ptr<T>,
   }
 };
 
+template <typename T, typename U>
+struct puper<std::pair<T, U>> {
+  inline static void impl(serdes& s, std::pair<T, U>& t) {
+    s | t.first;
+    s | t.second;
+  }
+};
+
 template <typename T>
 class puper<std::unique_ptr<T>,
             typename std::enable_if<!(is_polymorph<T>::value ||
@@ -370,9 +378,7 @@ class puper<std::unique_ptr<T>,
 
     if (!is_null) {
       if (s.unpacking()) {
-        auto* mem = (T*)(::operator new(sizeof(T)));
-        hypercomm::reconstruct(mem);
-        t.reset(mem);
+        t.reset((T*)(::operator new(sizeof(T))));
       }
 
       s | *t;
@@ -533,17 +539,16 @@ struct puper<comparable_map<K, V>> {
       s.copy(&size);
       ::new (&t) comparable_map<K, V>(size);
       for (auto i = 0; i < size; i++) {
-        std::tuple<K, V> pair;
-        pup(s, pair);
-        auto ins = t.emplace(std::get<0>(pair), std::move(std::get<1>(pair)));
-        CkAssert(ins.second);
+        std::pair<K, V> pair;
+        s | pair;
+        auto ins = t.insert(std::move(pair));
+        CkAssertMsg(ins.second, "insertion did not occur!");
       }
     } else {
       auto size = t.size();
       s.copy(&size);
       for (auto& pair : t) {
-        pup(s, pair.first);
-        pup(s, pair.second);
+        s | pair;
       }
     }
   }
