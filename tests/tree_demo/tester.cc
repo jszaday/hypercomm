@@ -159,12 +159,4 @@ class Main : public CBase_Main {
   }
 };
 
-
-namespace hypercomm {
-// TODO internalize this
-tree_builder *tree_builder::instance(void) {
-  return locProxy.ckLocalBranch();
-}
-}
-
 #include "tester.def.h"

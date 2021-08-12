@@ -26,6 +26,9 @@ template class access_bypass<std::vector<CkMigratable *> CkArray::*,
 class tree_builder : public CBase_tree_builder, public array_listener {
   tree_builder_SDAG_CODE;
 
+ private:
+  CksvStaticDeclare(CProxy_tree_builder, singleton_);
+
  public:
   using index_type = CkArrayIndex;
   using element_type = manageable_base_ *;
@@ -142,6 +145,8 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
  public:
   tree_builder(void) : CkArrayListener(0) {
+    CksvInitialize(CProxy_tree_builder, singleton_);
+    CksvAccess(singleton_) = thisProxy;
 #if CMK_SMP
     this->lockCounts_.resize(CkMyNodeSize());
     this->lock_ = CmiCreateLock();
@@ -325,7 +330,9 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     return (search == std::end(this->endpoints_)) ? nullptr : &(search->second);
   }
 
-  static tree_builder *instance(void);
+  static tree_builder *instance(void) {
+    return CksvAccess(singleton_).ckLocalBranch();
+  }
 
  protected:
   // pull the record for the element, fails if not found
@@ -557,6 +564,9 @@ const Index *managed_imprintable<Index>::pick_root(const proxy_ptr &proxy,
   auto *idx = (tree_builder::instance())->endpoint_for(aid);
   return idx ? &(reinterpret_index<Index>(*idx)) : nullptr;
 }
+
+// TODO ( make this an init'd readonly )
+CProxy_tree_builder tree_builder::CksvAccess(singleton_);
 
 #if CMK_SMP
 // register the handler for the back_inserter, returning its index
