@@ -25,14 +25,18 @@ class identity : public identity_base_ {
   // TODO incorporate tags, e.g., SOCK triplets!
   //     (i.e., should be next_reduction(const comparable&))
   inline reduction_id_t next_reduction(void) { return redn_count_++; }
+
+  // this represents the last reduction the identity has contributed to
   inline const reduction_id_t& last_reduction(void) const {
     return redn_count_;
   }
 
+  // this represents the next broadcast the identity will accept
   inline reduction_id_t next_broadcast(void) const {
     return (bcast_count_ + 1);
   }
 
+  // this "accepts" the provided broadcast when its ahead of the current one
   inline bool accept_broadcast(const reduction_id_t& bcast) {
     if (this->bcast_count_ >= bcast) {
       return false;

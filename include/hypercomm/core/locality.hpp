@@ -174,6 +174,32 @@ class vil : public Base,
   }
 
  protected:
+  bool past_reduction(const std::shared_ptr<reduction_port<Index>>& port) {
+    using imprintable_ptr = typename reduction_port<Index>::imprintable_ptr;
+    auto fn = utilities::hash<imprintable_ptr>();
+
+    for (auto& pair : this->identities) {
+      if (port->applies_to(pair.first, fn)) {
+        return ((pair.second)->last_reduction() >= port->count);
+      }
+    }
+
+    return false;
+  }
+
+  virtual void handle_undelivered(const entry_port_ptr& port,
+                                  component::value_type&& value) override {
+    auto cast = std::dynamic_pointer_cast<reduction_port<Index>>(port);
+    if (cast && this->past_reduction(cast)) {
+      // need to forward message to parent?
+      NOT_IMPLEMENTED;
+    } else {
+      // if it is not present, buffer it
+      this->port_queue[port].push_back(std::move(value));
+      QdCreate(1);
+    }
+  }
+
   void local_contribution(const identity_ptr& ident,
                           component::value_type&& value, const combiner_ptr& fn,
                           const callback_ptr& cb) {

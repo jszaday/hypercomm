@@ -28,11 +28,16 @@ class reduction_port : public entry_port {
   bool affected_by(const stamp_type& stamp) const {
     auto fn = stamp.hash_function();
     for (const auto& entry : stamp) {
-      if (this->identity == fn(entry.first)) {
+      if (this->applies_to(entry.first, fn)) {
         return this->count >= entry.second;
       }
     }
     return false;
+  }
+
+  template <typename Fn>
+  inline bool applies_to(const imprintable_ptr& identity, const Fn& fn) const {
+    return fn(identity) == this->identity;
   }
 
   virtual bool equals(const std::shared_ptr<comparable>& other) const override {

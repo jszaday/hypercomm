@@ -82,6 +82,9 @@ class generic_locality_ : public virtual common_functions_ {
   bool invalidated(const component::id_t& id);
   void update_context(void);
 
+  virtual void handle_undelivered(const entry_port_ptr&,
+                                  component::value_type&&) = 0;
+
  private:
   template <typename A>
   A* get_component(const component_id_t& id) {

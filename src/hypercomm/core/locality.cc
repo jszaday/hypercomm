@@ -104,9 +104,8 @@ void generic_locality_::receive_value(const entry_port_ptr& port,
   // seek this port in our list of active ports
   auto search = this->entry_ports.find(port);
   if (search == std::end(this->entry_ports)) {
-    // if it is not present, buffer it
-    port_queue[port].push_back(std::move(value));
-    QdCreate(1);
+    // handle the undelivered message
+    this->handle_undelivered(port, std::move(value));
   } else {
     // otherwise, try to deliver it
     CkAssertMsg(search->first && search->first->alive,
