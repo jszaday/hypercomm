@@ -12,7 +12,7 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
 
  private:
   // TODO ( add a "progenitor" field to ensure b/c's aren't delivered twice )
-  Index last_;
+  std::unique_ptr<Index> last_;
   imprintable_ptr imprintable_;
   std::shared_ptr<hypercomm::message> msg_;
 
@@ -20,13 +20,14 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
   broadcaster(PUP::reconstruct) {}
 
   broadcaster(const Index& _1, const imprintable_ptr& _2, decltype(msg_)&& _3)
-      : last_(_1), imprintable_(_2), msg_(_3) {}
+      : last_(new Index(_1)), imprintable_(_2), msg_(_3) {}
 
   broadcaster(const Index& _1, const imprintable_ptr& _2,
               hypercomm::message* _3)
-      : broadcaster(_1, _2,
-                    std::static_pointer_cast<hypercomm::message>(
-                        utilities::wrap_message(_3))) {}
+      : broadcaster(_1, _2, utilities::wrap_message(_3)) {}
+
+  broadcaster(const imprintable_ptr& _2, hypercomm::message* _3)
+      : last_(nullptr), imprintable_(_2), msg_(utilities::wrap_message(_3)) {}
 
   virtual void action(indexed_locality_<Index>* locality) override {
     // gather all the information for this broadcaster's imprintable
@@ -38,7 +39,7 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
     auto helper = [&](const std::vector<Index>& indices) {
       // for all the indices in the list
       for (const auto& idx : indices) {
-        if (this->last_ == idx) {
+        if (this->last_ && idx == (*this->last_)) {
           continue;  // besides the element that created this
                      // broadcaster (to prevent recurrences)
         } else {

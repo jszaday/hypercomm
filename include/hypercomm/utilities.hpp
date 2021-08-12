@@ -39,7 +39,11 @@ CkMessage* unwrap_message(std::shared_ptr<T>&& msg) {
   }
 }
 
-std::shared_ptr<CkMessage> wrap_message(CkMessage*);
+template <typename T>
+inline std::shared_ptr<T> wrap_message(T* msg) {
+  return std::shared_ptr<T>(msg, [](T* msg) { CkFreeMsg(msg); });
+}
+
 CkMessage* copy_message(const CkMessage*);
 std::shared_ptr<CkMessage> copy_message(const std::shared_ptr<CkMessage>&);
 

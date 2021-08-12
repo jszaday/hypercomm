@@ -356,6 +356,31 @@ class puper<std::unique_ptr<T>,
 };
 
 template <typename T>
+class puper<std::unique_ptr<T>,
+            typename std::enable_if<!(is_polymorph<T>::value ||
+                                      is_trait<T>::value)>::type> {
+ public:
+  inline static void impl(serdes& s, std::unique_ptr<T>& t) {
+    if (s.unpacking()) {
+      new (&t) std::unique_ptr<T>();
+    }
+
+    bool is_null = (t.get() == nullptr);
+    s | is_null;
+
+    if (!is_null) {
+      if (s.unpacking()) {
+        auto* mem = (T*)(::operator new(sizeof(T)));
+        hypercomm::reconstruct(mem);
+        t.reset(mem);
+      }
+
+      s | *t;
+    }
+  }
+};
+
+template <typename T>
 class puper<std::shared_ptr<T>, typename std::enable_if<std::is_base_of<
                                     hypercomm::proxy, T>::value>::type> {
   template <typename A>

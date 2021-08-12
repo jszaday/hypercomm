@@ -327,7 +327,7 @@ inline void broadcast_to(const proxy_ptr& proxy,
   // TODO ( do not assume array index )
   using base_index_type = CkArrayIndex;
   auto action =
-      std::make_shared<broadcaster<base_index_type, Index>>(-1, section, msg);
+      std::make_shared<broadcaster<base_index_type, Index>>(section, msg);
   interceptor::send_to_root((const CProxy_ArrayBase&)proxy->c_proxy(), section,
                             pack_action(action));
 }
@@ -335,7 +335,7 @@ inline void broadcast_to(const proxy_ptr& proxy,
 template <typename Base, typename Index>
 void vil<Base, Index>::broadcast(const imprintable_ptr& section, message* msg) {
   auto action =
-      std::make_shared<broadcaster<base_index_type, Index>>(-1, section, msg);
+      std::make_shared<broadcaster<base_index_type, Index>>(section, msg);
   interceptor::send_to_root(this->thisProxy, section, pack_action(action));
 }
 
