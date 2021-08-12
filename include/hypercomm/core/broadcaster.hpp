@@ -12,7 +12,7 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
 
  private:
   // TODO ( add a "progenitor" field to ensure b/c's aren't delivered twice )
-  std::unique_ptr<Index> last_;
+  std::unique_ptr<Index> root_;
   imprintable_ptr imprintable_;
   std::shared_ptr<hypercomm::message> msg_;
 
@@ -20,45 +20,33 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
   broadcaster(PUP::reconstruct) {}
 
   broadcaster(const Index& _1, const imprintable_ptr& _2, decltype(msg_)&& _3)
-      : last_(new Index(_1)), imprintable_(_2), msg_(_3) {}
+      : root_(new Index(_1)), imprintable_(_2), msg_(_3) {}
 
   broadcaster(const Index& _1, const imprintable_ptr& _2,
               hypercomm::message* _3)
       : broadcaster(_1, _2, utilities::wrap_message(_3)) {}
 
   broadcaster(const imprintable_ptr& _2, hypercomm::message* _3)
-      : last_(nullptr), imprintable_(_2), msg_(utilities::wrap_message(_3)) {}
+      : root_(nullptr), imprintable_(_2), msg_(utilities::wrap_message(_3)) {}
 
   virtual void action(indexed_locality_<Index>* locality) override {
     // gather all the information for this broadcaster's imprintable
     const auto& identity = locality->identity_for(imprintable_);
-    auto mine = identity->mine();
+    auto& mine = identity->mine();
+    auto& root = this->root_ ? *(this->root_) : mine;
     auto upstream = identity->upstream();
-    auto downstream = identity->downstream();
 
-    auto helper = [&](const std::vector<Index>& indices) {
-      // for all the indices in the list
-      for (const auto& idx : indices) {
-        if (this->last_ && idx == (*this->last_)) {
-          continue;  // besides the element that created this
-                     // broadcaster (to prevent recurrences)
-        } else {
-          // copy the broadcasted message
-          auto copy = std::static_pointer_cast<message>(
-              utilities::copy_message(this->msg_));
-          // use it to create the broadcaster for the next element
-          auto next = std::make_shared<broadcaster<BaseIndex, Index>>(
-              mine, this->imprintable_, std::move(copy));
-          // then send it along, remotely executing it
-          interceptor::send_async(locality->__element_at__(idx),
-                                  pack_action(next));
-        }
-      }
-    };
-
-    // apply the helper function to all incoming/outgoing edges
-    helper(downstream);
-    helper(upstream);
+    // for all the indices in the list
+    for (const auto& idx : upstream) {
+      // copy the broadcasted message
+      auto copy = std::static_pointer_cast<message>(
+          utilities::copy_message(this->msg_));
+      // use it to create the broadcaster for the next element
+      auto next = std::make_shared<broadcaster<BaseIndex, Index>>(
+          root, this->imprintable_, std::move(copy));
+      // then send it along, remotely executing it
+      interceptor::send_async(locality->__element_at__(idx), pack_action(next));
+    }
 
     // after that is done, send the message to this element
     locality->receive_message(static_cast<hypercomm::message*>(
@@ -66,7 +54,7 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
   }
 
   virtual void __pup__(serdes& s) override {
-    s | this->last_;
+    s | this->root_;
     s | this->imprintable_;
     s | this->msg_;
   }
