@@ -355,6 +355,37 @@ class puper<std::unique_ptr<T>,
   }
 };
 
+template <typename T, typename U>
+struct puper<std::pair<T, U>> {
+  inline static void impl(serdes& s, std::pair<T, U>& t) {
+    s | t.first;
+    s | t.second;
+  }
+};
+
+template <typename T>
+class puper<std::unique_ptr<T>,
+            typename std::enable_if<!(is_polymorph<T>::value ||
+                                      is_trait<T>::value)>::type> {
+ public:
+  inline static void impl(serdes& s, std::unique_ptr<T>& t) {
+    if (s.unpacking()) {
+      new (&t) std::unique_ptr<T>();
+    }
+
+    bool is_null = (t.get() == nullptr);
+    s | is_null;
+
+    if (!is_null) {
+      if (s.unpacking()) {
+        t.reset((T*)(::operator new(sizeof(T))));
+      }
+
+      s | *t;
+    }
+  }
+};
+
 template <typename T>
 class puper<std::shared_ptr<T>, typename std::enable_if<std::is_base_of<
                                     hypercomm::proxy, T>::value>::type> {
@@ -508,17 +539,16 @@ struct puper<comparable_map<K, V>> {
       s.copy(&size);
       ::new (&t) comparable_map<K, V>(size);
       for (auto i = 0; i < size; i++) {
-        std::tuple<K, V> pair;
-        pup(s, pair);
-        auto ins = t.emplace(std::get<0>(pair), std::move(std::get<1>(pair)));
-        CkAssert(ins.second);
+        std::pair<K, V> pair;
+        s | pair;
+        auto ins = t.insert(std::move(pair));
+        CkAssertMsg(ins.second, "insertion did not occur!");
       }
     } else {
       auto size = t.size();
       s.copy(&size);
       for (auto& pair : t) {
-        pup(s, pair.first);
-        pup(s, pair.second);
+        s | pair;
       }
     }
   }

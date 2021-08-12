@@ -233,24 +233,15 @@ struct get_argument<std::shared_ptr<T>> {
 };
 
 template <typename Action>
-void send_action(const std::shared_ptr<generic_element_proxy>& p,
-                 const Action& a) {
+CkMessage* pack_action(const Action& a) {
   using arg_type = typename get_argument<Action>::type;
   constexpr auto is_act =
       is_base_of_template<arg_type, indexed_locality_>::value;
   constexpr auto is_gen = std::is_base_of<generic_locality_, arg_type>::value;
   static_assert(is_act || is_gen, "unrecognized action type");
-
-  auto& base = static_cast<const CProxyElement_locality_base_&>(p->c_proxy());
-  auto msg = hypercomm::pack(is_act, a);
+  auto* msg = hypercomm::pack(is_act, a);
   UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::idx_execute_CkMessage());
-  interceptor::send_async(base, msg);
-}
-
-template <typename BaseIndex, typename Action>
-void send_action(const collective_ptr<BaseIndex>& p, const BaseIndex& i,
-                 const Action& a) {
-  send_action((*p)[i], a);
+  return msg;
 }
 
 template <typename Index>
@@ -335,30 +326,17 @@ inline void broadcast_to(const proxy_ptr& proxy,
                          message* msg) {
   // TODO ( do not assume array index )
   using base_index_type = CkArrayIndex;
-  // TODO ( handle failure to determine root )
-  auto root = *(section->pick_root(proxy));
   auto action =
-      std::make_shared<broadcaster<base_index_type, Index>>(root, section, msg);
-  auto collective =
-      std::dynamic_pointer_cast<collective_proxy<base_index_type>>(proxy);
-  send_action(collective, conv2idx<base_index_type>(root), action);
+      std::make_shared<broadcaster<base_index_type, Index>>(section, msg);
+  interceptor::send_to_root((const CProxy_ArrayBase&)proxy->c_proxy(), section,
+                            pack_action(action));
 }
 
 template <typename Base, typename Index>
 void vil<Base, Index>::broadcast(const imprintable_ptr& section, message* msg) {
-  auto proxy = this->__proxy__();
-  auto mine = this->__index__();
-  // TODO ( handle failure to determine root )
-  auto root = *(section->pick_root(proxy, &mine));
   auto action =
-      std::make_shared<broadcaster<base_index_type, Index>>(root, section, msg);
-
-  if (root == mine) {
-    this->receive_action(action);
-  } else {
-    auto rootIdx = conv2idx<base_index_type>(root);
-    send_action(proxy, rootIdx, action);
-  }
+      std::make_shared<broadcaster<base_index_type, Index>>(section, msg);
+  interceptor::send_to_root(this->thisProxy, section, pack_action(action));
 }
 
 template <typename Base, typename Index>
@@ -373,7 +351,7 @@ void vil<Base, Index>::request_future(const future& f, const callback_ptr& cb) {
     // open a remote port that forwards to this locality
     auto fwd = forward_to(std::move(ourElement), ourPort);
     auto opener = std::make_shared<port_opener>(ourPort, std::move(fwd));
-    send_action(home, opener);
+    interceptor::send_async(home, pack_action(opener));
   }
 }
 

@@ -19,9 +19,7 @@ class managed_imprintable : public imprintable<Index> {
     return (bool)std::dynamic_pointer_cast<managed_imprintable<Index>>(other);
   }
 
-  // pick the root for the spanning tree, with a favored candidate
-  virtual const Index* pick_root(const proxy_ptr& proxy,
-                                 const Index* favored) const;
+  virtual const CkArrayIndex* pick_root(const CkArrayID&) const;
 
   using identity_ptr = typename imprintable<Index>::identity_ptr;
   using typename imprintable<Index>::locality_ptr;

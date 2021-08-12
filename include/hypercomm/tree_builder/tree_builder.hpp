@@ -558,11 +558,9 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 };
 
 template <typename Index>
-const Index *managed_imprintable<Index>::pick_root(const proxy_ptr &proxy,
-                                                   const Index *) const {
-  auto aid = std::dynamic_pointer_cast<array_proxy>(proxy)->id();
-  auto *idx = (tree_builder::instance())->endpoint_for(aid);
-  return idx ? &(reinterpret_index<Index>(*idx)) : nullptr;
+const CkArrayIndex *managed_imprintable<Index>::pick_root(
+    const CkArrayID &aid) const {
+  return (tree_builder::instance())->endpoint_for(aid);
 }
 
 // TODO ( make this an init'd readonly )

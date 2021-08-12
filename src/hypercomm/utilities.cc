@@ -63,11 +63,6 @@ std::string env2str(const envelope* env) {
   return ss.str();
 }
 
-std::shared_ptr<CkMessage> wrap_message(CkMessage* msg) {
-  return std::shared_ptr<CkMessage>(msg,
-                                    [](CkMessage* msg) { CkFreeMsg(msg); });
-}
-
 CkMessage* copy_message(const CkMessage* msg) {
   auto msg_raw = const_cast<CkMessage*>(msg);
   return (CkMessage*)CkCopyMsg((void**)&msg_raw);

@@ -28,18 +28,22 @@ void pack_message(CkMessage*);
 void unpack_message(CkMessage*);
 
 template <typename T>
-CkMessage* unwrap_message(std::shared_ptr<T>&& msg) {
+inline T* unwrap_message(std::shared_ptr<T>&& msg) {
   auto msg_raw = msg.get();
   if (msg.use_count() == 1) {
     ::new (&msg) std::shared_ptr<T>{};
-    return (CkMessage*)msg_raw;
+    return (T*)msg_raw;
   } else {
     CkError("warning> forced to copy message %p!", msg_raw);
-    return (CkMessage*)CkCopyMsg((void**)&msg_raw);
+    return (T*)CkCopyMsg((void**)&msg_raw);
   }
 }
 
-std::shared_ptr<CkMessage> wrap_message(CkMessage*);
+template <typename T>
+inline std::shared_ptr<T> wrap_message(T* msg) {
+  return std::shared_ptr<T>(msg, [](T* msg) { CkFreeMsg(msg); });
+}
+
 CkMessage* copy_message(const CkMessage*);
 std::shared_ptr<CkMessage> copy_message(const std::shared_ptr<CkMessage>&);
 
