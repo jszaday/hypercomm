@@ -29,7 +29,10 @@ class identity : public identity_base_ {
     return redn_count_;
   }
 
-  inline reduction_id_t next_broadcast(void) const { return (bcast_count_ + 1); }
+  inline reduction_id_t next_broadcast(void) const {
+    return (bcast_count_ + 1);
+  }
+
   inline bool accept_broadcast(const reduction_id_t& bcast) {
     if (this->bcast_count_ >= bcast) {
       return false;

@@ -9,36 +9,34 @@ template <typename BaseIndex, typename Index>
 class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
  public:
   using imprintable_ptr = std::shared_ptr<imprintable<Index>>;
+  using stamp_type = std::pair<Index, reduction_id_t>;
 
  private:
-  using progenitor_t = std::pair<Index, reduction_id_t>;
-  std::unique_ptr<progenitor_t> progenitor_;
+  std::unique_ptr<stamp_type> stamp_;
   imprintable_ptr imprintable_;
   std::shared_ptr<hypercomm::message> msg_;
 
  public:
   broadcaster(PUP::reconstruct) {}
 
-  broadcaster(const progenitor_t& _1, const imprintable_ptr& _2,
+  broadcaster(const stamp_type& _1, const imprintable_ptr& _2,
               decltype(msg_)&& _3)
-      : progenitor_(new progenitor_t(_1)), imprintable_(_2), msg_(_3) {}
+      : stamp_(new stamp_type(_1)), imprintable_(_2), msg_(_3) {}
 
-  broadcaster(const progenitor_t& _1, const imprintable_ptr& _2,
+  broadcaster(const stamp_type& _1, const imprintable_ptr& _2,
               hypercomm::message* _3)
       : broadcaster(_1, _2, utilities::wrap_message(_3)) {}
 
   broadcaster(const imprintable_ptr& _2, hypercomm::message* _3)
-      : progenitor_(nullptr),
-        imprintable_(_2),
-        msg_(utilities::wrap_message(_3)) {}
+      : stamp_(nullptr), imprintable_(_2), msg_(utilities::wrap_message(_3)) {}
 
   virtual void action(indexed_locality_<Index>* locality) override {
     // gather all the information for this broadcaster's imprintable
     const auto& identity = locality->identity_for(imprintable_);
     auto& mine = identity->mine();
-    auto& root = this->progenitor_ ? this->progenitor_->first : mine;
-    auto count = this->progenitor_ ? this->progenitor_->second
-                                   : identity->next_broadcast();
+    auto& root = this->stamp_ ? this->stamp_->first : mine;
+    auto count =
+        this->stamp_ ? this->stamp_->second : identity->next_broadcast();
     auto upstream = identity->upstream();
 
     // for all the indices in the list
@@ -60,7 +58,7 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
   }
 
   virtual void __pup__(serdes& s) override {
-    s | this->progenitor_;
+    s | this->stamp_;
     s | this->imprintable_;
     s | this->msg_;
   }
