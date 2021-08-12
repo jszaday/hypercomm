@@ -32,7 +32,7 @@ class imprintable : public polymorph, public imprintable_base_ {
   }
 
   // pick the root for the spanning tree, with a favored candidate
-  virtual const Index& pick_root(const proxy_ptr&,
+  virtual const Index* pick_root(const proxy_ptr&,
                                  const Index* = nullptr) const = 0;
 
  protected:

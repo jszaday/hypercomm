@@ -43,6 +43,20 @@ inline T parent(const T &i) {
 }
 
 template <typename T>
+std::vector<T> leaves(const T &which, const T &max) {
+  auto left = left_child(which);
+  auto right = right_child(which);
+  std::vector<T> res;
+  if (left >= 0 && left < max) {
+    res.push_back(left);
+  }
+  if (right >= 0 && right < max) {
+    res.push_back(right);
+  }
+  return std::move(res);
+}
+
+template <typename T>
 inline int num_leaves(const T &n) {
   return int(n + 1) / 2;
 }

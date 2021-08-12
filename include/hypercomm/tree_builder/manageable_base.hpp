@@ -11,8 +11,6 @@ namespace hypercomm {
 //      of sections to assocations :3
 using association_ptr_ = std::unique_ptr<association_>;
 
-class tree_builder;
-
 class common_functions_ {
  public:
   using stamp_type = typename reducer::stamp_type;

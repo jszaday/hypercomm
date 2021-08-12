@@ -14,6 +14,8 @@ class manageable;
 
 class manageable_base_;
 
+class tree_builder;
+
 struct association_ {
   std::vector<CkArrayIndex> upstream_;
   std::vector<CkArrayIndex> downstream_;
