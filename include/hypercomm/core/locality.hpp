@@ -335,7 +335,8 @@ inline void broadcast_to(const proxy_ptr& proxy,
                          message* msg) {
   // TODO ( do not assume array index )
   using base_index_type = CkArrayIndex;
-  auto root = section->pick_root(proxy);
+  // TODO ( handle failure to determine root )
+  auto root = *(section->pick_root(proxy));
   auto action =
       std::make_shared<broadcaster<base_index_type, Index>>(root, section, msg);
   auto collective =
@@ -347,7 +348,8 @@ template <typename Base, typename Index>
 void vil<Base, Index>::broadcast(const imprintable_ptr& section, message* msg) {
   auto proxy = this->__proxy__();
   auto mine = this->__index__();
-  auto root = section->pick_root(proxy, &mine);
+  // TODO ( handle failure to determine root )
+  auto root = *(section->pick_root(proxy, &mine));
   auto action =
       std::make_shared<broadcaster<base_index_type, Index>>(root, section, msg);
 

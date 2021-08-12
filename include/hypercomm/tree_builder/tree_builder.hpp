@@ -258,13 +258,14 @@ class tree_builder : public CBase_tree_builder, public array_listener {
                     const CkArrayIndex &idx) {
     this->lock();
     // set the endpoint in our registry
-    this->endpoints_[aid] = idx;
+    auto ins = this->endpoints_.emplace(aid, idx);
+    CkAssertMsg(ins.second, "insertion did not occur");
     // attempt to lookup the specified element
     auto *elt = ep.elt_ ? ep.elt_ : this->lookup(aid, idx, false);
     CkAssert(!elt || idx == elt->ckGetArrayIndex());
     // if we have it, set it as the endpoint
     if (elt) elt->set_endpoint_();
-    // then propagate the root information downstream
+    // then propagate the information downstream
     auto &mine = this->thisIndex;
     auto leaves = binary_tree::leaves(mine, CkNumNodes());
     for (const auto &leaf : leaves) {
@@ -323,6 +324,8 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     auto search = this->endpoints_.find(aid);
     return (search == std::end(this->endpoints_)) ? nullptr : &(search->second);
   }
+
+  static tree_builder *instance(void);
 
  protected:
   // pull the record for the element, fails if not found
@@ -546,6 +549,14 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 
   virtual void pup(PUP::er &p) override { CBase_tree_builder::pup(p); }
 };
+
+template <typename Index>
+const Index *managed_imprintable<Index>::pick_root(const proxy_ptr &proxy,
+                                                   const Index *) const {
+  auto aid = std::dynamic_pointer_cast<array_proxy>(proxy)->id();
+  auto *idx = (tree_builder::instance())->endpoint_for(aid);
+  return idx ? &(reinterpret_index<Index>(*idx)) : nullptr;
+}
 
 #if CMK_SMP
 // register the handler for the back_inserter, returning its index

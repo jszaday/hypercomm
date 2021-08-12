@@ -43,12 +43,12 @@ struct section : public imprintable<Index> {
   using identity_ptr = typename imprintable<Index>::identity_ptr;
   using locality_ptr = typename imprintable<Index>::locality_ptr;
 
-  virtual const Index& pick_root(const proxy_ptr&, const Index* favored) const {
+  virtual const Index* pick_root(const proxy_ptr&, const Index* favored) const {
     // pick favored if it is a valid member of this section
     if (favored && this->is_member(*favored)) {
-      return *favored;
+      return favored;
     } else {
-      return this->index_at(0);
+      return &(this->index_at(0));
     }
   }
 

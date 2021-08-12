@@ -20,7 +20,7 @@ class managed_imprintable : public imprintable<Index> {
   }
 
   // pick the root for the spanning tree, with a favored candidate
-  virtual const Index& pick_root(const proxy_ptr& proxy,
+  virtual const Index* pick_root(const proxy_ptr& proxy,
                                  const Index* favored) const;
 
   using identity_ptr = typename imprintable<Index>::identity_ptr;
