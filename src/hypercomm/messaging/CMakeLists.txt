@@ -1,4 +1,4 @@
-set ( MESSAGING_SOURCES messaging.cc )
+set ( MESSAGING_SOURCES interceptor.cc messaging.cc )
 
 add_library(hypercomm-messaging "${MESSAGING_SOURCES}" "${CMAKE_BINARY_DIR}/include/hypercomm/messaging/messaging.decl.h")
 

@@ -8,6 +8,7 @@ namespace hypercomm {
 class imprintable_base_ : public virtual comparable {
  public:
   virtual bool is_member(const CkArrayIndex&) const = 0;
+  virtual const CkArrayIndex* pick_root(const CkArrayID&) const = 0;
 };
 
 /* imprintables define a list of members for collective
@@ -30,10 +31,6 @@ class imprintable : public polymorph, public imprintable_base_ {
   virtual bool is_member(const CkArrayIndex& idx) const {
     return this->is_member(reinterpret_index<Index>(idx));
   }
-
-  // pick the root for the spanning tree, with a favored candidate
-  virtual const Index* pick_root(const proxy_ptr&,
-                                 const Index* = nullptr) const = 0;
 
  protected:
   // apply this imprintable to a locality (generating an identity)

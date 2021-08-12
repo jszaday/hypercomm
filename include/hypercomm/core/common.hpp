@@ -15,6 +15,13 @@ using impl_index_t = typename index_for<T>::type;
 template <typename A, typename Enable = void>
 class comproxy;
 
+class imprintable_base_;
+
+template <typename Index>
+class imprintable;
+
+class identity_base_;
+
 template <typename Index>
 class identity;
 
@@ -48,9 +55,8 @@ using element_ptr = std::shared_ptr<hypercomm::element_proxy<Index>>;
 template <typename Index>
 using collective_ptr = std::shared_ptr<hypercomm::collective_proxy<Index>>;
 
-template <typename BaseIndex, typename Action>
-void send_action(const collective_ptr<BaseIndex>& p, const BaseIndex& i,
-                 const Action& a);
+template <typename Action>
+CkMessage* pack_action(const Action&);
 
 }  // namespace hypercomm
 

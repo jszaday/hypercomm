@@ -2,6 +2,7 @@
 #define __HYPERCOMM_CORE_BROADCASTER_HPP__
 
 #include "../sections/imprintable.hpp"
+#include "../messaging/interceptor.hpp"
 
 namespace hypercomm {
 template <typename BaseIndex, typename Index>
@@ -48,7 +49,8 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
           auto next = std::make_shared<broadcaster<BaseIndex, Index>>(
               mine, this->imprintable_, std::move(copy));
           // then send it along, remotely executing it
-          send_action(locality->__element_at__(idx), std::move(next));
+          interceptor::send_async(locality->__element_at__(idx),
+                                  pack_action(next));
         }
       }
     };

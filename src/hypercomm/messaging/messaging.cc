@@ -1,5 +1,5 @@
 #include <hypercomm/messaging/packing.hpp>
-#include <hypercomm/messaging/interceptor.hpp>
+#include <hypercomm/messaging/messaging.decl.h>
 
 #include <hypercomm/core/config.hpp>
 #include <hypercomm/core/module.hpp>
@@ -8,8 +8,6 @@
 #include <hypercomm/utilities.hpp>
 
 namespace hypercomm {
-
-CProxy_interceptor interceptor_;
 
 namespace messaging {
 
@@ -75,5 +73,3 @@ __msg__ *__msg__::make_null_message(const entry_port_ptr &dst) {
 }
 }  // namespace messaging
 }  // namespace hypercomm
-
-#include <hypercomm/messaging/messaging.def.h>
