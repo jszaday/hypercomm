@@ -1,10 +1,9 @@
 #ifndef __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 #define __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 
-#include "../sections/imprintable.hpp"
+#include "contribution.hpp"
 
 namespace hypercomm {
-
 struct reducer : public hypercomm::component {
   using imprintable_ptr = std::shared_ptr<imprintable_base_>;
   using stamp_type = comparable_map<imprintable_ptr, reduction_id_t>;
@@ -44,20 +43,7 @@ struct reducer : public hypercomm::component {
 
   virtual std::size_t n_outputs(void) const override { return this->n_dstream; }
 
-  virtual value_set action(value_set &&accepted) {
-    // NOTE this can be corrected by duplicating the result of
-    //      the combiner, but is it valid to do so?
-    CkAssertMsg(this->n_dstream == 1, "multi output unsupported");
-    // TODO is there a more efficient way to do this?
-    typename combiner::argument_type args;
-    for (auto &pair : accepted) {
-      auto &value = pair.second;
-      if (value) {
-        args.emplace_back(std::move(value));
-      }
-    }
-    return {std::make_pair(0, this->combiner->send(std::move(args)))};
-  }
+  virtual value_set action(value_set &&accepted) override;
 };
 }  // namespace hypercomm
 

@@ -1,8 +1,8 @@
 #ifndef __HYPERCOMM_CORE_TYPED_VALUE_HPP__
 #define __HYPERCOMM_CORE_TYPED_VALUE_HPP__
 
+#include "../reductions/contribution.hpp"
 #include "../messaging/packing.hpp"
-
 #include "value.hpp"
 
 namespace hypercomm {
@@ -11,32 +11,47 @@ using unit_type = std::tuple<>;
 
 template <typename T>
 class typed_value : public hyper_value {
+  static constexpr auto is_contribution = std::is_same<contribution, T>::value;
+
  public:
+  using type = T;
+
   temporary<T> tmp;
 
-  typed_value(const T& _1) : tmp(_1) {}
-
-  typed_value(message_type msg) {
-    if (msg) {
-      unpack(msg, tmp.value());
-    } else if (!std::is_same<unit_type, T>::value) {
-      CkAbort("null pointer exception!");
-    }
-  }
+  template <typename... Args>
+  typed_value(Args... args) : tmp(std::forward<Args>(args)...) {}
 
   virtual bool recastable(void) const override { return false; }
 
-  inline const T& value(void) const { return tmp.value(); }
+  inline T& value(void) noexcept { return tmp.value(); }
 
-  inline T& value(void) { return tmp.value(); }
+  inline T* operator->(void) noexcept { return &(this->value()); }
 
   virtual message_type release(void) override {
-    return pack_to_port({}, this->value());
+    auto msg = pack_to_port({}, this->value());
+    if (is_contribution) {
+      msg->set_redn(true);
+    }
+    return msg;
+  }
+
+  static std::shared_ptr<typed_value<T>> from_message(message_type msg) {
+    if (utilities::is_null_message(msg)) {
+      return std::shared_ptr<typed_value<T>>();
+    } else if (!is_contribution && utilities::is_reduction_message(msg)) {
+      CkMessage* imsg;
+      unpack(msg, imsg);
+      return from_message(imsg);
+    } else {
+      auto result = std::make_shared<typed_value<T>>(tags::no_init{});
+      unpack(msg, result->value());
+      return std::move(result);
+    }
   }
 };
 
 inline std::shared_ptr<typed_value<unit_type>> make_unit_value(void) {
-  return std::make_shared<typed_value<unit_type>>(nullptr);
+  return std::make_shared<typed_value<unit_type>>(tags::no_init{});
 }
 
 template <typename T>
@@ -46,11 +61,11 @@ std::shared_ptr<typed_value<T>> value2typed(
   if (try_cast) {
     return try_cast;
   } else if (value->recastable()) {
-    auto typed = std::make_shared<typed_value<T>>(std::move(value->release()));
+    auto typed = typed_value<T>::from_message(value->release());
     typed->source = value->source;
     return std::move(typed);
   } else {
-    throw std::runtime_error("invalid cast!");
+    CkAbort("invalid cast!");
   }
 }
 }  // namespace hypercomm

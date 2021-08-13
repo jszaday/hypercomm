@@ -78,9 +78,9 @@ struct puper<T, typename std::enable_if<is_list_or_deque<T>::value>::type> {
       s.copy(&size);
       ::new (&t) T();
       for (auto i = 0; i < size; i++) {
-        temporary<value_type> tmp;
+        temporary<value_type> tmp(tags::no_init{});
         pup(s, tmp);
-        t.push_back(tmp.value());
+        t.emplace_back(std::move(tmp.value()));
       }
     } else {
       auto size = t.size();
@@ -99,7 +99,9 @@ struct puper<T, typename std::enable_if<PUP::as_bytes<T>::value>::type> {
 
 template <typename T>
 struct puper<temporary<T>> {
-  inline static void impl(serdes& s, temporary<T>& t) { s | t.value(); }
+  inline static void impl(serdes& s, temporary<T>& t) {
+    s | t.value();
+  }
 };
 
 template <typename T, std::size_t N>

@@ -57,18 +57,20 @@ __msg__ *__msg__::make_message(const std::size_t &user_size,
   // NOTE default allocation via new(...) doesn't seem to work here
   auto *raw = CkAllocMsg(__msg__::__idx, total_size, 0, GroupDepNum{});
   auto *msg = new (raw) __msg__;
+  auto *env = UsrToEnv(msg);
   msg->dst = dst;
   msg->payload = (char *)msg + hdr_size + port_size;
+  env->setRef(0x0);
   if (locality_registered_()) {
     // NOTE ( this is occasionally relied on, but probably shouldn't be )
-    UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
+    env->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
   }
   return msg;
 }
 
 __msg__ *__msg__::make_null_message(const entry_port_ptr &dst) {
   auto msg = make_message(0x0, dst);
-  UsrToEnv(msg)->setRef(__null_msg__);
+  UsrToEnv(msg)->setRef(0b1 << __attribs__::kNull);
   return msg;
 }
 }  // namespace messaging

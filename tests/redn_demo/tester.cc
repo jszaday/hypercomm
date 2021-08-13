@@ -14,10 +14,12 @@ void enroll_polymorphs(void) {
   hypercomm::init_polymorph_registry();
 
   if (CkMyRank() == 0) {
+    hypercomm::enroll<null_combiner>();
     hypercomm::enroll<persistent_port>();
     hypercomm::enroll<reduction_port<int>>();
-    hypercomm::enroll<broadcaster<CkArrayIndex, int>>();
     hypercomm::enroll<vector_section<int>>();
+    hypercomm::enroll<broadcaster<CkArrayIndex, int>>();
+    hypercomm::enroll<forwarding_callback<CkArrayIndex>>();
   }
 }
 
