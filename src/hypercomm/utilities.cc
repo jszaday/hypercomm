@@ -11,6 +11,15 @@ bool is_reduction_message(CkMessage* msg) {
   return (idx == message::index()) && ((message*)msg)->is_redn();
 }
 
+bool is_null_message(CkMessage* msg) {
+  if (msg == nullptr) {
+    return true;
+  } else {
+    auto idx = UsrToEnv(msg)->getMsgIdx();
+    return (idx == message::index()) && ((message*)msg)->is_null();
+  }
+}
+
 char* get_message_buffer(const CkMessage* _1) {
   auto msg = const_cast<CkMessage*>(_1);
   auto env = UsrToEnv(msg);

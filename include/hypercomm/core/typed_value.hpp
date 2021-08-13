@@ -36,7 +36,9 @@ class typed_value : public hyper_value {
   }
 
   static std::shared_ptr<typed_value<T>> from_message(message_type msg) {
-    if (!is_contribution && utilities::is_reduction_message(msg)) {
+    if (utilities::is_null_message(msg)) {
+      return std::shared_ptr<typed_value<T>>();
+    } else if (!is_contribution && utilities::is_reduction_message(msg)) {
       CkMessage* imsg;
       unpack(msg, imsg);
       return from_message(imsg);
