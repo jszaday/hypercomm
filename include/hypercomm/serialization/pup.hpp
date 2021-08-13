@@ -100,10 +100,6 @@ struct puper<T, typename std::enable_if<PUP::as_bytes<T>::value>::type> {
 template <typename T>
 struct puper<temporary<T>> {
   inline static void impl(serdes& s, temporary<T>& t) {
-    if (s.unpacking()) {
-      ::new (&t) temporary<T>(tags::reconstruct{});
-    }
-
     s | t.value();
   }
 };

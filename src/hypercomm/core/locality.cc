@@ -200,7 +200,9 @@ reducer::value_set reducer::action(value_set&& accepted) {
   CkAssertMsg(this->n_dstream == 1, "reducers may only have one output");
 
   auto cmp = comparable_comparator<callback_ptr>();
-  callback_ptr ours;
+  callback_ptr ourCb;
+
+  auto& ourCmbnr = this->combiner;
 
   using contribution_type = typed_value<contribution>;
   typename combiner::argument_type args;
@@ -214,21 +216,26 @@ reducer::value_set reducer::action(value_set&& accepted) {
         args.emplace_back(std::make_shared<plain_value>((*contrib)->msg_));
       }
 
-      auto& theirs = (*contrib)->callback_;
-      if (theirs) {
-        if (ours) {
+      auto& theirCb = (*contrib)->callback_;
+      if (theirCb) {
+        if (ourCb) {
           // CkAssertMsg(cmp(cb, (*contrib)->callback_), "callbacks must
           // match");
         } else {
-          ours = theirs;
+          ourCb = theirCb;
         }
+      }
+
+      auto& theirCmbnr = (*contrib)->combiner_;
+      if (!ourCmbnr && theirCmbnr) {
+        ourCmbnr = theirCmbnr;
       }
     }
   }
 
-  auto result = this->combiner->send(std::move(args));
-  auto contrib = std::make_shared<contribution_type>(std::move(result),
-                                                     this->combiner, ours);
+  auto result = ourCmbnr->send(std::move(args));
+  auto contrib =
+      std::make_shared<contribution_type>(std::move(result), ourCmbnr, ourCb);
   return {std::make_pair(0, std::move(contrib))};
 }
 
