@@ -145,7 +145,7 @@ class Main : public CBase_Main {
   }
 
   void done(CkMessage* msg) {
-    auto value = std::make_shared<typed_value<int>>(msg);
+    auto value = typed_value<int>::from_message(msg);
     auto expected = this->expected();
 
     if (value->value() != expected) {

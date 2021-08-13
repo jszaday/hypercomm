@@ -26,6 +26,7 @@ std::string env2str(const envelope* env);
 
 void pack_message(CkMessage*);
 void unpack_message(CkMessage*);
+bool is_reduction_message(CkMessage*);
 
 template <typename T>
 inline T* unwrap_message(std::shared_ptr<T>&& msg) {

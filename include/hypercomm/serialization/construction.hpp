@@ -34,14 +34,26 @@ reconstruct(T* p) {
   ::new (p) T();
 }
 
+namespace tags {
+struct no_init {};
+
+using reconstruct = PUP::reconstruct;
+}  // namespace tags
+
 // temporary storage for an object of a given type
 template <typename T>
 struct temporary {
   typename std::aligned_storage<sizeof(T), alignof(T)>::type data;
 
-  temporary(void) { reconstruct(&(this->value())); }
+  // used to when there should be no initialization whatsoever
+  temporary(const tags::no_init&) {}
 
-  temporary(const T& value) : temporary() { this->value() = value; }
+  temporary(const tags::reconstruct&) { reconstruct(&(this->value())); }
+
+  template <typename... Args>
+  temporary(Args... args) {
+    ::new (&this->value()) T(std::forward<Args>(args)...);
+  }
 
   ~temporary() { value().~T(); }
 

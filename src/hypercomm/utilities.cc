@@ -6,6 +6,11 @@
 namespace hypercomm {
 namespace utilities {
 
+bool is_reduction_message(CkMessage* msg) {
+  auto idx = UsrToEnv(msg)->getMsgIdx();
+  return (idx == message::index()) && ((message*)msg)->is_redn();
+}
+
 char* get_message_buffer(const CkMessage* _1) {
   auto msg = const_cast<CkMessage*>(_1);
   auto env = UsrToEnv(msg);

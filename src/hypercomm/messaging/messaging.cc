@@ -68,7 +68,7 @@ __msg__ *__msg__::make_message(const std::size_t &user_size,
 
 __msg__ *__msg__::make_null_message(const entry_port_ptr &dst) {
   auto msg = make_message(0x0, dst);
-  UsrToEnv(msg)->setRef(__null_msg__);
+  UsrToEnv(msg)->setRef(0b1 << __attribs__::kNull);
   return msg;
 }
 }  // namespace messaging

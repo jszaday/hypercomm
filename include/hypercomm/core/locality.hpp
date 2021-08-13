@@ -13,6 +13,7 @@
 #include "entry_port.hpp"
 #include "broadcaster.hpp"
 #include "port_opener.hpp"
+#include "typed_value.hpp"
 
 #include "../messaging/packing.hpp"
 #include "../messaging/messaging.hpp"
@@ -206,7 +207,9 @@ class vil : public Base,
     }
 
     this->activate_component(rdcr);
-    this->components[rdcr]->receive_value(0, std::move(value));
+    auto contrib =
+        std::make_shared<typed_value<contribution>>(std::move(value), fn, cb);
+    this->components[rdcr]->receive_value(0, std::move(contrib));
   }
 };
 

@@ -129,7 +129,9 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& raw,
   thisProxy[destPe].deliver(aid, idx, CkMarshalledMessage(msg));
 }
 
-void interceptor::send_to_root(const CkArrayID& aid, const std::shared_ptr<imprintable_base_>& section, CkMessage* msg) {
+void interceptor::send_to_root(
+    const CkArrayID& aid, const std::shared_ptr<imprintable_base_>& section,
+    CkMessage* msg) {
   auto* root = section->pick_root(aid);
   if (root) {
     interceptor::send_async(aid, *root, msg);
