@@ -199,8 +199,8 @@ void generic_locality_::try_send(const component_port_t& port,
 reducer::value_set reducer::action(value_set&& accepted) {
   CkAssertMsg(this->n_dstream == 1, "reducers may only have one output");
 
-  // auto cmp = comparable_comparator<callback_ptr>();
-  callback_ptr cb;
+  auto cmp = comparable_comparator<callback_ptr>();
+  callback_ptr ours;
 
   using contribution_type = typed_value<contribution>;
   typename combiner::argument_type args;
@@ -208,23 +208,27 @@ reducer::value_set reducer::action(value_set&& accepted) {
     auto& raw = pair.second;
     auto contrib =
         raw ? value2typed<typename contribution_type::type>(std::move(raw))
-            : std::shared_ptr<contribution_type>{};
+            : std::shared_ptr<contribution_type>();
     if (contrib) {
       if ((*contrib)->msg_ != nullptr) {
         args.emplace_back(std::make_shared<plain_value>((*contrib)->msg_));
       }
 
-      if (cb) {
-        // CkAssertMsg(cmp(cb, (*contrib)->callback_), "callbacks must match");
-      } else {
-        cb = (*contrib)->callback_;
+      auto& theirs = (*contrib)->callback_;
+      if (theirs) {
+        if (ours) {
+          // CkAssertMsg(cmp(cb, (*contrib)->callback_), "callbacks must
+          // match");
+        } else {
+          ours = theirs;
+        }
       }
     }
   }
 
   auto result = this->combiner->send(std::move(args));
   auto contrib = std::make_shared<contribution_type>(std::move(result),
-                                                     this->combiner, cb);
+                                                     this->combiner, ours);
   return {std::make_pair(0, std::move(contrib))};
 }
 

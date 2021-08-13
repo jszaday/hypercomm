@@ -42,19 +42,14 @@ class typed_value : public hyper_value {
       return from_message(imsg);
     } else {
       auto result = std::make_shared<typed_value<T>>(tags::no_init{});
-      if (msg) {
-        unpack(msg, result->value());
-      } else {
-        CkEnforceMsg((std::is_same<unit_type, T>::value),
-                     "expected non-null value");
-      }
+      unpack(msg, result->value());
       return std::move(result);
     }
   }
 };
 
 inline std::shared_ptr<typed_value<unit_type>> make_unit_value(void) {
-  return typed_value<unit_type>::from_message(nullptr);
+  return std::make_shared<typed_value<unit_type>>(tags::no_init{});
 }
 
 template <typename T>

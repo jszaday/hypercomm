@@ -25,18 +25,12 @@ inline const std::shared_ptr<imprintable<int>>& span_all(void) {
 }
 }
 
-void enroll_polymorphs(void) {
-  hypercomm::tree_builder::initialize();
-  hypercomm::init_polymorph_registry();
-
-  if (CkMyRank() == 0) {
-    hypercomm::enroll<managed_imprintable<int>>();
-    hypercomm::enroll<reduction_port<int>>();
-  }
-}
-
 template <typename T>
 class adder : public core::combiner {
+ public: 
+  adder(void) = default;
+  adder(const tags::reconstruct&) {}
+
   virtual combiner::return_type send(combiner::argument_type&& args) override {
     if (args.empty()) {
       return {};
@@ -53,6 +47,18 @@ class adder : public core::combiner {
 
   virtual void __pup__(hypercomm::serdes& s) override {}
 };
+
+void enroll_polymorphs(void) {
+  hypercomm::tree_builder::initialize();
+  hypercomm::init_polymorph_registry();
+
+  if (CkMyRank() == 0) {
+    hypercomm::enroll<managed_imprintable<int>>();
+    hypercomm::enroll<reduction_port<int>>();
+    hypercomm::enroll<inter_callback>();
+    hypercomm::enroll<adder<int>>();
+  }
+}
 
 class Test : public manageable<vil<CBase_Test, int>> {
  public:
