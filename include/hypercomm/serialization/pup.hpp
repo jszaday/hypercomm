@@ -99,9 +99,7 @@ struct puper<T, typename std::enable_if<PUP::as_bytes<T>::value>::type> {
 
 template <typename T>
 struct puper<temporary<T>> {
-  inline static void impl(serdes& s, temporary<T>& t) {
-    s | t.value();
-  }
+  inline static void impl(serdes& s, temporary<T>& t) { s | t.value(); }
 };
 
 template <typename T, std::size_t N>

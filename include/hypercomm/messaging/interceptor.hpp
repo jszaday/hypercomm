@@ -2,9 +2,7 @@
 #define __HYPERCOMM_MESSAGING_INTERCEPTOR_MSG_HPP__
 
 #include "messaging.hpp"
-
-#include "../core/entry_port.hpp"
-#include "../core/value.hpp"
+#include "delivery.hpp"
 
 namespace hypercomm {
 
@@ -44,19 +42,25 @@ class interceptor : public CBase_interceptor {
   // delete any forwarding records for the given idx, at its home pe
   void stop_forwarding(const CkArrayID& aid, const CkArrayIndex& idx);
 
+  // entry-method accessible version of deliver
   inline void deliver(const CkArrayID& aid, const CkArrayIndex& raw,
                       CkMarshalledMessage&& msg) {
-    this->deliver(aid, raw, msg.getMessage());
+    this->deliver(aid, raw, detail::make_payload(std::move(msg)), true);
   }
 
-  void deliver(const CkArrayID& aid, const CkArrayIndex& raw, CkMessage* msg);
+  void deliver(const CkArrayID& aid, const CkArrayIndex& raw,
+               detail::payload_ptr&&, const bool& immediate);
 
-  inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx, const entry_port_ptr& port, value_ptr&& value) {
-    interceptor::send_async(aid, idx, repack_to_port(port, std::move(value)));
+  inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
+                                const entry_port_ptr& port, value_ptr&& value) {
+    interceptor::send_async(aid, idx,
+                            detail::make_payload(port, std::move(value)));
   }
 
-  inline static void send_async(const CProxyElement_ArrayElement& proxy, const entry_port_ptr& port, value_ptr&& value) {
-    interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(), port, std::move(value));
+  inline static void send_async(const CProxyElement_ArrayElement& proxy,
+                                const entry_port_ptr& port, value_ptr&& value) {
+    interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(), port,
+                            std::move(value));
   }
 
   // asynchronously send a message to the specified element
@@ -73,18 +77,25 @@ class interceptor : public CBase_interceptor {
     interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(), msg);
   }
 
-  // asynchronously send a message to the specified index of aid
   inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
                                 CkMessage* msg) {
+    interceptor::send_async(aid, idx, detail::make_payload(msg));
+  }
+
+  // asynchronously send a message to the specified index of aid
+  inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
+                                detail::payload_ptr&& payload) {
     if (((CkGroupID)interceptor_).isZero()) {
 #if CMK_VERBOSE
       CkError("warning> unable to deliver through interceptor.\n");
 #endif
       // TODO ( is there a better function for this? )
+      auto msg = payload->release();
       CProxyElement_ArrayBase::ckSendWrapper(aid, idx, msg,
                                              UsrToEnv(msg)->getEpIdx(), 0);
     } else {
-      interceptor_[CkMyPe()].deliver(aid, idx, CkMarshalledMessage(msg));
+      (interceptor_.ckLocalBranch())
+          ->deliver(aid, idx, std::move(payload), false);
     }
   }
 

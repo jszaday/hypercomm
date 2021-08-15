@@ -277,10 +277,12 @@ message* repack_to_port(const entry_port_ptr& port,
   }
 }
 
-void generic_locality_::loopback(const entry_port_ptr& port, component::value_type&& value) {
-  auto elt = dynamic_cast<ArrayElement *>(this);
+void generic_locality_::loopback(const entry_port_ptr& port,
+                                 component::value_type&& value) {
+  auto elt = dynamic_cast<ArrayElement*>(this);
   CkAssert(elt != nullptr);
-  interceptor::send_async(elt->ckGetArrayID(), elt->ckGetArrayIndex(), port, std::move(value));
+  interceptor::send_async(elt->ckGetArrayID(), elt->ckGetArrayIndex(), port,
+                          std::move(value));
 }
 
 template <typename Proxy,

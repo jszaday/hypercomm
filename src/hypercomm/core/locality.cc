@@ -136,12 +136,12 @@ generic_locality_::~generic_locality_() {
   }
 }
 
-void generic_locality_::receive_message(message* msg) {
+void generic_locality_::receive_message(CkMessage* msg) {
   auto* env = UsrToEnv(msg);
   auto idx = env->getEpIdx();
-
   if (idx == CkIndex_locality_base_::idx_demux_CkMessage()) {
-    this->receive_value(msg->dst, msg2value(msg));
+    auto* cast = (message*)msg;
+    this->receive_value(cast->dst, msg2value(cast));
   } else {
     _entryTable[idx]->call(msg, dynamic_cast<CkMigratable*>(this));
   }
