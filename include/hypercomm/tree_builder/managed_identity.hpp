@@ -24,6 +24,11 @@ class managed_identity : public identity<Index> {
   managed_identity(const reduction_id_t& _0, const manageable_base_* _1)
       : identity<Index>(_0), inst_(_1) {}
 
+  virtual const Index* root(void) const override {
+    auto* idx = this->get_imprintable()->pick_root(this->inst_->ckGetArrayID());
+    return idx ? &(reinterpret_index<Index>(*idx)) : nullptr;
+  }
+
   virtual const Index& mine(void) const override {
     return reinterpret_index<Index>(inst_->ckGetArrayIndex());
   }

@@ -178,6 +178,9 @@ class vil : public Base,
   void local_contribution(const identity_ptr& ident,
                           component::value_type&& value, const combiner_ptr& fn,
                           const callback_ptr& cb) {
+    auto* root = ident->root()
+    auto& mine = ident->mine();
+
     auto next = ident->next_reduction();
     auto ustream = ident->upstream();
     auto dstream = ident->downstream();
@@ -193,7 +196,11 @@ class vil : public Base,
     }
 
     if (dstream.empty()) {
-      this->connect(rdcr, 0, cb);
+      if (root && (mine == *root)) {
+        this->connect(rdcr, 0, cb);
+      } else {
+        NOT_IMPLEMENTED;
+      }
     } else {
       auto theirs =
           std::make_shared<reduction_port<Index>>(stamp, ident->mine());

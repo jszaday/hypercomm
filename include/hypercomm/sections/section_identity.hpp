@@ -28,6 +28,9 @@ class section_identity : public identity<Index> {
 
  public:
   virtual const Index &mine(void) const override { return this->mine_; }
+  virtual const Index *root(void) const override {
+    return &(this->sect_->index_at(0));
+  }
 
   // TODO when can we avoid this clone?
   section_identity(const reduction_id_t &_0, const section_type &_1,

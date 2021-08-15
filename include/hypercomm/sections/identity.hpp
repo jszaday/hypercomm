@@ -42,7 +42,9 @@ class identity : public identity_base_ {
     }
   }
 
+  virtual const Index* root(void) const = 0;
   virtual const Index& mine(void) const = 0;
+
   virtual std::vector<Index> upstream(void) const = 0;
   virtual std::vector<Index> downstream(void) const = 0;
 };
