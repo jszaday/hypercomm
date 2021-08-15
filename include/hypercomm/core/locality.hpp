@@ -261,6 +261,9 @@ message* repack_to_port(const entry_port_ptr& port,
                    : message::make_null_message(port);
   auto env = UsrToEnv(msg);
   auto msgIdx = env->getMsgIdx();
+
+  env->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
+
   if (msgIdx == message::__idx) {
     // TODO should this be a move?
     msg->dst = port;
@@ -274,12 +277,10 @@ message* repack_to_port(const entry_port_ptr& port,
   }
 }
 
-void generic_locality_::loopback(message* msg) {
-  CkArrayID aid = UsrToEnv(msg)->getArrayMgr();
-  auto id = ((CkArrayMessage*)msg)->array_element_id();
-  auto idx = aid.ckLocalBranch()->getLocMgr()->lookupIdx(id);
-  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
-  interceptor::send_async(aid, idx, msg);
+void generic_locality_::loopback(const entry_port_ptr& port, component::value_type&& value) {
+  auto elt = dynamic_cast<ArrayElement *>(this);
+  CkAssert(elt != nullptr);
+  interceptor::send_async(elt->ckGetArrayID(), elt->ckGetArrayIndex(), port, std::move(value));
 }
 
 template <typename Proxy,
@@ -287,9 +288,7 @@ template <typename Proxy,
               CProxyElement_locality_base_, Proxy>::value>::type>
 inline void send2port(const Proxy& proxy, const entry_port_ptr& port,
                       component::value_type&& value) {
-  auto* msg = repack_to_port(port, std::move(value));
-  UsrToEnv(msg)->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
-  interceptor::send_async(proxy, msg);
+  interceptor::send_async(proxy, port, std::move(value));
 }
 
 // NOTE this should always be used for invalidations
@@ -302,14 +301,9 @@ inline void send2port(const element_ptr<Index>& proxy,
   send2port(base, port, std::move(value));
 }
 
-inline void send2port(const std::shared_ptr<generic_element_proxy>& proxy,
-                      const entry_port_ptr& port,
-                      component::value_type&& value) {
-  proxy->receive(repack_to_port(port, std::move(value)));
-}
-
 inline void send2future(const future& f, component::value_type&& value) {
-  auto src = std::dynamic_pointer_cast<generic_element_proxy>(f.source);
+  // TODO ( do not assume array-issuedness )
+  auto src = std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(f.source);
   CkAssertMsg(src, "future must be from a locality!");
   auto port = std::make_shared<future_port>(f);
   send2port(src, port, std::move(value));

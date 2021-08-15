@@ -129,8 +129,8 @@ generic_locality_::~generic_locality_() {
   for (auto& pair : this->port_queue) {
     auto& port = pair.first;
     for (auto& value : pair.second) {
-      auto* msg = repack_to_port(port, std::move(value));
-      this->loopback(msg);
+      this->loopback(port, std::move(value));
+
       QdProcess(1);
     }
   }

@@ -3,6 +3,9 @@
 
 #include "messaging.hpp"
 
+#include "../core/entry_port.hpp"
+#include "../core/value.hpp"
+
 namespace hypercomm {
 
 extern CProxy_interceptor interceptor_;
@@ -47,6 +50,14 @@ class interceptor : public CBase_interceptor {
   }
 
   void deliver(const CkArrayID& aid, const CkArrayIndex& raw, CkMessage* msg);
+
+  inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx, const entry_port_ptr& port, value_ptr&& value) {
+    interceptor::send_async(aid, idx, repack_to_port(port, std::move(value)));
+  }
+
+  inline static void send_async(const CProxyElement_ArrayElement& proxy, const entry_port_ptr& port, value_ptr&& value) {
+    interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(), port, std::move(value));
+  }
 
   // asynchronously send a message to the specified element
   inline static void send_async(

@@ -98,8 +98,6 @@ struct collective_proxy;
 
 struct generic_element_proxy : virtual public located_chare {
   virtual bool collective(void) const override { return false; }
-
-  virtual void receive(message* msg) = 0;
 };
 
 template <typename Index>
@@ -107,8 +105,6 @@ struct element_proxy : virtual public generic_element_proxy {
   virtual Index index() const = 0;
 
   virtual std::shared_ptr<collective_proxy<Index>> collection(void) const = 0;
-
-  virtual void receive(message*) override;
 };
 
 template <typename Index>
@@ -377,17 +373,6 @@ generic_collective_proxy<T>::operator[](
     const generic_collective_proxy<T>::index_type& idx) const {
   return element_at(this, idx);
 }
-}  // namespace hypercomm
-
-#include "../messaging/delivery.hpp"
-
-namespace hypercomm {
-
-template <typename Index>
-void element_proxy<Index>::receive(message* msg) {
-  deliver(*this, msg);
-}
-
 }  // namespace hypercomm
 
 #endif
