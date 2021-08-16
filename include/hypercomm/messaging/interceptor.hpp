@@ -16,9 +16,7 @@ class interceptor : public CBase_interceptor {
 
   std::unordered_map<CkArrayID, req_map_type, ArrayIDHasher> fwdReqs_;
   std::unordered_map<CkArrayID, queue_type, ArrayIDHasher> queued_;
-
- public:
-  interceptor(void) { CkpvAccess(interceptor_) = this->thisProxy; }
+  std::map<CkGroupID, CkArrayID> locMgrs_;
 
   // try to send any messages buffered for a given idx
   void resync_queue(const CkArrayID& aid, const CkArrayIndex& idx);
@@ -34,7 +32,13 @@ class interceptor : public CBase_interceptor {
   const CkArrayIndex& dealias(const CkArrayID& aid,
                               const CkArrayIndex& idx) const;
 
+  void subscribe_to(CkArray* arr);
+
+  void on_location_update(const CkGroupID&, const CmiUInt8&, const int&);
+
  public:
+  interceptor(void) { CkpvAccess(interceptor_) = this->thisProxy; }
+
   // create a forwarding record for "from" to "to" at the home pe of "from"
   void forward(const CkArrayID& aid, const CkArrayIndex& from,
                const CkArrayIndex& to);

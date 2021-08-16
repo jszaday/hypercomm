@@ -105,6 +105,30 @@ void interceptor::stop_forwarding(const CkArrayID& aid,
   }
 }
 
+void interceptor::subscribe_to(CkArray* arr) {
+  auto* locMgr = arr->getLocMgr();
+  auto& gid = locMgr->ckGetGroupID();
+  auto search = this->locMgrs_.find(gid);
+  // if we have not already subscribed to updates
+  if (search == std::end(this->locMgrs_)) {
+    // register the locmgr and its array
+    // (may fail with bound arrays?)
+    this->locMgrs_[locMgr->ckGetGroupID()] = arr->CkGetGroupID();
+    // and add us as a listener to location updates
+    using namespace std::placeholders;
+    locMgr->addListener(
+        std::bind(&interceptor::on_location_update, this, _1, _2, _3));
+  }
+}
+
+// resync our queue when the loc mgr undergoes an update
+void interceptor::on_location_update(const CkGroupID& gid, const CmiUInt8& id,
+                                     const int& pe) {
+  auto& aid = this->locMgrs_[gid];
+  auto* loc = CProxy_CkLocMgr(gid).ckLocalBranch();
+  this->resync_queue(aid, loc->lookupIdx(id));
+}
+
 void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
                           detail::payload_ptr&& payload,
                           const bool& immediate) {
@@ -122,7 +146,9 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
     auto ourElt = homePe == lastPe;
     // if we are the elt's home (and its last known loc)
     if (ourElt && (homePe == CkMyPe())) {
-      // buffer it and create (1) to delay QD
+      // subscribe to location updates in case it (re)manifests
+      this->subscribe_to(arr);
+      // then buffer the msg and create (1) to delay QD
       this->queued_[aid][post].push_back(msg);
       QdCreate(1);
     } else {
