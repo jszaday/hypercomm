@@ -255,6 +255,7 @@ void deliver(const element_proxy<Index>& proxy, message* msg) {
   interceptor::send_async(base, msg);
 }
 
+// TODO this should probably be renamed to "pack_to_port"
 message* repack_to_port(const entry_port_ptr& port,
                         component::value_type&& value) {
   auto msg = value ? static_cast<message*>(value->release())
@@ -277,10 +278,12 @@ message* repack_to_port(const entry_port_ptr& port,
   }
 }
 
-void generic_locality_::loopback(const entry_port_ptr& port, component::value_type&& value) {
-  auto elt = dynamic_cast<ArrayElement *>(this);
+void generic_locality_::loopback(const entry_port_ptr& port,
+                                 component::value_type&& value) {
+  auto elt = dynamic_cast<ArrayElement*>(this);
   CkAssert(elt != nullptr);
-  interceptor::send_async(elt->ckGetArrayID(), elt->ckGetArrayIndex(), port, std::move(value));
+  interceptor::send_async(elt->ckGetArrayID(), elt->ckGetArrayIndex(), port,
+                          std::move(value));
 }
 
 template <typename Proxy,

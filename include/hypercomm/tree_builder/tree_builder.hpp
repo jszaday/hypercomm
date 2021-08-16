@@ -10,6 +10,7 @@
 #include "../core/math.hpp"
 #include "../messaging/interceptor.hpp"
 #include "../utilities/backstage_pass.hpp"
+#include "../utilities/macros.hpp"
 #include "back_inserter.hpp"
 #include "manageable.hpp"
 
@@ -479,7 +480,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     } else {
       auto &parent = *(std::begin(elt->association_->upstream_));
       auto &children = elt->association_->downstream_;
-      auto interceptor = interceptor_[CkMyPe()];
+      auto interceptor = (CkpvAccess(interceptor_))[CkMyPe()];
       // replace this elt with its children in its parent
       // (there may be none! that is ok, effectively a "delete".)
       auto *msg = hypercomm::pack(curr, children, elt->__stamp__());
@@ -569,15 +570,7 @@ CProxy_tree_builder tree_builder::CksvAccess(singleton_);
 #if CMK_SMP
 // register the handler for the back_inserter, returning its index
 const int &back_inserter::handler(void) {
-  CpvStaticDeclare(int, back_inserter_handler_);
-
-  if (!CpvInitialized(back_inserter_handler_)) {
-    CpvInitialize(int, back_inserter_handler_);
-    CpvAccess(back_inserter_handler_) =
-        CmiRegisterHandler((CmiHandler)back_inserter::handler_);
-  }
-
-  return CpvAccess(back_inserter_handler_);
+  return CmiAutoRegister(back_inserter::handler_);
 }
 
 // call the startup process for the given tree builder and aid

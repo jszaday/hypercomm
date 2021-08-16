@@ -1,7 +1,6 @@
 #include <hypercomm/core/module.hpp>
 #include <hypercomm/core/locality_map.hpp>
-
-#include <hypercomm/messaging/messaging.decl.h>
+#include <hypercomm/messaging/common.hpp>
 
 namespace hypercomm {
 
@@ -43,27 +42,25 @@ int CkIndex_locality_base_::__idx;
 
 namespace core {
 void initialize(void) {
-  if (CkMyRank() != 0) {
-    CkAbort("initialize cannot be called on ranks besides 0");
+  if (CkMyRank() == 0) {
+    auto& __idx = CkIndex_locality_base_::__idx;
+
+    __idx = CkRegisterChare("hypercomm::locality_base_", 0, TypeArray);
+    CkRegisterArrayDimensions(__idx, -1);
+    CkRegisterBase(__idx, CkIndex_ArrayElement::__idx);
+
+    CkIndex_locality_base_::idx_demux_CkMessage();
+
+    CkIndex_locality_base_::idx_execute_CkMessage();
+
+    CkIndex_locality_base_::idx_replace_downstream_CkMessage();
+
+    // register the locality module
+    _registerlocality();
   }
 
-  auto& __idx = CkIndex_locality_base_::__idx;
-
-  __idx = CkRegisterChare("hypercomm::locality_base_", 0, TypeArray);
-  CkRegisterArrayDimensions(__idx, -1);
-  CkRegisterBase(__idx, CkIndex_ArrayElement::__idx);
-
-  CkIndex_locality_base_::idx_demux_CkMessage();
-
-  CkIndex_locality_base_::idx_execute_CkMessage();
-
-  CkIndex_locality_base_::idx_replace_downstream_CkMessage();
-
   // register the messaging module
-  _registermessaging();
-
-  // register the locality module
-  _registerlocality();
+  messaging::initialize();
 }
 }  // namespace core
 }  // namespace hypercomm

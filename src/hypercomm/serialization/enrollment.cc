@@ -10,10 +10,8 @@ CsvDeclare(type_registry_t, type_registry_);
 CsvDeclare(alloc_registry_t, alloc_registry_);
 
 void init_polymorph_registry(void) {
-  if (CkMyRank() == 0) {
-    // TODO ( we should probably move this out of here )
-    core::initialize();
-  }
+  // TODO ( we should probably move this out of here )
+  core::initialize();
 
   CsvInitialize(type_registry_t, type_registry_);
   CsvInitialize(alloc_registry_t, alloc_registry_);

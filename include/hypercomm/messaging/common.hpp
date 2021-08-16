@@ -4,7 +4,9 @@
 namespace hypercomm {
 namespace messaging {
 struct __msg__;
-}
+
+void initialize(void);
+}  // namespace messaging
 
 using message = messaging::__msg__;
 }  // namespace hypercomm

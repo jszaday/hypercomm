@@ -1,9 +1,37 @@
+#include <hypercomm/core/generic_locality.hpp>
 #include <hypercomm/messaging/interceptor.hpp>
 #include <hypercomm/sections/imprintable.hpp>
+#include <hypercomm/utilities/macros.hpp>
 
 namespace hypercomm {
 
-CProxy_interceptor interceptor_;
+CkpvDeclare(CProxy_interceptor, interceptor_);
+
+namespace messaging {
+void initialize(void) {
+  // register the messaging module (on rank 0)
+  if (CkMyRank() == 0) {
+    _registermessaging();
+  }
+  // register the handler for delivery
+  delivery::handler();
+  // zero the per-pe interceptor proxy
+  CkpvInitialize(CProxy_interceptor, interceptor_);
+  CkAssert(((CkGroupID)CkpvAccess(interceptor_)).isZero());
+}
+}  // namespace messaging
+
+// registers delivery::handler_ as a converse handler
+const int& delivery::handler(void) {
+  return CmiAutoRegister(delivery::handler_);
+}
+
+// locally delivers the payload to the interceptor with immediacy
+void delivery::handler_(delivery* msg) {
+  auto* local = interceptor::local_branch();
+  local->deliver(msg->aid, msg->idx, std::move(msg->payload), true);
+  delete msg;
+}
 
 // try to send any messages buffered for a given idx
 void interceptor::resync_queue(const CkArrayID& aid, const CkArrayIndex& idx) {
@@ -77,57 +105,75 @@ void interceptor::stop_forwarding(const CkArrayID& aid,
   }
 }
 
-void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& raw,
-                          CkMessage* msg) {
-  auto* env = UsrToEnv(msg);
-  env->setMsgtype(ForArrayEltMsg);
-  auto& numHops = env->getsetArrayHops();
-
-  auto& idx = this->dealias(aid, raw);
-  auto pair = this->lastKnown(aid, idx);
-  auto& homePe = pair.first;
-  auto& lastPe = (pair.second >= 0) ? pair.second : homePe;
-
-  // if the last known pe was our pe
-  if (lastPe == CkMyPe()) {
-    // look up the element in our local branch
-    auto* arr = CProxy_ArrayBase(aid).ckLocalBranch();
-    auto* elt = arr->lookup(idx);
-    // if it's present,
-    if (elt != nullptr) {
-      // invoke the entry method (per the msg's epIdx)
-      elt->ckInvokeEntry(UsrToEnv(msg)->getEpIdx(), msg, true);
-      return;
-    } else if (homePe == CkMyPe()) {
-      // otherwise, if we are its home PE, buffer the message
-      this->queued_[aid][idx].push_back(msg);
-      QdCreate(1);  // create (1) to delay QD
-
-#if CMK_ERROR_CHECKING
-      auto& reqMap = this->fwdReqs_[aid];
-      if (reqMap.find(idx) != std::end(reqMap)) {
-        CkAbort("%d> refusing to create (1) for %d.\n", CkMyPe(),
-                *(idx.data()));
-      }
-#endif  // CMK_ERROR_CHECKING
-
-      return;
+void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
+                          detail::payload_ptr&& payload,
+                          const bool& immediate) {
+  auto* arr = CProxy_ArrayBase(aid).ckLocalBranch();
+  auto& post = this->dealias(aid, pre);
+  auto* elt = arr->lookup(post);
+  // if the elt is locally available
+  if (elt != nullptr) {
+    // process it with appropriate immediacy
+    detail::payload::process(elt, std::move(payload), immediate);
+  } else {
+    auto msg = payload->release();
+    auto homePe = arr->homePe(post);
+    auto lastPe = arr->lastKnown(post);
+    auto ourElt = homePe == lastPe;
+    // if we are the elt's home (and its last known loc)
+    if (ourElt && (homePe == CkMyPe())) {
+      // buffer it and create (1) to delay QD
+      this->queued_[aid][post].push_back(msg);
+      QdCreate(1);
+    } else {
+      // if we lost an elt, the home pe will know its location
+      // (or at least buffer it)
+      auto destPe = ourElt ? homePe : lastPe;
+      thisProxy[destPe].deliver(aid, post, CkMarshalledMessage(msg));
     }
   }
-
-  // otherwise, determine the next location to send the msg
-  int destPe;
-  if (numHops > 1 && (homePe != CkMyPe())) {
-    numHops = 0;
-    destPe = homePe;  // home PE if it's hopped, resetting hop count
-  } else {
-    numHops += 1;
-    destPe = lastPe;  // otherwise, try last known PE
-  }
-
-  // then send it along
-  thisProxy[destPe].deliver(aid, idx, CkMarshalledMessage(msg));
 }
+
+namespace detail {
+void payload::process(ArrayElement* elt, payload_ptr&& payload,
+                      const bool& immediate) {
+  CkAssert(payload->valid());
+
+  auto* cast = dynamic_cast<generic_locality_*>(elt);
+  auto& opts = payload->options_;
+
+  if (immediate) {
+    cast->update_context();
+
+    if (payload->type_ == kMessage) {
+      auto& msg = opts.msg_;
+#if CMK_VERBOSE
+      CkPrintf("pe%d> delivering msg %p to idx %s!\n", CkMyPe(), msg,
+               utilities::idx2str(elt->ckGetArrayIndex()).c_str());
+#endif
+      cast->receive_message(msg);
+      msg = nullptr;
+    } else {
+      auto& port = opts.value_.port_;
+#if CMK_VERBOSE
+      CkPrintf("pe%d> delivering a value to port %s of idx %s.\n", CkMyPe(),
+               (port->to_string()).c_str(),
+               utilities::idx2str(elt->ckGetArrayIndex()).c_str());
+#endif
+      // dump both the port and value since we don't need them after this
+      cast->receive_value(std::move(port), std::move(opts.value_.value_));
+    }
+  } else {
+    auto& aid = elt->ckGetArrayID();
+    auto& idx = elt->ckGetArrayIndex();
+#if CMK_VERBOSE
+    CkPrintf("pe%d> pushing a message/value onto the queue for %s.\n", CkMyPe(),
+             utilities::idx2str(elt->ckGetArrayIndex()).c_str());
+#endif
+    CmiPushPE(CkMyRank(), new delivery(aid, idx, std::move(payload)));
+  }
+}
+}  // namespace detail
 
 void interceptor::send_to_root(
     const CkArrayID& aid, const std::shared_ptr<imprintable_base_>& section,
