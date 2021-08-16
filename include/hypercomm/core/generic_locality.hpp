@@ -2,7 +2,8 @@
 #define __HYPERCOMM_CORE_GENLOC_HPP__
 
 #include "../messaging/destination.hpp"
-#include "entry_port.hpp"
+#include "../messaging/interceptor.hpp"
+
 #include "module.hpp"
 
 /* TODO consider introducing a simplified connection API that
@@ -15,6 +16,7 @@ class generic_locality_ : public virtual common_functions_ {
  public:
   template <typename A, typename Enable>
   friend class comproxy;
+  friend class detail::payload;
 
   entry_port_map entry_ports;
   component_map components;

@@ -143,10 +143,12 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
   auto& opts = payload->options_;
 
   if (immediate) {
+    cast->update_context();
+
     if (payload->type_ == kMessage) {
       auto& msg = opts.msg_;
 #if CMK_VERBOSE
-      CkPrintf("info> delivering msg %p to idx %s!\n", msg,
+      CkPrintf("pe%d> delivering msg %p to idx %s!\n", CkMyPe(), msg,
                utilities::idx2str(elt->ckGetArrayIndex()).c_str());
 #endif
       cast->receive_message(msg);
@@ -154,7 +156,7 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
     } else {
       auto& port = opts.value_.port_;
 #if CMK_VERBOSE
-      CkPrintf("info> delivering a value to port %s of idx %s.\n",
+      CkPrintf("pe%d> delivering a value to port %s of idx %s.\n", CkMyPe(),
                (port->to_string()).c_str(),
                utilities::idx2str(elt->ckGetArrayIndex()).c_str());
 #endif
@@ -163,6 +165,10 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
   } else {
     auto& aid = elt->ckGetArrayID();
     auto& idx = elt->ckGetArrayIndex();
+#if CMK_VERBOSE
+    CkPrintf("pe%d> pushing a message/value onto the queue for %s.\n", CkMyPe(),
+             utilities::idx2str(elt->ckGetArrayIndex()).c_str());
+#endif
     CmiPushPE(CkMyRank(), new delivery(aid, idx, std::move(payload)));
   }
 }

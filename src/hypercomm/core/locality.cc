@@ -141,6 +141,7 @@ void generic_locality_::receive_message(CkMessage* msg) {
   auto idx = env->getEpIdx();
   if (idx == CkIndex_locality_base_::idx_demux_CkMessage()) {
     auto* cast = (message*)msg;
+    CkAssert(env->getMsgIdx() == message::index());
     this->receive_value(cast->dst, msg2value(cast));
   } else {
     _entryTable[idx]->call(msg, dynamic_cast<CkMigratable*>(this));
