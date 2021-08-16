@@ -1,6 +1,7 @@
 #include <hypercomm/core/generic_locality.hpp>
 #include <hypercomm/messaging/interceptor.hpp>
 #include <hypercomm/sections/imprintable.hpp>
+#include <hypercomm/utilities/macros.hpp>
 
 namespace hypercomm {
 
@@ -8,29 +9,24 @@ CkpvDeclare(CProxy_interceptor, interceptor_);
 
 namespace messaging {
 void initialize(void) {
+  // register the messaging module (on rank 0)
   if (CkMyRank() == 0) {
     _registermessaging();
   }
-
+  // register the handler for delivery
   delivery::handler();
-
+  // zero the per-pe interceptor proxy
   CkpvInitialize(CProxy_interceptor, interceptor_);
   CkAssert(((CkGroupID)CkpvAccess(interceptor_)).isZero());
 }
 }  // namespace messaging
 
+// registers delivery::handler_ as a converse handler
 const int& delivery::handler(void) {
-  CpvStaticDeclare(int, delivery_handler_);
-
-  if (!CpvInitialized(delivery_handler_) || !CpvAccess(delivery_handler_)) {
-    CpvInitialize(int, delivery_handler_);
-    CpvAccess(delivery_handler_) =
-        CmiRegisterHandler((CmiHandler)delivery::handler_);
-  }
-
-  return CpvAccess(delivery_handler_);
+  return CmiAutoRegister(delivery::handler_);
 }
 
+// locally delivers the payload to the interceptor with immediacy
 void delivery::handler_(delivery* msg) {
   auto* local = interceptor::local_branch();
   local->deliver(msg->aid, msg->idx, std::move(msg->payload), true);

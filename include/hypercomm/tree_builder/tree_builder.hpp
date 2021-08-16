@@ -10,6 +10,7 @@
 #include "../core/math.hpp"
 #include "../messaging/interceptor.hpp"
 #include "../utilities/backstage_pass.hpp"
+#include "../utilities/macros.hpp"
 #include "back_inserter.hpp"
 #include "manageable.hpp"
 
@@ -569,15 +570,7 @@ CProxy_tree_builder tree_builder::CksvAccess(singleton_);
 #if CMK_SMP
 // register the handler for the back_inserter, returning its index
 const int &back_inserter::handler(void) {
-  CpvStaticDeclare(int, back_inserter_handler_);
-
-  if (!CpvInitialized(back_inserter_handler_)) {
-    CpvInitialize(int, back_inserter_handler_);
-    CpvAccess(back_inserter_handler_) =
-        CmiRegisterHandler((CmiHandler)back_inserter::handler_);
-  }
-
-  return CpvAccess(back_inserter_handler_);
+  return CmiAutoRegister(back_inserter::handler_);
 }
 
 // call the startup process for the given tree builder and aid

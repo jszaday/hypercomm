@@ -45,6 +45,7 @@ class interceptor : public CBase_interceptor {
   // entry-method accessible version of deliver
   inline void deliver(const CkArrayID& aid, const CkArrayIndex& raw,
                       CkMarshalledMessage&& msg) {
+    // deliver with immediately payload processing, "inlining" the EP
     this->deliver(aid, raw, detail::make_payload(std::move(msg)), true);
   }
 
