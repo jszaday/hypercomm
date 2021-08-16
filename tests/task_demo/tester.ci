@@ -1,4 +1,6 @@
 mainmodule tester {
+    initproc void enroll_polymorphs(void);
+
     mainchare main {
         entry main(CkArgMsg*);
     };
@@ -6,6 +8,4 @@ mainmodule tester {
     array [Max] locality : hypercomm::locality_base_ {
         entry locality(int);
     };
-
-    initproc void enroll_polymorphs(void);
 }

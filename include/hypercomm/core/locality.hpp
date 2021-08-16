@@ -255,6 +255,7 @@ void deliver(const element_proxy<Index>& proxy, message* msg) {
   interceptor::send_async(base, msg);
 }
 
+// TODO this should probably be renamed to "pack_to_port"
 message* repack_to_port(const entry_port_ptr& port,
                         component::value_type&& value) {
   auto msg = value ? static_cast<message*>(value->release())

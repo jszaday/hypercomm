@@ -4,6 +4,8 @@
 
 namespace hypercomm {
 
+CkpvDeclare(CProxy_interceptor, interceptor_);
+
 namespace messaging {
 void initialize(void) {
   if (CkMyRank() == 0) {
@@ -11,6 +13,9 @@ void initialize(void) {
   }
 
   delivery::handler();
+
+  CkpvInitialize(CProxy_interceptor, interceptor_);
+  CkAssert(((CkGroupID)CkpvAccess(interceptor_)).isZero());
 }
 }  // namespace messaging
 
@@ -31,8 +36,6 @@ void delivery::handler_(delivery* msg) {
   local->deliver(msg->aid, msg->idx, std::move(msg->payload), true);
   delete msg;
 }
-
-CProxy_interceptor interceptor_;
 
 // try to send any messages buffered for a given idx
 void interceptor::resync_queue(const CkArrayID& aid, const CkArrayIndex& idx) {
@@ -112,8 +115,9 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
   auto* arr = CProxy_ArrayBase(aid).ckLocalBranch();
   auto& post = this->dealias(aid, pre);
   auto* elt = arr->lookup(post);
-
+  // if the elt is locally available
   if (elt != nullptr) {
+    // process it with appropriate immediacy
     detail::payload::process(elt, std::move(payload), immediate);
   } else {
     auto msg = payload->release();
@@ -160,7 +164,8 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
                (port->to_string()).c_str(),
                utilities::idx2str(elt->ckGetArrayIndex()).c_str());
 #endif
-      cast->receive_value(port, std::move(opts.value_.value_));
+      // dump both the port and value since we don't need them after this
+      cast->receive_value(std::move(port), std::move(opts.value_.value_));
     }
   } else {
     auto& aid = elt->ckGetArrayID();

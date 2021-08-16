@@ -6,7 +6,7 @@
 
 namespace hypercomm {
 
-extern CProxy_interceptor interceptor_;
+CkpvExtern(CProxy_interceptor, interceptor_);
 
 class interceptor : public CBase_interceptor {
   using queue_type =
@@ -18,7 +18,9 @@ class interceptor : public CBase_interceptor {
   std::unordered_map<CkArrayID, queue_type, ArrayIDHasher> queued_;
 
  public:
-  interceptor(void) = default;
+  interceptor(void) {
+    CkpvAccess(interceptor_) = this->thisProxy;
+  }
 
   // try to send any messages buffered for a given idx
   void resync_queue(const CkArrayID& aid, const CkArrayIndex& idx);
@@ -85,7 +87,7 @@ class interceptor : public CBase_interceptor {
   // asynchronously send a message to the specified index of aid
   inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
                                 detail::payload_ptr&& payload) {
-    if (((CkGroupID)interceptor_).isZero()) {
+    if (((CkGroupID)CkpvAccess(interceptor_)).isZero()) {
 #if CMK_VERBOSE
       CkError("warning> unable to deliver through interceptor.\n");
 #endif
@@ -94,8 +96,9 @@ class interceptor : public CBase_interceptor {
       CProxyElement_ArrayBase::ckSendWrapper(aid, idx, msg,
                                              UsrToEnv(msg)->getEpIdx(), 0);
     } else {
-      (interceptor_.ckLocalBranch())
-          ->deliver(aid, idx, std::move(payload), false);
+      auto *loc = spin_to_win();
+      CkAssertMsg(loc, "unable to retrieve interceptor");
+      loc->deliver(aid, idx, std::move(payload), false);
     }
   }
 
@@ -105,11 +108,25 @@ class interceptor : public CBase_interceptor {
 
   // get the local branch of interceptor_
   inline static interceptor* local_branch() {
-    if (((CkGroupID)interceptor_).isZero()) {
+    if (((CkGroupID)CkpvAccess(interceptor_)).isZero()) {
       return nullptr;
     } else {
-      return interceptor_.ckLocalBranch();
+      return spin_to_win();
     }
+  }
+
+ protected:
+
+  inline static interceptor* spin_to_win(void) {
+    void* local = nullptr;
+    while ((local = CkLocalBranch(CkpvAccess(interceptor_))) == nullptr) {
+      if (CthIsMainThread(CthSelf())) {
+        CsdScheduler(0);
+      } else {
+        CthYield();
+      }
+    }
+    return (interceptor*)local;
   }
 };
 
@@ -117,7 +134,8 @@ class interceptor : public CBase_interceptor {
 class interceptor_initializer_ : public CBase_interceptor_initializer_ {
  public:
   interceptor_initializer_(CkArgMsg* m) {
-    interceptor_ = CProxy_interceptor::ckNew();
+    CProxy_interceptor::ckNew();
+
     delete this;
   }
 

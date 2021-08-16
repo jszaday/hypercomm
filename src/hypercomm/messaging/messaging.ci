@@ -11,8 +11,6 @@ module messaging {
             entry void stop_forwarding(const CkArrayID&, const CkArrayIndex&);
         };
 
-        readonly CProxy_interceptor interceptor_;
-
         mainchare interceptor_initializer_ {
             entry [nokeep] interceptor_initializer_(CkArgMsg*);
         };

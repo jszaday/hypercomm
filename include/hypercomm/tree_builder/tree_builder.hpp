@@ -479,7 +479,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     } else {
       auto &parent = *(std::begin(elt->association_->upstream_));
       auto &children = elt->association_->downstream_;
-      auto interceptor = interceptor_[CkMyPe()];
+      auto interceptor = (CkpvAccess(interceptor_))[CkMyPe()];
       // replace this elt with its children in its parent
       // (there may be none! that is ok, effectively a "delete".)
       auto *msg = hypercomm::pack(curr, children, elt->__stamp__());

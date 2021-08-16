@@ -22,8 +22,8 @@ struct payload {
     struct s_value_ {
       entry_port_ptr port_;
       value_ptr value_;
-
-      inline bool valid(void) const { return this->port_ && this->value_; }
+      // a value may be null, so we only check the port for validity
+      inline bool valid(void) const { return (bool)this->port_; }
     } value_;
 
     CkMessage* msg_;
@@ -65,17 +65,20 @@ struct payload {
   static void process(ArrayElement* elt, payload_ptr&&, const bool& immediate);
 
   inline CkMessage* release(void) {
+    CkAssert(this->valid());
     if (this->type_ == kMessage) {
       auto msg = this->options_.msg_;
       this->options_.msg_ = nullptr;
       return msg;
     } else {
       auto& pair = this->options_.value_;
-      return repack_to_port(pair.port_, std::move(pair.value_));
+      // pack the value with its destination port to form a message
+      return repack_to_port(std::move(pair.port_), std::move(pair.value_));
     }
   }
 };
 
+// convenience method for creating a unique payload ptr
 template <typename... Args>
 inline payload_ptr make_payload(Args... args) {
   return std::move(payload_ptr(new payload(std::forward<Args>(args)...)));
