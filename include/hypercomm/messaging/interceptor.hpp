@@ -18,9 +18,7 @@ class interceptor : public CBase_interceptor {
   std::unordered_map<CkArrayID, queue_type, ArrayIDHasher> queued_;
 
  public:
-  interceptor(void) {
-    CkpvAccess(interceptor_) = this->thisProxy;
-  }
+  interceptor(void) { CkpvAccess(interceptor_) = this->thisProxy; }
 
   // try to send any messages buffered for a given idx
   void resync_queue(const CkArrayID& aid, const CkArrayIndex& idx);
@@ -96,7 +94,7 @@ class interceptor : public CBase_interceptor {
       CProxyElement_ArrayBase::ckSendWrapper(aid, idx, msg,
                                              UsrToEnv(msg)->getEpIdx(), 0);
     } else {
-      auto *loc = spin_to_win();
+      auto* loc = spin_to_win();
       CkAssertMsg(loc, "unable to retrieve interceptor");
       loc->deliver(aid, idx, std::move(payload), false);
     }
@@ -116,7 +114,6 @@ class interceptor : public CBase_interceptor {
   }
 
  protected:
-
   inline static interceptor* spin_to_win(void) {
     void* local = nullptr;
     while ((local = CkLocalBranch(CkpvAccess(interceptor_))) == nullptr) {
