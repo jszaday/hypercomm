@@ -214,7 +214,7 @@ reducer::value_set reducer::action(value_set&& accepted) {
             : std::shared_ptr<contribution_type>();
     if (contrib) {
       if ((*contrib)->msg_ != nullptr) {
-        args.emplace_back(std::make_shared<plain_value>((*contrib)->msg_));
+        args.emplace_back(msg2value((*contrib)->msg_));
       }
 
       auto& theirCb = (*contrib)->callback_;
@@ -236,8 +236,8 @@ reducer::value_set reducer::action(value_set&& accepted) {
 
   auto result = ourCmbnr->send(std::move(args));
   auto contrib =
-      std::make_shared<contribution_type>(std::move(result), ourCmbnr, ourCb);
-  return {std::make_pair(0, std::move(contrib))};
+      make_value<contribution_type>(std::move(result), ourCmbnr, ourCb);
+  return component::make_set(0, std::move(contrib));
 }
 
 }  // namespace hypercomm

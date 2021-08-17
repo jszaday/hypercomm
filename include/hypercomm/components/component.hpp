@@ -108,6 +108,13 @@ class component : virtual public impermanent {
     this->listeners_.clear();
   }
 
+  // create a value set and initialize it with the port/value pair
+  inline static value_set make_set(const port_type& port, value_type&& value) {
+    value_set set;
+    set.emplace(port, std::move(value));
+    return std::move(set);
+  }
+
  protected:
   std::vector<listener_ptr> listeners_;
 

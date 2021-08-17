@@ -7,9 +7,11 @@ namespace hypercomm {
 
 class hyper_value;
 
+using value_ptr = std::unique_ptr<hyper_value>;
+
 class value_source {
  public:
-  virtual void take_back(std::shared_ptr<hyper_value>&&) = 0;
+  virtual void take_back(value_ptr&&) = 0;
 };
 
 class hyper_value {
@@ -23,8 +25,6 @@ class hyper_value {
   virtual bool recastable(void) const = 0;
   virtual message_type release(void) = 0;
 };
-
-using value_ptr = std::shared_ptr<hyper_value>;
 
 inline void try_return(value_ptr&& value) {
   if (value) {
@@ -62,15 +62,19 @@ class plain_value : public hyper_value {
   }
 };
 
-inline std::shared_ptr<plain_value> msg2value(
-    typename hyper_value::message_type msg) {
-  return std::make_shared<plain_value>(msg);
+template <typename T, typename... Args>
+inline std::unique_ptr<T> make_value(Args... args) {
+  return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
-inline std::shared_ptr<plain_value> msg2value(
+inline std::unique_ptr<plain_value> msg2value(
+    typename hyper_value::message_type msg) {
+  return make_value<plain_value>(msg);
+}
+
+inline std::unique_ptr<plain_value> msg2value(
     std::shared_ptr<CkMessage>&& msg) {
-  return std::make_shared<plain_value>(
-      utilities::unwrap_message(std::move(msg)));
+  return make_value<plain_value>(utilities::unwrap_message(std::move(msg)));
 }
 }  // namespace hypercomm
 
