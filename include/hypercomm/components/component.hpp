@@ -108,6 +108,19 @@ class component : virtual public impermanent {
     this->listeners_.clear();
   }
 
+  template <typename... Args>
+  // create a value set and initialize it a variable number of port/value pairs
+  inline static value_set make_varset(Args&&... args) {
+    using value_type = typename value_set::value_type;
+    value_set set;
+    auto insert = [&](value_type&& value) -> void {
+      set.insert(std::move(value));
+    };
+    using expander = int[];
+    (void)expander{0, (void(insert(std::move(args))), 0)...};
+    return std::move(set);
+  }
+
   // create a value set and initialize it with the port/value pair
   inline static value_set make_set(const port_type& port, value_type&& value) {
     value_set set;

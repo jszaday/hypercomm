@@ -50,7 +50,8 @@ struct main : public CBase_main {
         make_grouplike<CProxy_locality>(cfg.n);
         break;
       case config_type::chare_type::TypeNodeGroup:
-        CkPrintf("main> nodegroup-like, numNodes=%d, numPes=%d\n", CkNumNodes(), CkNumPes());
+        CkPrintf("main> nodegroup-like, numNodes=%d, numPes=%d\n", CkNumNodes(),
+                 CkNumPes());
         make_nodegrouplike<CProxy_locality>(cfg.n);
         break;
       case config_type::chare_type::TypeArray:
@@ -125,9 +126,9 @@ typename gen_values<T>::value_set gen_values<T>::action(value_set&&) {
 
   auto copy0 = utilities::copy_message(msg);
   auto copy1 = utilities::copy_message(msg);
-  return {std::make_pair(0, msg2value(msg)),
-          std::make_pair(1, msg2value(copy0)),
-          std::make_pair(2, msg2value(copy1))};
+  return make_varset(std::make_pair(0, msg2value(msg)),
+                     std::make_pair(1, msg2value(copy0)),
+                     std::make_pair(2, msg2value(copy1)));
 }
 
 template <typename T>
@@ -151,7 +152,7 @@ typename add_values<T>::value_set add_values<T>::action(value_set&& accepted) {
     lhs[i] += rhs[i];
   }
 
-  return {std::make_pair(0, lhsMsg)};
+  return make_set(0, std::move(lhsMsg));
 }
 
 template <typename T>
