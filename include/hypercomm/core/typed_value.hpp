@@ -35,34 +35,35 @@ class typed_value : public hyper_value {
     return msg;
   }
 
-  static std::shared_ptr<typed_value<T>> from_message(message_type msg) {
+  static std::unique_ptr<typed_value<T>> from_message(message_type msg) {
     if (utilities::is_null_message(msg)) {
-      return std::shared_ptr<typed_value<T>>();
+      return std::unique_ptr<typed_value<T>>();
     } else if (!is_contribution && utilities::is_reduction_message(msg)) {
       CkMessage* imsg;
       unpack(msg, imsg);
       return from_message(imsg);
     } else {
-      auto result = std::make_shared<typed_value<T>>(tags::no_init{});
+      auto result = make_value<typed_value<T>>(tags::no_init{});
       unpack(msg, result->value());
       return std::move(result);
     }
   }
 };
 
-inline std::shared_ptr<typed_value<unit_type>> make_unit_value(void) {
-  return std::make_shared<typed_value<unit_type>>(tags::no_init{});
+inline std::unique_ptr<typed_value<unit_type>> make_unit_value(void) {
+  return make_value<typed_value<unit_type>>(tags::no_init{});
 }
 
 template <typename T>
-std::shared_ptr<typed_value<T>> value2typed(
-    std::shared_ptr<hyper_value>&& value) {
-  auto try_cast = std::dynamic_pointer_cast<typed_value<T>>(value);
+std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
+  auto* value = ptr.release();
+  auto* try_cast = dynamic_cast<typed_value<T>*>(value);
   if (try_cast) {
-    return try_cast;
+    return std::unique_ptr<typed_value<T>>(try_cast);
   } else if (value->recastable()) {
     auto typed = typed_value<T>::from_message(value->release());
     typed->source = value->source;
+    delete value;
     return std::move(typed);
   } else {
     CkAbort("invalid cast!");

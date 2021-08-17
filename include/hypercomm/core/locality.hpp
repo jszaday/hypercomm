@@ -136,12 +136,15 @@ class vil : public Base,
   /* NOTE ( this is a mechanism for demux'ing an incoming message
    *        to the appropriate entry port )
    */
-  virtual void demux(message* _1) override {
+  virtual void demux(message* msg) override {
     this->update_context();
-    auto msg = _1->is_null() ? std::shared_ptr<hyper_value>(
-                                   nullptr, [_1](void*) { CkFreeMsg(_1); })
-                             : msg2value(_1);
-    this->receive_value(_1->dst, std::move(msg));
+    auto nullify = [&](void) {
+      CkFreeMsg(msg);
+      return value_ptr();
+    };
+    auto port = msg->dst;
+    auto value = msg->is_null() ? nullify() : msg2value(msg);
+    this->receive_value(port, std::move(value));
   }
 
   virtual const Index& __index__(void) const {
@@ -208,7 +211,7 @@ class vil : public Base,
 
     this->activate_component(rdcr);
     auto contrib =
-        std::make_shared<typed_value<contribution>>(std::move(value), fn, cb);
+        make_value<typed_value<contribution>>(std::move(value), fn, cb);
     this->components[rdcr]->receive_value(0, std::move(contrib));
   }
 };
@@ -368,7 +371,7 @@ void entry_port::on_invalidation(const component&) {
   access_context_()->invalidate_port(this->shared_from_this());
 }
 
-void entry_port::take_back(std::shared_ptr<hyper_value>&& value) {
+void entry_port::take_back(value_ptr&& value) {
   access_context_()->receive_value(this->shared_from_this(), std::move(value));
 }
 }  // namespace hypercomm

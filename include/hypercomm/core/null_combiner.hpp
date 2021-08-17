@@ -9,7 +9,7 @@ struct null_combiner : public core::combiner {
   null_combiner(const tags::reconstruct&) {}
 
   virtual combiner::return_type send(combiner::argument_type&& args) override {
-    return args.empty() ? combiner::return_type{} : args[0];
+    return args.empty() ? combiner::return_type{} : std::move(args[0]);
   }
 
   virtual void __pup__(hypercomm::serdes&) override {}

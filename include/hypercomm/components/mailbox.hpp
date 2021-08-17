@@ -43,7 +43,7 @@ class mailbox : public component {
 
  protected:
   std::deque<request_type> requests_;
-  std::deque<std::shared_ptr<typed_value<T>>> buffer_;
+  std::deque<std::unique_ptr<typed_value<T>>> buffer_;
 
  public:
   mailbox(const id_t& _1) : component(_1) {}
@@ -119,7 +119,7 @@ class mailbox : public component {
   using request_iterator = typename decltype(requests_)::iterator;
 
   inline request_iterator find_matching(
-      const std::shared_ptr<typed_value<T>>& _1) {
+      const std::unique_ptr<typed_value<T>>& _1) {
     const auto& value = _1->value();
     request_iterator search = std::begin(this->requests_);
     for (; search != std::end(this->requests_); search++) {

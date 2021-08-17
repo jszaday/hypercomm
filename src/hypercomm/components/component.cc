@@ -158,12 +158,13 @@ void component::receive_value(const port_type& port, value_type&& value) {
     // if one is not found:
     if (search == this->incoming.rend()) {
       // create a new set, and put it at the head of the buffer
-      this->incoming.push_front({std::make_pair(port, std::move(value))});
+      this->incoming.emplace_front(make_set(port, std::move(value)));
       // then, update the search iterator
       search = this->incoming.rbegin();
     } else {
       // otherwise, update the found value set
-      (*search)[port] = value;
+      auto ins = (*search).emplace(port, std::move(value));
+      CkAssertMsg(ins.second, "insertion did not occur!");
     }
     // if the value set at the iterator is ready
     if (search->size() == this->n_expected()) {

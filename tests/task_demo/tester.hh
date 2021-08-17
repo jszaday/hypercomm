@@ -10,7 +10,7 @@ using namespace hypercomm;
 
 template<typename T>
 void unpack_array(const component::value_type& _1, std::size_t** n, T** arr) {
-  auto msg = (message*)std::dynamic_pointer_cast<plain_value>(_1)->msg;
+  auto msg = (message*)dynamic_cast<plain_value*>(_1.get())->msg;
   *n = (std::size_t*)msg->payload;
   *arr = (T*)(msg->payload + sizeof(n));
 }

@@ -15,7 +15,7 @@ struct entry_port : public virtual polymorph,
   virtual std::string to_string(void) const = 0;
   virtual void on_completion(const component&) override;
   virtual void on_invalidation(const component&) override;
-  virtual void take_back(std::shared_ptr<hyper_value>&& value) override;
+  virtual void take_back(value_ptr&& value) override;
 };
 }  // namespace hypercomm
 

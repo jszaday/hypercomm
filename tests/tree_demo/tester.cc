@@ -84,7 +84,7 @@ class Test : public manageable<vil<CBase_Test, int>> {
       return;
     }
 
-    auto val = std::make_shared<typed_value<int>>(mine);
+    auto val = make_value<typed_value<int>>(mine);
     auto fn = std::make_shared<adder<int>>();
     auto cb = CkCallback(CkIndex_Main::done(nullptr), mainProxy);
     auto icb = std::make_shared<inter_callback>(cb);
