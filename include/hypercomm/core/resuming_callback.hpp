@@ -14,19 +14,24 @@ struct resuming_callback : public core::callback {
   CthThread th;
   std::shared_ptr<result_type> result;
 
-  resuming_callback(PUP::reconstruct) {}
-
-  resuming_callback(const CthThread& _1) : th(_1) {}
+  resuming_callback(void) : th(nullptr) {}
 
   virtual void send(value_type&& value) override {
     this->result = value2typed<type>(std::move(value));
-
-    if (th) {
-      CthAwaken(th);
+    if (this->th) {
+      CthAwaken(this->th);
+      this->th = nullptr;
     }
   }
 
-  inline bool ready(void) const { return (bool)this->result; }
+  void wait(void) {
+    if (!this->result) {
+      CkAssert(this->th == nullptr);
+      this->th = CthSelf();
+      CkAssert(!CthIsMainThread(this->th));
+      CthSuspend();
+    }
+  }
 
   inline type& value(void) { return this->result->value(); }
 

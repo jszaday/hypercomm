@@ -109,12 +109,9 @@ struct locality : public vil<CBase_locality, int> {
       // prepare and send a message
       f.set(message::make_message(0, {}));
       // request the remote value -> our callback
-      auto cb = std::make_shared<resuming_callback<unit_type>>(CthSelf());
+      auto cb = std::make_shared<resuming_callback<unit_type>>();
       self->request_future(g, cb);
-      // suspend if necessary
-      if (!cb->ready()) {
-        CthSuspend();
-      }
+      cb->wait(); // suspends if necessary
       // update the context after resume
       self->update_context();
     }
