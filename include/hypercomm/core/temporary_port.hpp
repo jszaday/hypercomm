@@ -5,7 +5,7 @@
 
 namespace hypercomm {
 
-template<typename... Ts>
+template <typename... Ts>
 struct temporary_port : public entry_port {
   using tuple_type = std::tuple<Ts...>;
 
@@ -27,7 +27,9 @@ struct temporary_port : public entry_port {
     return theirs && this->tag == theirs->tag;
   }
 
-  virtual hash_code hash(void) const override { return utilities::hash<tuple_type>()(tag); }
+  virtual hash_code hash(void) const override {
+    return utilities::hash<tuple_type>()(tag);
+  }
 
   virtual void __pup__(serdes& s) override { s | tag; }
 };
