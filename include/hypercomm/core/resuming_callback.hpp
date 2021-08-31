@@ -39,9 +39,7 @@ struct resuming_callback : public core::callback {
 
   inline const type& value(void) const { return this->result->value(); }
 
-  virtual void __pup__(serdes& s) override {
-    throw std::runtime_error("not yet implemented");
-  }
+  virtual void __pup__(serdes& s) override { NOT_IMPLEMENTED; }
 };
 }  // namespace hypercomm
 

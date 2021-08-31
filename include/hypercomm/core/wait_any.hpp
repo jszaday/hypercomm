@@ -30,9 +30,7 @@ struct wait_any_callback : public core::callback {
     }
   }
 
-  virtual void __pup__(serdes& s) override {
-    throw std::runtime_error("not yet implemented");
-  }
+  virtual void __pup__(serdes& s) override { NOT_IMPLEMENTED; }
 };
 
 // returns a pair with a value and an iterator pointing to a future
