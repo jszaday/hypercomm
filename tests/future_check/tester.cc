@@ -18,7 +18,10 @@ struct locality : public vil<CBase_locality, int> {
     auto f = this->make_future();
     auto value = hypercomm::make_unit_value();
     f.set(std::move(value));
-    while (!f.ready()) CthYield();
+    do {
+      CthYield();
+      this->update_context();
+    } while (!f.ready());
     this->contribute(CkCallback(CkCallback::ckExit));
   }
 };
