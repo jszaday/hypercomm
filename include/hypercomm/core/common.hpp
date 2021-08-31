@@ -5,7 +5,7 @@
 #include "../components/component.hpp"
 #include "callback.hpp"
 
-#define NOT_IMPLEMENTED CkAbort("not yet implemented")
+#define NOT_IMPLEMENTED CkAbort("not yet implemented!")
 
 namespace hypercomm {
 

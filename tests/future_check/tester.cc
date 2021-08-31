@@ -16,12 +16,20 @@ struct locality : public vil<CBase_locality, int> {
 
   void run(void) {
     auto f = this->make_future();
+    auto g = this->make_future();
+
     auto value = hypercomm::make_unit_value();
     f.set(std::move(value));
+
     do {
       CthYield();
       this->update_context();
     } while (!f.ready());
+
+    auto list = { f, g };
+    auto pair = wait_any(std::begin(list), std::end(list));
+    CkEnforce(f.equals(*pair.second));
+
     this->contribute(CkCallback(CkCallback::ckExit));
   }
 };

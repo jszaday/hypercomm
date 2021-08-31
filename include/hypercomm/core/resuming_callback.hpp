@@ -25,7 +25,7 @@ struct resuming_callback : public core::callback {
   }
 
   void wait(void) {
-    if (!this->result) {
+    if (!this->ready()) {
       CkAssert(this->th == nullptr);
       this->th = CthSelf();
       CkAssert(!CthIsMainThread(this->th));
@@ -33,13 +33,13 @@ struct resuming_callback : public core::callback {
     }
   }
 
+  inline bool ready(void) const { return (bool)this->result; }
+
   inline type& value(void) { return this->result->value(); }
 
   inline const type& value(void) const { return this->result->value(); }
 
-  virtual void __pup__(serdes& s) override {
-    throw std::runtime_error("not yet implemented");
-  }
+  virtual void __pup__(serdes& s) override { NOT_IMPLEMENTED; }
 };
 }  // namespace hypercomm
 
