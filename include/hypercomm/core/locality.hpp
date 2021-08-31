@@ -81,6 +81,8 @@ struct future_manager_ {
   virtual future make_future(void) = 0;
 
   virtual void request_future(const future& f, const callback_ptr& cb) = 0;
+
+  virtual bool check_future(const future&) const = 0;
 };
 
 template <typename Base, typename Index>
@@ -158,6 +160,8 @@ class vil : public Base,
 
   virtual void request_future(const future& f, const callback_ptr& cb) override;
 
+  virtual bool check_future(const future&) const override;
+
   template <typename Action>
   inline void receive_action(const Action& ptr) {
     ptr->action(this);
@@ -215,6 +219,11 @@ class vil : public Base,
     this->components[rdcr]->receive_value(0, std::move(contrib));
   }
 };
+
+inline bool future::ready(void) const {
+  auto* ctx = dynamic_cast<future_manager_*>(access_context_());
+  return ctx->check_future(*this);
+}
 
 template <typename T, typename Enable = void>
 struct get_argument;
@@ -312,6 +321,7 @@ inline void send2future(const future& f, component::value_type&& value) {
   auto src = std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(f.source);
   CkAssertMsg(src, "future must be from a locality!");
   auto port = std::make_shared<future_port>(f);
+  // TODO ( send immediately looking forward! )
   send2port(src, port, std::move(value));
 }
 
@@ -355,6 +365,18 @@ void vil<Base, Index>::request_future(const future& f, const callback_ptr& cb) {
     auto fwd = forward_to(std::move(ourElement), ourPort);
     auto opener = std::make_shared<port_opener>(ourPort, std::move(fwd));
     interceptor::send_async(home, pack_action(opener));
+  }
+}
+
+template <typename Base, typename Index>
+bool vil<Base, Index>::check_future(const future& f) const {
+  auto home = std::dynamic_pointer_cast<generic_element_proxy>(f.source);
+  auto elt = this->__element__();
+  if (home && home->equals(*elt)) {
+    auto port = std::make_shared<future_port>(f);
+    return this->has_value(std::move(port));
+  } else {
+    return false;
   }
 }
 

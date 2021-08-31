@@ -63,6 +63,9 @@ jobs:
         TESTOPTS="++local ++ppn 2 129" make test
         TESTOPTS="++local 65" make test
         TESTOPTS="++local 129" make test
+        echo "<!-- future_check --!>"
+        cd ../future_check
+        TESTOPTS="++local" make test
         echo "<!-- sdag_demo --!>"
         cd ../sdag_demo
         TESTOPTS="++local ++ppn 2 65" make test

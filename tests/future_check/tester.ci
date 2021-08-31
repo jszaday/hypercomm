@@ -1,0 +1,12 @@
+mainmodule tester {
+    mainchare main {
+        entry [nokeep] main(CkArgMsg*);
+    };
+
+    array [Max] locality : hypercomm::locality_base_ {
+        entry locality(void);
+        entry [threaded] void run(void);
+    };
+
+    initproc void setup_environment(void);
+}

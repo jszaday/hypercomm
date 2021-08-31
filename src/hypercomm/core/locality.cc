@@ -107,13 +107,22 @@ void generic_locality_::receive_value(const entry_port_ptr& port,
   auto search = this->entry_ports.find(port);
   if (search == std::end(this->entry_ports)) {
     // if it is not present, buffer it
-    port_queue[port].push_back(std::move(value));
+    this->port_queue[port].push_back(std::move(value));
     QdCreate(1);
   } else {
     // otherwise, try to deliver it
     CkAssertMsg(search->first && search->first->alive,
                 "entry port must be alive");
     this->try_send(search->second, std::move(value));
+  }
+}
+
+bool generic_locality_::has_value(const entry_port_ptr& port) const {
+  auto search = this->port_queue.find(port);
+  if (search != std::end(this->port_queue)) {
+    return !search->second.empty();
+  } else {
+    return false;
   }
 }
 

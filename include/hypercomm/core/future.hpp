@@ -34,6 +34,8 @@ struct future {
 
   inline void set(value_ptr&& value) { send2future(*this, std::move(value)); }
 
+  inline bool ready(void) const;
+
   inline hash_code hash(void) const {
     return hash_combine(source->hash(), hash_code(id));
   }
