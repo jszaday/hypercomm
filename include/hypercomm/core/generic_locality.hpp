@@ -33,6 +33,7 @@ class generic_locality_ : public virtual common_functions_ {
   void receive_message(CkMessage* msg);
   void receive_value(const entry_port_ptr& port, component::value_type&& value);
   void loopback(const entry_port_ptr& port, component::value_type&& value);
+  bool has_value(const entry_port_ptr& port) const;
 
   template <typename Destination>
   void open(const entry_port_ptr& ours, const Destination& theirs);
