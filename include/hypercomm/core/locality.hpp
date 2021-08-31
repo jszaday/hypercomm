@@ -398,4 +398,6 @@ void entry_port::take_back(value_ptr&& value) {
 }
 }  // namespace hypercomm
 
+#include "wait_any.hpp"
+
 #endif

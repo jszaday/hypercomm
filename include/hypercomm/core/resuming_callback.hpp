@@ -25,13 +25,15 @@ struct resuming_callback : public core::callback {
   }
 
   void wait(void) {
-    if (!this->result) {
+    if (!this->ready()) {
       CkAssert(this->th == nullptr);
       this->th = CthSelf();
       CkAssert(!CthIsMainThread(this->th));
       CthSuspend();
     }
   }
+
+  inline bool ready(void) const { return (bool)this->result; }
 
   inline type& value(void) { return this->result->value(); }
 
