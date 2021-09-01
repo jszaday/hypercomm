@@ -1,25 +1,51 @@
 #ifndef __HYPERCOMM_CORE_LOCALITY_MAP_HPP__
 #define __HYPERCOMM_CORE_LOCALITY_MAP_HPP__
 
-#include "../utilities.hpp"
+#include "../messaging/packing.hpp"
+#include "immediate.hpp"
 
 #include <hypercomm/core/locality.decl.h>
 
-class locality_map_ : public CkArrayMap {
+namespace hypercomm {
+namespace detail {
+// maps indices to PEs
+using mapper = immediate_action<int(const CkArrayIndex&)>;
+
+template <typename T>
+class default_mapper : public mapper {
   bool node_level_;
 
  public:
-  locality_map_(const bool& _1) : node_level_(_1) {}
-  locality_map_(CkMigrateMessage*) {}
+  default_mapper(const bool& _1) : node_level_(_1) {}
 
-  virtual int procNum(int, const CkArrayIndex& element) override {
-    const auto& idx = hypercomm::reinterpret_index<int>(element);
-
+  virtual int action(const CkArrayIndex& elt) override {
+    const auto& idx = hypercomm::reinterpret_index<T>(elt);
     if (node_level_) {
+      // return the first pe at the node
       return CkNodeFirst(idx % CkNumNodes());
     } else {
       return idx % CkNumPes();
     }
+  }
+
+  virtual void __pup__(serdes& s) override { s | this->node_level_; }
+};
+}  // namespace detail
+}  // namespace hypercomm
+
+class locality_map_ : public CkArrayMap {
+  std::shared_ptr<hypercomm::detail::mapper> mapper_;
+
+ public:
+  locality_map_(const bool& _1)
+      : mapper_(new hypercomm::detail::default_mapper<int>(_1)) {}
+
+  locality_map_(CkMessage* msg) { hypercomm::unpack(msg, this->mapper_); }
+
+  locality_map_(CkMigrateMessage*) {}
+
+  virtual int procNum(int, const CkArrayIndex& elt) override {
+    return this->mapper_->action(elt);
   }
 };
 

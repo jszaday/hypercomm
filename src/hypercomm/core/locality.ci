@@ -1,5 +1,6 @@
 module locality {
     group locality_map_ : CkArrayMap {
-        entry locality_map_(const bool& node_level);
+        entry locality_map_(bool);
+        entry locality_map_(CkMessage*);
     };
 }
