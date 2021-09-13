@@ -444,14 +444,11 @@ struct puper<std::shared_ptr<T>,
     if (rec.is_null()) {
       ::new (&t) std::shared_ptr<T>();
     } else if (rec.is_instance()) {
-      auto ins = false;
       if (is_bytes<T>()) {
         ::new (&t) std::shared_ptr<T>(std::move(s.source.lock()),
                                       reinterpret_cast<T*>(s.current));
 
         s.advance<T>();
-
-        ins = s.put_instance(rec.d.instance.id, t);
       } else {
         // allocate memory for the object
         auto* p = (T*)aligned_alloc(alignof(T), sizeof(T));
@@ -464,10 +461,9 @@ struct puper<std::shared_ptr<T>,
           p->~T();
           free(p);
         });
-        // then place it as an instance within the registry
-        ins = s.put_instance(rec.d.instance.id, t);
       }
-      CkAssertMsg(ins, "instance insertion did not occur!");
+      CkAssertMsg(s.put_instance(rec.d.instance.id, t),
+                  "instance insertion did not occur!");
     } else if (rec.is_reference()) {
       ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.d.reference.id));
     } else {
