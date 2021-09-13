@@ -453,20 +453,19 @@ struct puper<std::shared_ptr<T>,
 
         ins = s.put_instance(rec.d.instance.id, t);
       } else {
-        // allocate and create a shared pointer for the object
-        std::shared_ptr<void> vsp(aligned_alloc(alignof(T), sizeof(T)),
-                                  [](void* p) {
-                                    ((T*)p)->~T();
-                                    free(p);
-                                  });
-        // and place it as an instance within the registry
-        ins = s.put_instance(rec.d.instance.id, vsp);
+        // allocate memory for the object
+        auto* p = (T*)aligned_alloc(alignof(T), sizeof(T));
         // then reconstruct it
-        pup(s, *((T*)vsp.get()));
-        // the object must be reconstructed before typed shared
+        pup(s, *p);
+        // the object must be reconstructed before any shared
         // ptrs in case it's shared_from_this enabled. it will
         // result in subtle failures otherwise.
-        ::new (&t) std::shared_ptr<T>(std::static_pointer_cast<T>(vsp));
+        ::new (&t) std::shared_ptr<T>(p, [](T* p) {
+          p->~T();
+          free(p);
+        });
+        // then place it as an instance within the registry
+        ins = s.put_instance(rec.d.instance.id, t);
       }
       CkAssertMsg(ins, "instance insertion did not occur!");
     } else if (rec.is_reference()) {
