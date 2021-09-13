@@ -444,22 +444,31 @@ struct puper<std::shared_ptr<T>,
     if (rec.is_null()) {
       ::new (&t) std::shared_ptr<T>();
     } else if (rec.is_instance()) {
+      auto ins = false;
       if (is_bytes<T>()) {
         ::new (&t) std::shared_ptr<T>(std::move(s.source.lock()),
                                       reinterpret_cast<T*>(s.current));
+
         s.advance<T>();
+
+        ins = s.put_instance(rec.d.instance.id, t);
       } else {
-        auto p = (T*)(aligned_alloc(alignof(T), sizeof(T)));
-        ::new (&t) std::shared_ptr<T>(p, [](T* p) {
-          p->~T();
-          free(p);
-        });
+        // allocate and create a shared pointer for the object
+        std::shared_ptr<void> vsp(aligned_alloc(alignof(T), sizeof(T)),
+                                  [](void* p) {
+                                    ((T*)p)->~T();
+                                    free(p);
+                                  });
+        // and place it as an instance within the registry
+        ins = s.put_instance(rec.d.instance.id, vsp);
+        // then reconstruct it
+        pup(s, *((T*)vsp.get()));
+        // the object must be reconstructed before typed shared
+        // ptrs in case it's shared_from_this enabled. it will
+        // result in subtle failures otherwise.
+        ::new (&t) std::shared_ptr<T>(std::static_pointer_cast<T>(vsp));
       }
-      CkAssertMsg(s.put_instance(rec.d.instance.id, t),
-                  "instance insertion did not occur!");
-      if (!is_bytes<T>()) {
-        pup(s, *t);
-      }
+      CkAssertMsg(ins, "instance insertion did not occur!");
     } else if (rec.is_reference()) {
       ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.d.reference.id));
     } else {

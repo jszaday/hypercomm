@@ -19,7 +19,11 @@ class serdes {
   template <typename K, typename V>
   using owner_less_map = std::map<K, V, std::owner_less<K>>;
 
+  std::map<ptr_id_t, std::weak_ptr<void>> instances;
+
  public:
+  owner_less_map<std::weak_ptr<void>, ptr_id_t> records;
+
   enum state_t { SIZING, PACKING, UNPACKING };
 
   const std::weak_ptr<void> source;
@@ -27,10 +31,6 @@ class serdes {
   char* current;
   const state_t state;
 
-  owner_less_map<std::weak_ptr<void>, ptr_id_t> records;
-  std::map<ptr_id_t, std::weak_ptr<void>> instances;
-
- private:
   serdes(const std::shared_ptr<void>& _1, const char* _2)
       : source(_1),
         start(_2),
