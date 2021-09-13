@@ -228,7 +228,7 @@ inline static void pack_ptr(serdes& s, std::shared_ptr<T>& p,
       ptr_record rec(search->second);
       pup(s, rec);
     } else {
-      auto id = s.records.size();
+      auto id = s.records.size() + 1;
       ptr_record rec(id, f());
       pup(s, rec);
       s.records[p] = id;
@@ -303,11 +303,11 @@ class puper<std::shared_ptr<T>,
         std::shared_ptr<polymorph> p;
         if (rec.is_instance()) {
           p.reset(hypercomm::instantiate(rec.d.instance.ty));
-          s.instances[rec.d.instance.id] = p;
+          CkAssertMsg(s.put_instance(rec.d.instance.id, p),
+                      "instance insertion did not occur!");
           p->__pup__(s);
         } else if (rec.is_reference()) {
-          p = std::static_pointer_cast<polymorph>(
-              s.instances[rec.d.reference.id].lock());
+          p = s.get_instance<polymorph>(rec.d.reference.id);
         } else {
           CkAbort("unknown record type %d", static_cast<int>(rec.t));
         }
@@ -449,19 +449,19 @@ struct puper<std::shared_ptr<T>,
                                       reinterpret_cast<T*>(s.current));
         s.advance<T>();
       } else {
-        auto p = static_cast<T*>(malloc(sizeof(T)));
+        auto p = (T*)(aligned_alloc(alignof(T), sizeof(T)));
         ::new (&t) std::shared_ptr<T>(p, [](T* p) {
           p->~T();
           free(p);
         });
       }
-      s.instances[rec.d.instance.id] = t;
+      CkAssertMsg(s.put_instance(rec.d.instance.id, t),
+                  "instance insertion did not occur!");
       if (!is_bytes<T>()) {
         pup(s, *t);
       }
     } else if (rec.is_reference()) {
-      ::new (&t) std::shared_ptr<T>(
-          std::static_pointer_cast<T>(s.instances[rec.d.reference.id].lock()));
+      ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.d.reference.id));
     } else {
       CkAbort("unknown record type %d", static_cast<int>(rec.t));
     }
