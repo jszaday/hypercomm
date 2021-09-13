@@ -25,7 +25,7 @@ inline serdes& operator|(serdes& s, T& t) {
 
 template <typename T>
 inline size_t size(const T& t) {
-  auto s = serdes::make_sizer();
+  sizer s;
   pup(s, const_cast<T&>(t));
   return s.size();
 }
@@ -34,12 +34,12 @@ template <typename T>
 void interpup(PUP::er& p, T& t) {
   if (typeid(p) == typeid(PUP::fromMem)) {
     auto& mem = *static_cast<PUP::fromMem*>(&p);
-    auto s = serdes::make_unpacker(nullptr, mem.get_current_pointer());
+    unpacker s(nullptr, mem.get_current_pointer());
     pup(s, t);
     mem.advance(s.size());
   } else if (typeid(p) == typeid(PUP::toMem)) {
     auto& mem = *static_cast<PUP::toMem*>(&p);
-    auto s = serdes::make_packer(mem.get_current_pointer());
+    packer s(mem.get_current_pointer());
     pup(s, t);
     mem.advance(s.size());
   } else if (typeid(p) == typeid(PUP::sizer)) {
@@ -228,7 +228,7 @@ inline static void pack_ptr(serdes& s, std::shared_ptr<T>& p,
       ptr_record rec(search->second);
       pup(s, rec);
     } else {
-      auto id = s.records.size();
+      auto id = s.records.size() + 1;
       ptr_record rec(id, f());
       pup(s, rec);
       s.records[p] = id;
@@ -303,11 +303,11 @@ class puper<std::shared_ptr<T>,
         std::shared_ptr<polymorph> p;
         if (rec.is_instance()) {
           p.reset(hypercomm::instantiate(rec.d.instance.ty));
-          s.instances[rec.d.instance.id] = p;
+          CkAssertMsg(s.put_instance(rec.d.instance.id, p),
+                      "instance insertion did not occur!");
           p->__pup__(s);
         } else if (rec.is_reference()) {
-          p = std::static_pointer_cast<polymorph>(
-              s.instances[rec.d.reference.id].lock());
+          p = s.get_instance<polymorph>(rec.d.reference.id);
         } else {
           CkAbort("unknown record type %d", static_cast<int>(rec.t));
         }
@@ -447,21 +447,25 @@ struct puper<std::shared_ptr<T>,
       if (is_bytes<T>()) {
         ::new (&t) std::shared_ptr<T>(std::move(s.source.lock()),
                                       reinterpret_cast<T*>(s.current));
+
         s.advance<T>();
       } else {
-        auto p = static_cast<T*>(malloc(sizeof(T)));
+        // allocate memory for the object
+        auto* p = (T*)aligned_alloc(alignof(T), sizeof(T));
+        // then reconstruct it
+        pup(s, *p);
+        // the object must be reconstructed before any shared
+        // ptrs in case it's shared_from_this enabled. it will
+        // result in subtle failures otherwise.
         ::new (&t) std::shared_ptr<T>(p, [](T* p) {
           p->~T();
           free(p);
         });
       }
-      s.instances[rec.d.instance.id] = t;
-      if (!is_bytes<T>()) {
-        pup(s, *t);
-      }
+      CkAssertMsg(s.put_instance(rec.d.instance.id, t),
+                  "instance insertion did not occur!");
     } else if (rec.is_reference()) {
-      ::new (&t) std::shared_ptr<T>(
-          std::static_pointer_cast<T>(s.instances[rec.d.reference.id].lock()));
+      ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.d.reference.id));
     } else {
       CkAbort("unknown record type %d", static_cast<int>(rec.t));
     }

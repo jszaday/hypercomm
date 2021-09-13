@@ -8,7 +8,7 @@
 namespace hypercomm {
 template <typename... Args>
 void unpack(std::shared_ptr<CkMessage>&& msg, Args&... args) {
-  auto s = serdes::make_unpacker(msg, utilities::get_message_buffer(msg));
+  unpacker s(msg, utilities::get_message_buffer(msg));
   hypercomm::pup(s, std::forward_as_tuple(args...));
 }
 
@@ -20,9 +20,9 @@ void unpack(CkMessage* msg, Args&... args) {
 
 template <typename... Args>
 std::size_t pack_into(char* buf, const std::tuple<Args&...>& args) {
-  auto packer = hypercomm::serdes::make_packer(buf);
-  hypercomm::pup(packer, args);
-  return packer.size();
+  packer s(buf);
+  hypercomm::pup(s, args);
+  return s.size();
 }
 
 template <typename... Args>
