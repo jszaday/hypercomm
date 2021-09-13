@@ -18,8 +18,8 @@ void *__msg__::pack(__msg__ *msg) {
   const auto avail_size = std::size_t(msg->payload) - hdr_size;
   const auto real_size = hypercomm::size(msg->dst);
   if (real_size <= avail_size) {
-    auto packer = hypercomm::serdes::make_packer((char *)msg + hdr_size);
-    hypercomm::pup(packer, msg->dst);
+    packer s((char *)msg + hdr_size);
+    hypercomm::pup(s, msg->dst);
     return (void *)msg;
   } else {
     // TODO introduce HYPERCOMM_NO_COPYING and abort only when undefined
@@ -37,10 +37,9 @@ __msg__ *__msg__::unpack(void *buf) {
   CkPrintf("info@%d> unpacking a %lu byte port from: %s\n", CkMyPe(),
            expected_size, str.c_str());
 #endif
-  auto unpacker = hypercomm::serdes::make_unpacker(std::shared_ptr<void>{},
-                                                   (char *)msg + hdr_size);
-  hypercomm::pup(unpacker, msg->dst);
-  CkAssertMsg(expected_size >= unpacker.size(), "entry port size changed");
+  unpacker s(std::shared_ptr<void>{}, (char *)msg + hdr_size);
+  hypercomm::pup(s, msg->dst);
+  CkAssertMsg(expected_size >= s.size(), "entry port size changed");
   return msg;
 }
 

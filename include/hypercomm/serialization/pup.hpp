@@ -25,7 +25,7 @@ inline serdes& operator|(serdes& s, T& t) {
 
 template <typename T>
 inline size_t size(const T& t) {
-  auto s = serdes::make_sizer();
+  sizer s;
   pup(s, const_cast<T&>(t));
   return s.size();
 }
@@ -34,12 +34,12 @@ template <typename T>
 void interpup(PUP::er& p, T& t) {
   if (typeid(p) == typeid(PUP::fromMem)) {
     auto& mem = *static_cast<PUP::fromMem*>(&p);
-    auto s = serdes::make_unpacker(nullptr, mem.get_current_pointer());
+    unpacker s(nullptr, mem.get_current_pointer());
     pup(s, t);
     mem.advance(s.size());
   } else if (typeid(p) == typeid(PUP::toMem)) {
     auto& mem = *static_cast<PUP::toMem*>(&p);
-    auto s = serdes::make_packer(mem.get_current_pointer());
+    packer s(mem.get_current_pointer());
     pup(s, t);
     mem.advance(s.size());
   } else if (typeid(p) == typeid(PUP::sizer)) {

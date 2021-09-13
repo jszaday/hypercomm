@@ -119,7 +119,7 @@ class vil : public Base,
     this->update_context();
 
     auto msg = utilities::wrap_message(_1);
-    auto s = serdes::make_unpacker(msg, utilities::get_message_buffer(msg));
+    unpacker s(msg, utilities::get_message_buffer(msg));
 
     bool typed;
     s | typed;
