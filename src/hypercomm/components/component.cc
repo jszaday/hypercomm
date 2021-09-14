@@ -20,11 +20,11 @@ using incoming_type = component::incoming_type;
 
 // find any records that are ready, i.e., they have all the expected values
 inline incoming_type::iterator find_ready(incoming_type& incoming,
-                                                  const int& n_needed) {
+                                          const int& n_needed) {
   auto search = incoming.rbegin();
   for (; search != incoming.rend(); search++) {
     if (n_needed == search->size()) {
-      return search.base();
+      return search.base() - 1;
     }
   }
   return std::end(incoming);
@@ -55,12 +55,12 @@ void component::activate(void) {
 
 // find a value set that has a "gap", or missing value,
 // at the specified port
-inline incoming_type::iterator find_gap(
-    incoming_type& incoming, const component::port_type& which) {
+inline incoming_type::iterator find_gap(incoming_type& incoming,
+                                        const component::port_type& which) {
   auto search = incoming.rbegin();
   for (; search != incoming.rend(); search++) {
     if (search->find(which) == search->end()) {
-      return search.base();
+      return search.base() - 1;
     }
   }
   return std::end(incoming);
