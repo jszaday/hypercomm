@@ -139,7 +139,7 @@ class component : virtual public impermanent {
   std::map<port_type, std::deque<callback_ptr>> routes;
 
  private:
-  void stage_action(incoming_type::reverse_iterator*);
+  void stage_action(incoming_type::iterator*);
 
   void on_invalidation(void);
 
