@@ -19,15 +19,15 @@ bool component::collectible(void) const {
 using incoming_type = component::incoming_type;
 
 // find any records that are ready, i.e., they have all the expected values
-inline incoming_type::reverse_iterator find_ready(incoming_type& incoming,
-                                                  const int& n_needed) {
+inline incoming_type::iterator find_ready(incoming_type& incoming,
+                                          const int& n_needed) {
   auto search = incoming.rbegin();
   for (; search != incoming.rend(); search++) {
     if (n_needed == search->size()) {
-      return search;
+      return search.base() - 1;
     }
   }
-  return search;
+  return std::end(incoming);
 }
 
 // activates a component, enabling it to execute
@@ -41,36 +41,43 @@ void component::activate(void) {
     // if none, we can stage the action of the component
     this->stage_action(nullptr);
   } else {
-    incoming_type::reverse_iterator search;
     // otherwise, stage all ready values (while we are alive)
-    while (this->alive && (this->incoming.rend() !=
-                           (search = find_ready(this->incoming, n_expt)))) {
-      this->stage_action(&search);
+    while (this->alive) {
+      auto search = find_ready(this->incoming, n_expt);
+      if (search == std::end(this->incoming)) {
+        break;
+      } else {
+        this->stage_action(&search);
+      }
     }
   }
 }
 
 // find a value set that has a "gap", or missing value,
 // at the specified port
-inline incoming_type::reverse_iterator find_gap(
-    incoming_type& incoming, const component::port_type& which) {
+inline incoming_type::iterator find_gap(incoming_type& incoming,
+                                        const component::port_type& which) {
   auto search = incoming.rbegin();
   for (; search != incoming.rend(); search++) {
     if (search->find(which) == search->end()) {
-      return search;
+      return search.base() - 1;
     }
   }
-  return search;
+  return std::end(incoming);
 }
 
 // this should only be called with a ready value set,
 // this may be "nullptr" when components require no values.
-void component::stage_action(incoming_type::reverse_iterator* search) {
+void component::stage_action(incoming_type::iterator* search) {
   // when a component is alive:
   if (this->alive) {
-    // act using available values, consuming them
+    // use whichever values are available
     auto values = search ? this->action(std::move(**search)) : this->action({});
-    if (search) this->incoming.erase(search->base());
+    // erase values from the list to consume them
+    if (search) {
+      CkAssert(*search != std::end(this->incoming));
+      this->incoming.erase(*search);
+    }
     // send the results downstream
     this->unspool_values(values);
     // determine whether we persist after acting
@@ -156,11 +163,11 @@ void component::receive_value(const port_type& port, value_type&& value) {
     // look for a value set missing a value for this port
     auto search = find_gap(this->incoming, port);
     // if one is not found:
-    if (search == this->incoming.rend()) {
+    if (search == std::end(this->incoming)) {
       // create a new set, and put it at the head of the buffer
       this->incoming.emplace_front(make_set(port, std::move(value)));
       // then, update the search iterator
-      search = this->incoming.rbegin();
+      search = std::begin(this->incoming);
     } else {
       // otherwise, update the found value set
       auto ins = (*search).emplace(port, std::move(value));
