@@ -156,21 +156,29 @@ void generic_locality_::receive_message(CkMessage* msg) {
   }
 }
 
+// TODO ( make this migration robust! )
 struct zero_copy_payload_ {
  private:
   generic_locality_* parent_;
   entry_port_ptr dst_;
 
  public:
-  // TODO make this migration robust!
   zero_copy_payload_(generic_locality_* _1, entry_port_ptr&& _2)
   : parent_(_1), dst_(std::move(_2)) {}
 
   static void action_(zero_copy_payload_* self, CkDataMsg* msg) {
+    QdProcess(1);
     auto* buf = (CkNcpyBuffer*)(msg->data);
-    // self->parent_->update_context();
-    // self->parent_->receive_value(self->dst_, ...);
-    CkFreeMsg(msg);
+    std::shared_ptr<void> ptr(
+      const_cast<void*>(buf->ptr),
+      [=](void*) {
+        buf->deregisterMem();
+        CkFreeMsg(msg);
+      }
+    );
+    auto val = make_value<buffer_value>(std::move(ptr), buf->cnt);
+    self->parent_->update_context();
+    self->parent_->receive_value(self->dst_, std::move(val));
   }
 };
 
@@ -187,6 +195,7 @@ void generic_locality_::demux_message(message* msg) {
                   new zero_copy_payload_(this, std::move(port)));
     CkNcpyBuffer dest(mem, src.cnt, cb, CK_BUFFER_UNREG);
 
+    QdCreate(1);
     dest.get(src);
   } else {
     this->receive_value(port, msg2value(msg));

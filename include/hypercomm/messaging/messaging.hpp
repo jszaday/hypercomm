@@ -60,6 +60,29 @@ struct __msg__ : public CMessage___msg__ {
 };
 
 }  // namespace messaging
+
+inline value_ptr msg2value(message *msg) {
+  if (msg->is_null()) {
+    CkFreeMsg(msg);
+    return nullptr;
+  } else {
+    CkAssertMsg(!msg->is_zero_copy(), "value for msg unavailable!");
+    return make_value<plain_value>(msg);
+  }
+}
+
+inline value_ptr msg2value(typename hyper_value::message_type msg) {
+  if (UsrToEnv(msg)->getMsgIdx() == message::index()) {
+    return msg2value((message*)msg);
+  } else {
+    return make_value<plain_value>(msg);
+  }
+}
+
+inline std::unique_ptr<plain_value> msg2value(
+    std::shared_ptr<CkMessage>&& msg) {
+  return make_value<plain_value>(utilities::unwrap_message(std::move(msg)));
+}
 }  // namespace hypercomm
 
 #endif

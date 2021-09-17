@@ -12,12 +12,7 @@ struct payload;
 
 using payload_ptr = std::unique_ptr<payload>;
 
-void delete_value_(hyper_value* value, CkDataMsg* msg) {
-  delete value;
-  auto* buf = (CkNcpyBuffer *)(msg->data);
-  buf->deregisterMem();
-  CkFreeMsg(msg);
-}
+void delete_value_(hyper_value* value, CkDataMsg* msg);
 
 struct payload {
  private:

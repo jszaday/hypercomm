@@ -30,6 +30,7 @@ class generic_locality_ : public virtual common_functions_ {
   generic_locality_(void) { this->update_context(); }
   virtual ~generic_locality_();
 
+  void update_context(void);
   void demux_message(message* msg);
   void receive_message(CkMessage* msg);
   void receive_value(const entry_port_ptr& port, component::value_type&& value);
@@ -84,7 +85,6 @@ class generic_locality_ : public virtual common_functions_ {
 
  protected:
   bool invalidated(const component::id_t& id);
-  void update_context(void);
 
  private:
   template <typename A>

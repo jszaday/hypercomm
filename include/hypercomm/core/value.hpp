@@ -66,32 +66,22 @@ class plain_value : public hyper_value {
   }
 };
 
+class buffer_value: public hyper_value {
+ public:
+  std::shared_ptr<void> buffer;
+  std::size_t size;
+
+  buffer_value(const std::shared_ptr<void>& _1, const std::size_t& _2)
+  : buffer(_1), size(_2) {}
+
+  virtual bool recastable(void) const override { return (bool)this->buffer; }
+
+  virtual message_type release(void) override { return nullptr; }
+};
+
 template <typename T, typename... Args>
 inline std::unique_ptr<T> make_value(Args... args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-}
-
-inline value_ptr msg2value(message *msg) {
-  if (msg->is_null()) {
-    CkFreeMsg(msg);
-    return nullptr;
-  } else {
-    CkAssertMsg(!msg->is_zero_copy(), "value for msg unavailable!");
-    return make_value<plain_value>(msg);
-  }
-}
-
-inline value_ptr msg2value(typename hyper_value::message_type msg) {
-  if (UsrToEnv(msg)->getMsgIdx() == message::index()) {
-    return msg2value((message*)msg);
-  } else {
-    return make_value<plain_value>(msg);
-  }
-}
-
-inline std::unique_ptr<plain_value> msg2value(
-    std::shared_ptr<CkMessage>&& msg) {
-  return make_value<plain_value>(utilities::unwrap_message(std::move(msg)));
 }
 }  // namespace hypercomm
 

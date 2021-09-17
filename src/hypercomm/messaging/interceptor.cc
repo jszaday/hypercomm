@@ -7,6 +7,15 @@ namespace hypercomm {
 
 CkpvDeclare(CProxy_interceptor, interceptor_);
 
+namespace detail {
+void delete_value_(hyper_value* value, CkDataMsg* msg) {
+  delete value;
+  auto* buf = (CkNcpyBuffer *)(msg->data);
+  buf->deregisterMem();
+  CkFreeMsg(msg);
+}
+}
+
 namespace messaging {
 void initialize(void) {
   // register the messaging module (on rank 0)
