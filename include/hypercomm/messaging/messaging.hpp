@@ -10,7 +10,7 @@ namespace messaging {
 static constexpr auto __null_msg__ =
     std::numeric_limits<CMK_REFNUM_TYPE>::max();
 
-enum __attribs__ : std::uint8_t { kNull = 0, kRedn = 1 };
+enum __attribs__ : std::uint8_t { kNull = 0, kRedn = 1, kZeroCopy = 2 };
 
 struct __msg__ : public CMessage___msg__ {
   entry_port_ptr dst;
@@ -22,6 +22,10 @@ struct __msg__ : public CMessage___msg__ {
                                const entry_port_ptr &dst);
   static __msg__ *make_null_message(const entry_port_ptr &dst);
 
+  inline bool is_zero_copy(void) const {
+    return UsrToEnv(this)->getRef() & (0b1 << __attribs__::kZeroCopy);
+  }
+
   inline bool is_null(void) const {
     return UsrToEnv(this)->getRef() & (0b1 << __attribs__::kNull);
   }
@@ -30,18 +34,29 @@ struct __msg__ : public CMessage___msg__ {
     return UsrToEnv(this)->getRef() & (0b1 << __attribs__::kRedn);
   }
 
-  inline void set_redn(const bool &value) const {
-    constexpr auto mask = 0b1 << __attribs__::kRedn;
-    auto ref = UsrToEnv(this)->getRef();
+  inline void set_redn(const bool &value) {
+    this->set_flag_<kRedn>(value);
+  }
+
+  inline void set_zero_copy(const bool &value) {
+    this->set_flag_<kZeroCopy>(value);
+  }
+
+  static inline const int &index(void) { return __idx; }
+
+ private:
+  template<__attribs__ which>
+  inline void set_flag_(const bool& value) {
+    constexpr auto mask = 0b1 << which;
+    auto* env = UsrToEnv(this);
+    auto ref = env->getRef();
     if (value) {
       ref |= mask;
     } else {
       ref &= ~mask;
     }
-    UsrToEnv(this)->setRef(ref);
+    env->setRef(ref);
   }
-
-  static inline const int &index(void) { return __idx; }
 };
 
 }  // namespace messaging

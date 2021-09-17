@@ -147,13 +147,49 @@ generic_locality_::~generic_locality_() {
 
 void generic_locality_::receive_message(CkMessage* msg) {
   auto* env = UsrToEnv(msg);
-  auto idx = env->getEpIdx();
-  if (idx == CkIndex_locality_base_::idx_demux_CkMessage()) {
-    auto* cast = (message*)msg;
+  auto epIdx = env->getEpIdx();
+  if (epIdx == CkIndex_locality_base_::idx_demux_CkMessage()) {
     CkAssert(env->getMsgIdx() == message::index());
-    this->receive_value(cast->dst, msg2value(cast));
+    this->demux_message((message*)msg);
   } else {
-    _entryTable[idx]->call(msg, dynamic_cast<CkMigratable*>(this));
+    _entryTable[epIdx]->call(msg, dynamic_cast<CkMigratable*>(this));
+  }
+}
+
+struct zero_copy_payload_ {
+ private:
+  generic_locality_* parent_;
+  entry_port_ptr dst_;
+
+ public:
+  // TODO make this migration robust!
+  zero_copy_payload_(generic_locality_* _1, entry_port_ptr&& _2)
+  : parent_(_1), dst_(std::move(_2)) {}
+
+  static void action_(zero_copy_payload_* self, CkDataMsg* msg) {
+    auto* buf = (CkNcpyBuffer*)(msg->data);
+    // self->parent_->update_context();
+    // self->parent_->receive_value(self->dst_, ...);
+    CkFreeMsg(msg);
+  }
+};
+
+void generic_locality_::demux_message(message* msg) {
+  this->update_context();
+  auto port = std::move(msg->dst);
+  if (msg->is_zero_copy()) {
+    CkNcpyBuffer src;
+    PUP::fromMem p(msg->payload);
+    p | src;
+
+    void* mem = malloc(src.cnt);
+    CkCallback cb((CkCallbackFn)&zero_copy_payload_::action_,
+                  new zero_copy_payload_(this, std::move(port)));
+    CkNcpyBuffer dest(mem, src.cnt, cb, CK_BUFFER_UNREG);
+
+    dest.get(src);
+  } else {
+    this->receive_value(port, msg2value(msg));
   }
 }
 

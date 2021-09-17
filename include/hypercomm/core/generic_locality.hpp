@@ -30,6 +30,7 @@ class generic_locality_ : public virtual common_functions_ {
   generic_locality_(void) { this->update_context(); }
   virtual ~generic_locality_();
 
+  void demux_message(message* msg);
   void receive_message(CkMessage* msg);
   void receive_value(const entry_port_ptr& port, component::value_type&& value);
   void loopback(const entry_port_ptr& port, component::value_type&& value);

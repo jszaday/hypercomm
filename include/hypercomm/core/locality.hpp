@@ -138,16 +138,7 @@ class vil : public Base,
   /* NOTE ( this is a mechanism for demux'ing an incoming message
    *        to the appropriate entry port )
    */
-  virtual void demux(message* msg) override {
-    this->update_context();
-    auto nullify = [&](void) {
-      CkFreeMsg(msg);
-      return value_ptr();
-    };
-    auto port = msg->dst;
-    auto value = msg->is_null() ? nullify() : msg2value(msg);
-    this->receive_value(port, std::move(value));
-  }
+  virtual void demux(message* msg) override { this->demux_message(msg); }
 
   virtual const Index& __index__(void) const {
     return reinterpret_index<Index>(this->__base_index__());

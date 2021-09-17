@@ -22,8 +22,12 @@ class hyper_value {
   source_type source;
 
   virtual ~hyper_value() = default;
-  virtual bool recastable(void) const = 0;
   virtual message_type release(void) = 0;
+
+  virtual bool recastable(void) const = 0;
+  virtual std::pair<void*, std::size_t> as_nocopy(void) const {
+    return std::make_pair(nullptr, 0);
+  }
 };
 
 inline void try_return(value_ptr&& value) {
@@ -67,9 +71,22 @@ inline std::unique_ptr<T> make_value(Args... args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
-inline std::unique_ptr<plain_value> msg2value(
-    typename hyper_value::message_type msg) {
-  return make_value<plain_value>(msg);
+inline value_ptr msg2value(message *msg) {
+  if (msg->is_null()) {
+    CkFreeMsg(msg);
+    return nullptr;
+  } else {
+    CkAssertMsg(!msg->is_zero_copy(), "value for msg unavailable!");
+    return make_value<plain_value>(msg);
+  }
+}
+
+inline value_ptr msg2value(typename hyper_value::message_type msg) {
+  if (UsrToEnv(msg)->getMsgIdx() == message::index()) {
+    return msg2value((message*)msg);
+  } else {
+    return make_value<plain_value>(msg);
+  }
 }
 
 inline std::unique_ptr<plain_value> msg2value(

@@ -143,8 +143,6 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
   auto& opts = payload->options_;
 
   if (immediate) {
-    cast->update_context();
-
     if (payload->type_ == kMessage) {
       auto& msg = opts.msg_;
 #if CMK_VERBOSE
@@ -160,6 +158,8 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
                (port->to_string()).c_str(),
                utilities::idx2str(elt->ckGetArrayIndex()).c_str());
 #endif
+      // update context so everything's kosher
+      cast->update_context();
       // dump both the port and value since we don't need them after this
       cast->receive_value(std::move(port), std::move(opts.value_.value_));
     }
