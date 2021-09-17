@@ -107,10 +107,11 @@ struct validate_chunga : public hypercomm::component {
 
   virtual value_set action(value_set&& values) override {
     auto val = std::move(values[0]);
-    auto buf = dynamic_cast<buffer_value*>(val.get());
-    if (buf != nullptr) {
+    auto is_buf = dynamic_cast<buffer_value*>(val.get()) != nullptr;
+    if (is_buf) {
       CkPrintf("com%lu> big chungus has arrived... via zerocopy!.\n", this->id);
-      auto valid = big_chungus<T>::is_valid(buf->payload<T>());
+      auto typed = value2typed<int>(std::move(val));
+      auto valid = big_chungus<T>::is_valid(typed->get());
       CkEnforceMsg(valid, "bad chunga!");
     }
     return {};

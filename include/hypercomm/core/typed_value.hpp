@@ -78,10 +78,23 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
   if (try_cast) {
     return std::unique_ptr<typed_value<T>>(try_cast);
   } else if (value->recastable()) {
-    auto typed = typed_value<T>::from_message(value->release());
-    typed->source = value->source;
-    delete value;
-    return std::move(typed);
+    auto* try_buff = dynamic_cast<buffer_value*>(value);
+    if (try_buff) {
+      auto typed = make_value<typed_value_impl_<T, kBuffer>>(tags::no_init{});
+      CkAssertMsg(is_bytes<T>(), "only bytes-based codepath is extant");
+      auto offset = try_buff->payload<T>();
+      ::new (&typed->tmp.data) std::shared_ptr<T>(
+        std::move(try_buff->source),
+        offset
+      );
+      delete value;
+      return std::move(typed);
+    } else {
+      auto typed = typed_value<T>::from_message(value->release());
+      typed->source = value->source;
+      delete value;
+      return std::move(typed);
+    }
   } else {
     CkAbort("invalid cast!");
   }
