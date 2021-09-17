@@ -34,9 +34,7 @@ struct __msg__ : public CMessage___msg__ {
     return UsrToEnv(this)->getRef() & (0b1 << __attribs__::kRedn);
   }
 
-  inline void set_redn(const bool &value) {
-    this->set_flag_<kRedn>(value);
-  }
+  inline void set_redn(const bool &value) { this->set_flag_<kRedn>(value); }
 
   inline void set_zero_copy(const bool &value) {
     this->set_flag_<kZeroCopy>(value);
@@ -45,10 +43,10 @@ struct __msg__ : public CMessage___msg__ {
   static inline const int &index(void) { return __idx; }
 
  private:
-  template<__attribs__ which>
-  inline void set_flag_(const bool& value) {
+  template <__attribs__ which>
+  inline void set_flag_(const bool &value) {
     constexpr auto mask = 0b1 << which;
-    auto* env = UsrToEnv(this);
+    auto *env = UsrToEnv(this);
     auto ref = env->getRef();
     if (value) {
       ref |= mask;
@@ -73,14 +71,14 @@ inline value_ptr msg2value(message *msg) {
 
 inline value_ptr msg2value(typename hyper_value::message_type msg) {
   if (UsrToEnv(msg)->getMsgIdx() == message::index()) {
-    return msg2value((message*)msg);
+    return msg2value((message *)msg);
   } else {
     return make_value<plain_value>(msg);
   }
 }
 
 inline std::unique_ptr<plain_value> msg2value(
-    std::shared_ptr<CkMessage>&& msg) {
+    std::shared_ptr<CkMessage> &&msg) {
   return make_value<plain_value>(utilities::unwrap_message(std::move(msg)));
 }
 }  // namespace hypercomm

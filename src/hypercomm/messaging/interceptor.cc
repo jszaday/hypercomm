@@ -10,11 +10,11 @@ CkpvDeclare(CProxy_interceptor, interceptor_);
 namespace detail {
 void delete_value_(hyper_value* value, CkDataMsg* msg) {
   delete value;
-  auto* buf = (CkNcpyBuffer *)(msg->data);
+  auto* buf = (CkNcpyBuffer*)(msg->data);
   buf->deregisterMem();
   CkFreeMsg(msg);
 }
-}
+}  // namespace detail
 
 namespace messaging {
 void initialize(void) {

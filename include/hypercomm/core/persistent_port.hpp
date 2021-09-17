@@ -23,7 +23,9 @@ struct persistent_port : public entry_port {
     return theirs && this->id == theirs->id;
   }
 
-  virtual hash_code hash(void) const override { return hash_code(id); }
+  virtual hash_code hash(void) const override {
+    return std::hash<decltype(id)>()(id);
+  }
 
   virtual void __pup__(serdes& s) override { s | id; }
 };

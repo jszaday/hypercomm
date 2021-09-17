@@ -63,9 +63,27 @@ struct main : public CBase_main {
 
 template<typename T>
 struct big_chungus: public hyper_value {
-  static constexpr std::size_t kGoal = 128 * 1024;
+  static constexpr std::size_t kStep = 128;
+  static constexpr std::size_t kGoal = kStep * 1024;
   static constexpr std::size_t kSize = kGoal / sizeof(T) + 1;
-  int data[kSize];
+  static constexpr T kMagic = 0x69696969;
+  T data[kSize];
+
+  big_chungus(void) {
+    auto end = data + kSize;
+    for (auto it = data; it < end; it += kStep) {
+      *it = kMagic;
+    }
+  }
+
+  static bool is_valid(T* data) {
+    auto end = data + kSize;
+    auto valid = true;
+    for (auto it = data; valid && it < end; it += kStep) {
+      valid = valid && (*it == kMagic);
+    }
+    return valid;
+  }
 
   virtual bool recastable(void) const { return false; }
   virtual message_type release(void) { return nullptr; }
@@ -88,8 +106,13 @@ struct validate_chunga : public hypercomm::component {
   }
 
   virtual value_set action(value_set&& values) override {
-    auto val0 = std::move(values[0]);
-    CkPrintf("com%lu> big chungus has arrived.\n", this->id);
+    auto val = std::move(values[0]);
+    auto buf = dynamic_cast<buffer_value*>(val.get());
+    if (buf != nullptr) {
+      CkPrintf("com%lu> big chungus has arrived... via zerocopy!.\n", this->id);
+      auto valid = big_chungus<T>::is_valid(buf->payload<T>());
+      CkEnforceMsg(valid, "bad chunga!");
+    }
     return {};
   }
 };
@@ -105,13 +128,14 @@ struct locality : public vil<CBase_locality, int> {
   : n(_1), port(std::make_shared<persistent_port>(0x420)),
     com(this->emplace_component<validate_chunga<wunga_type>>()) {
     this->connect(port, com, 0);
+    this->activate_component(com);
   }
 
   void run(CkMessage* msg) {
-    auto idx = conv2idx<CkArrayIndex>((reinterpret_index<int>(thisIndexMax) + 1) % n);
     const auto numIters = typed_value<int>::from_message(msg)->value();
     for (auto it = 0; it < numIters; it++) {
       auto mem = make_value<big_chungus<wunga_type>>();
+      auto idx = conv2idx<CkArrayIndex>((reinterpret_index<int>(thisIndexMax) + it) % n);
       interceptor::send_async(thisProxy[idx], port, std::move(mem));
     }
   }

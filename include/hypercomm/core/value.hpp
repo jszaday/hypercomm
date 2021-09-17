@@ -66,13 +66,18 @@ class plain_value : public hyper_value {
   }
 };
 
-class buffer_value: public hyper_value {
+class buffer_value : public hyper_value {
  public:
   std::shared_ptr<void> buffer;
   std::size_t size;
 
   buffer_value(const std::shared_ptr<void>& _1, const std::size_t& _2)
-  : buffer(_1), size(_2) {}
+      : buffer(_1), size(_2) {}
+
+  template <typename T>
+  inline T* payload(void) const {
+    return static_cast<T*>(this->buffer.get());
+  }
 
   virtual bool recastable(void) const override { return (bool)this->buffer; }
 
