@@ -285,7 +285,7 @@ reducer::value_set reducer::action(value_set&& accepted) {
 
   auto result = ourCmbnr->send(std::move(args));
   auto contrib =
-      make_value<contribution_type>(std::move(result), ourCmbnr, ourCb);
+      make_typed_value<typename contribution_type::type>(std::move(result), ourCmbnr, ourCb);
   return component::make_set(0, std::move(contrib));
 }
 

@@ -111,7 +111,7 @@ struct sender : public vil<CBase_sender, int> {
     for (int i = 0; i < numIters; i++) {
       for (int j = 0; j < numElements; j++) {
         send2port<CkArrayIndex>(receivers[j], recv_port,
-                                make_value<typed_value<int>>(i));
+                                make_typed_value<int>(i));
       }
     }
   }

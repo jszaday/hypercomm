@@ -35,7 +35,7 @@ struct main : public CBase_main {
 
   void run(CkArrayCreatedMsg* msg) {
     auto localities = CProxy_locality(msg->aid);
-    auto value = typed_value<int>(numIters);
+    auto value = make_typed_value<int>(numIters);
     double avgTime = 0.0;
 
     for (int i = 0; i < numReps; i += 1) {
@@ -45,7 +45,7 @@ struct main : public CBase_main {
 
       auto start = CkWallTimer();
 
-      localities.run(value.release());
+      localities.run(value->release());
 
       CkWaitQD();
 
