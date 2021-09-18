@@ -175,6 +175,7 @@ struct zero_copy_payload_ {
     auto val = make_value<buffer_value>(std::move(ptr), buf->cnt);
     self->parent_->update_context();
     self->parent_->receive_value(self->dst_, std::move(val));
+    delete self;
   }
 };
 
