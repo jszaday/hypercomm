@@ -106,13 +106,13 @@ struct locality : public vil<CBase_locality, int> {
     for (auto i = 0; i < numIters; i += 1) {
       if (i % 2 == 0) {
         send2port<CkArrayIndex>(left, this->foo_port,
-                                make_value<typed_value<int>>(mine));
+                                make_typed_value<int>(mine));
 
         send2port<CkArrayIndex>(left, this->bar_port,
-                                make_value<typed_value<int>>(mine));
+                                make_typed_value<int>(mine));
       } else {
         send2port<CkArrayIndex>(left, this->baz_port,
-                                make_value<typed_value<int>>(mine));
+                                make_typed_value<int>(mine));
       }
     }
 

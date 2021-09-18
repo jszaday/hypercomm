@@ -12,6 +12,8 @@ struct payload;
 
 using payload_ptr = std::unique_ptr<payload>;
 
+void delete_value_(hyper_value* value, CkDataMsg* msg);
+
 struct payload {
  private:
   enum types_ : uint8_t { kValue, kMessage };
@@ -71,9 +73,23 @@ struct payload {
       this->options_.msg_ = nullptr;
       return msg;
     } else {
-      auto& pair = this->options_.value_;
-      // pack the value with its destination port to form a message
-      return repack_to_port(std::move(pair.port_), std::move(pair.value_));
+      auto& value = this->options_.value_;
+      auto pair = value.value_->try_zero_copy();
+      if (pair.first != nullptr) {
+        auto* released = value.value_.release();
+        // deletes the value when the rts is done with it
+        CkCallback cb((CkCallbackFn)&delete_value_, released);
+        CkNcpyBuffer src(pair.first, pair.second, cb, CK_BUFFER_REG,
+                         CK_BUFFER_NODEREG);
+        auto size = PUP::size(src);
+        auto* msg = message::make_message(size, std::move(value.port_));
+        msg->set_zero_copy(true);
+        PUP::toMemBuf(src, msg->payload, size);
+        return msg;
+      } else {
+        // pack the value with its destination port to form a message
+        return repack_to_port(std::move(value.port_), std::move(value.value_));
+      }
     }
   }
 };

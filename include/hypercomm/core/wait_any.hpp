@@ -24,8 +24,7 @@ struct wait_any_callback : public core::callback {
       // return the value to the source
       fut.set(std::move(value));
     } else {
-      auto paired =
-          make_value<typed_value<resumer_pair>>(fut, std::move(value));
+      auto paired = make_typed_value<resumer_pair>(fut, std::move(value));
       target->send(std::move(paired));
     }
   }

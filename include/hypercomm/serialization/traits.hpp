@@ -14,6 +14,11 @@ constexpr bool is_bytes(void) {
   return PUP::as_bytes<T>::value;
 }
 
+template <typename T, typename Enable = void>
+struct zero_copyable {
+  static constexpr auto value = is_bytes<T>();
+};
+
 template <typename T>
 using is_polymorph = std::is_base_of<hypercomm::polymorph, T>;
 

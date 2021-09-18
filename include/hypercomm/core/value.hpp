@@ -22,8 +22,13 @@ class hyper_value {
   source_type source;
 
   virtual ~hyper_value() = default;
-  virtual bool recastable(void) const = 0;
   virtual message_type release(void) = 0;
+
+  virtual bool recastable(void) const = 0;
+
+  virtual std::pair<const void*, std::size_t> try_zero_copy(void) const {
+    return std::make_pair(nullptr, 0);
+  }
 };
 
 inline void try_return(value_ptr&& value) {
@@ -62,19 +67,27 @@ class plain_value : public hyper_value {
   }
 };
 
+class buffer_value : public hyper_value {
+ public:
+  std::shared_ptr<void> buffer;
+  std::size_t size;
+
+  buffer_value(const std::shared_ptr<void>& _1, const std::size_t& _2)
+      : buffer(_1), size(_2) {}
+
+  template <typename T>
+  inline T* payload(void) const {
+    return static_cast<T*>(this->buffer.get());
+  }
+
+  virtual bool recastable(void) const override { return (bool)this->buffer; }
+
+  virtual message_type release(void) override { return nullptr; }
+};
+
 template <typename T, typename... Args>
 inline std::unique_ptr<T> make_value(Args... args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-}
-
-inline std::unique_ptr<plain_value> msg2value(
-    typename hyper_value::message_type msg) {
-  return make_value<plain_value>(msg);
-}
-
-inline std::unique_ptr<plain_value> msg2value(
-    std::shared_ptr<CkMessage>&& msg) {
-  return make_value<plain_value>(utilities::unwrap_message(std::move(msg)));
 }
 }  // namespace hypercomm
 

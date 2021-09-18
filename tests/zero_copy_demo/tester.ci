@@ -1,0 +1,13 @@
+mainmodule tester {
+    mainchare main {
+        entry main(CkArgMsg*);
+        entry [threaded] void run(CkArrayCreatedMsg*);
+    };
+
+    array [Max] locality : hypercomm::locality_base_ {
+        entry locality(int);
+        entry void run(CkMessage*);
+    };
+
+    initproc void enroll_polymorphs(void);
+}
