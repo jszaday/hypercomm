@@ -25,7 +25,8 @@ class hyper_value {
   virtual message_type release(void) = 0;
 
   virtual bool recastable(void) const = 0;
-  virtual std::pair<void*, std::size_t> as_nocopy(void) const {
+
+  virtual std::pair<const void*, std::size_t> try_zero_copy(void) const {
     return std::make_pair(nullptr, 0);
   }
 };

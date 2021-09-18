@@ -62,21 +62,24 @@ struct main : public CBase_main {
 };
 
 template<typename T>
-struct big_chungus: public hyper_value {
+struct big_data {
   static constexpr std::size_t kStep = 128;
   static constexpr std::size_t kGoal = kStep * 1024;
   static constexpr std::size_t kSize = kGoal / sizeof(T) + 1;
+
+  static_assert((kSize * sizeof(T)) >= kZeroCopySize, "a big datum is not big enough!");
+
   static constexpr T kMagic = 0x69696969;
   T data[kSize];
 
-  big_chungus(void) {
+  big_data(void) {
     auto end = data + kSize;
     for (auto it = data; it < end; it += kStep) {
       *it = kMagic;
     }
   }
 
-  static bool is_valid(T* data) {
+  bool is_valid(void) const {
     auto end = data + kSize;
     auto valid = true;
     for (auto it = data; valid && it < end; it += kStep) {
@@ -84,18 +87,11 @@ struct big_chungus: public hyper_value {
     }
     return valid;
   }
-
-  virtual bool recastable(void) const { return false; }
-  virtual message_type release(void) { return nullptr; }
-
-  virtual std::pair<void*, std::size_t> as_nocopy(void) const {
-    return std::make_pair(const_cast<int*>(data), kSize * sizeof(T));
-  }
 };
 
 template<typename T>
-struct validate_chunga : public hypercomm::component {
-  validate_chunga(const id_t& _1) : component(_1) {}
+struct validate_data : public hypercomm::component {
+  validate_data(const id_t& _1) : component(_1) {}
 
   virtual std::size_t n_inputs(void) const override { return 1; }
 
@@ -109,16 +105,17 @@ struct validate_chunga : public hypercomm::component {
     auto val = std::move(values[0]);
     auto is_buf = dynamic_cast<buffer_value*>(val.get()) != nullptr;
     if (is_buf) {
-      CkPrintf("com%lu> big chungus has arrived... via zerocopy!.\n", this->id);
-      auto typed = value2typed<int>(std::move(val));
-      auto valid = big_chungus<T>::is_valid(typed->get());
-      CkEnforceMsg(valid, "bad chunga!");
+      CkPrintf("com%lu> big data has arrived... via zerocopy!.\n", this->id);
+      auto typed = value2typed<big_data<T>>(std::move(val));
+      auto valid = (*typed)->is_valid();
+      CkEnforceMsg(valid, "bad data!");
     }
     return {};
   }
 };
 
-using wunga_type = int;
+using data_type = int;
+PUPbytes(big_data<data_type>);
 
 struct locality : public vil<CBase_locality, int> {
   entry_port_ptr port;
@@ -127,7 +124,7 @@ struct locality : public vil<CBase_locality, int> {
 
   locality(int _1)
   : n(_1), port(std::make_shared<persistent_port>(0x420)),
-    com(this->emplace_component<validate_chunga<wunga_type>>()) {
+    com(this->emplace_component<validate_data<data_type>>()) {
     this->connect(port, com, 0);
     this->activate_component(com);
   }
@@ -135,7 +132,7 @@ struct locality : public vil<CBase_locality, int> {
   void run(CkMessage* msg) {
     const auto numIters = typed_value<int>::from_message(msg)->value();
     for (auto it = 0; it < numIters; it++) {
-      auto mem = make_value<big_chungus<wunga_type>>();
+      auto mem = make_typed_value<big_data<data_type>>();
       auto idx = conv2idx<CkArrayIndex>((reinterpret_index<int>(thisIndexMax) + it) % n);
       interceptor::send_async(thisProxy[idx], port, std::move(mem));
     }

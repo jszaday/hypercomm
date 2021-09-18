@@ -205,8 +205,7 @@ class vil : public Base,
     }
 
     this->activate_component(rdcr);
-    auto contrib =
-        make_typed_value<contribution>(std::move(value), fn, cb);
+    auto contrib = make_typed_value<contribution>(std::move(value), fn, cb);
     this->components[rdcr]->receive_value(0, std::move(contrib));
   }
 };

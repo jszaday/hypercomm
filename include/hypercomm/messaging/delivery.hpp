@@ -74,7 +74,7 @@ struct payload {
       return msg;
     } else {
       auto& value = this->options_.value_;
-      auto pair = value.value_->as_nocopy();
+      auto pair = value.value_->try_zero_copy();
       if (pair.first != nullptr) {
         auto* released = value.value_.release();
         // deletes the value when the rts is done with it

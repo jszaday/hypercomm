@@ -43,9 +43,7 @@ struct allocate {};
 using reconstruct = PUP::reconstruct;
 }  // namespace tags
 
-enum storage_scheme {
-  kInline, kBuffer
-};
+enum storage_scheme { kInline, kBuffer };
 
 template <typename T, storage_scheme Scheme = kInline>
 struct temporary;
@@ -79,10 +77,10 @@ struct temporary<T, kBuffer> {
   // used to when there should be no initialization whatsoever
   temporary(const tags::no_init&) {}
   temporary(const tags::reconstruct&) {}
-  temporary(const tags::allocate&) : data(::operator new (sizeof(T))) {}
+  temporary(const tags::allocate&) : data(::operator new(sizeof(T))) {}
 
   template <typename... Args>
-  temporary(Args... args): temporary(tags::allocate{}) {
+  temporary(Args... args) : temporary(tags::allocate{}) {
     ::new (&this->value()) T(std::forward<Args>(args)...);
   }
 

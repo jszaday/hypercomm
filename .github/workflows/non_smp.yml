@@ -67,6 +67,9 @@ jobs:
         cd ../lb_demo
         echo "lb_demo"
         TESTOPTS="++local" make test
+        echo "<!-- zero_copy_demo --!>"
+        cd ../zero_copy_demo
+        TESTOPTS="++local" make test
         cd ../avalanche
         echo "avalanche"
         TESTOPTS="++local 65" DEBUG=1 make test
