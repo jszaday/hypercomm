@@ -102,7 +102,7 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
       auto typed = make_value<typed_value_impl_<T, kBuffer>>(tags::no_init{});
       auto offset = try_buff->payload<T>();
       ::new (&typed->tmp.data)
-          std::shared_ptr<T>(std::move(try_buff->source), offset);
+          std::shared_ptr<T>(std::move(try_buff->buffer), offset);
       delete value;
       return std::move(typed);
     } else {

@@ -168,13 +168,14 @@ struct zero_copy_payload_ {
 
   static void action_(zero_copy_payload_* self, CkDataMsg* msg) {
     auto* buf = (CkNcpyBuffer*)(msg->data);
-    std::shared_ptr<void> ptr(const_cast<void*>(buf->ptr), [=](void*) {
-      buf->deregisterMem();
-      CkFreeMsg(msg);
-    });
+    std::shared_ptr<void> ptr(const_cast<void*>(buf->ptr), CkRdmaFree);
     auto val = make_value<buffer_value>(std::move(ptr), buf->cnt);
+    buf->deregisterMem();
+    CkFreeMsg(msg);
+
     self->parent_->update_context();
     self->parent_->receive_value(self->dst_, std::move(val));
+
     delete self;
   }
 };
@@ -187,10 +188,10 @@ void generic_locality_::demux_message(message* msg) {
     PUP::fromMem p(msg->payload);
     p | src;
 
-    void* mem = malloc(src.cnt);
+    void* mem = CkRdmaAlloc(src.cnt);
     CkCallback cb((CkCallbackFn)&zero_copy_payload_::action_,
                   new zero_copy_payload_(this, std::move(port)));
-    CkNcpyBuffer dest(mem, src.cnt, cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer dest(mem, src.cnt, cb, CK_BUFFER_PREREG);
 
     dest.get(src);
   } else {
