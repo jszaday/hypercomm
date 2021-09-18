@@ -95,9 +95,9 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
   if (try_cast) {
     return std::unique_ptr<typed_value<T>>(try_cast);
   } else if (value->recastable()) {
-    auto* try_buff = (zero_copyable<T>::value)
-                         ? dynamic_cast<buffer_value*>(value)
-                         : nullptr;
+    buffer_value* try_buff = (zero_copyable<T>::value)
+                                 ? dynamic_cast<buffer_value*>(value)
+                                 : nullptr;
     if (try_buff) {
       auto typed = make_value<typed_value_impl_<T, kBuffer>>(tags::no_init{});
       auto offset = try_buff->payload<T>();
