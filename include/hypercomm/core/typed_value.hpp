@@ -26,6 +26,9 @@ class typed_value : public hyper_value {
 
   template <storage_scheme Scheme = kInline>
   static std::unique_ptr<typed_value<T>> from_message(message_type msg);
+
+  template <typename... Args>
+  inline static std::unique_ptr<typed_value<T>> from_buffer(Args... args);
 };
 
 template <typename T, storage_scheme Scheme = kInline>
@@ -64,6 +67,14 @@ class typed_value_impl_ : public typed_value<T> {
 };
 
 template <typename T>
+template <typename... Args>
+inline std::unique_ptr<typed_value<T>> typed_value<T>::from_buffer(
+    Args... args) {
+  return make_value<typed_value_impl_<T, kBuffer>>(
+      tags::use_buffer<T>(std::forward<Args>(args)...));
+}
+
+template <typename T>
 template <storage_scheme Scheme>
 std::unique_ptr<typed_value<T>> typed_value<T>::from_message(message_type msg) {
   if (utilities::is_null_message(msg)) {
@@ -84,12 +95,6 @@ inline std::unique_ptr<typed_value<T>> make_typed_value(Args... args) {
   return make_value<typed_value_impl_<T>>(std::forward<Args>(args)...);
 }
 
-template <typename T, typename... Args>
-inline std::unique_ptr<typed_value<T>> wrap_buffer(Args... args) {
-  return make_value<typed_value_impl_<T, kBuffer>>(
-      tags::use_buffer<T>(std::forward<Args>(args)...));
-}
-
 inline std::unique_ptr<typed_value<unit_type>> make_unit_value(void) {
   return make_typed_value<unit_type>(tags::no_init{});
 }
@@ -105,8 +110,9 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
                                  ? dynamic_cast<buffer_value*>(value)
                                  : nullptr;
     if (try_buff) {
+      auto* ptr = try_buff->payload<T>();
       auto typed =
-          wrap_buffer<T>(std::move(try_buff->buffer), try_buff->payload<T>());
+          typed_value<T>::from_buffer(std::move(try_buff->buffer), ptr);
       delete value;
       return std::move(typed);
     } else {

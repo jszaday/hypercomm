@@ -135,7 +135,7 @@ struct locality : public vil<CBase_locality, int> {
         if (sender) {
           // use the same buffer for send/receive
           this->post_buffer(port, buffer, size);
-          auto mem = wrap_buffer<big_data<data_type>>(buffer);
+          auto mem = typed_value<big_data<data_type>>::from_buffer(buffer);
           interceptor::send_async(thisProxy[receiverIdx], port, std::move(mem));
           this->mb->put_request({}, senti);
         } else {
