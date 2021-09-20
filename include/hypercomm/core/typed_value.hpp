@@ -15,17 +15,40 @@ class typed_value : public hyper_value {
  protected:
   static constexpr auto is_contribution = std::is_same<contribution, T>::value;
 
+  const void* storage;
+  const storage_scheme scheme;
+
  public:
   using type = T;
-  virtual T* get(void) = 0;
+
+  typed_value(const void* _1, const storage_scheme& _2)
+      : storage(_1), scheme(_2) {}
+
+  // avoids a costly virtual method dispatch
+  inline T* get(void) noexcept {
+    switch (scheme) {
+      case kBuffer:
+        return &(((temporary<T, kBuffer>*)storage)->value());
+      case kInline:
+        return &(((temporary<T, kInline>*)storage)->value());
+      default:
+        return nullptr;
+    }
+  }
+
   inline T& value(void) noexcept { return *(this->get()); }
+
   inline const T& value(void) const noexcept {
     return *(const_cast<typed_value<T>*>(this)->get());
   }
+
   inline T* operator->(void) noexcept { return this->get(); }
 
   template <storage_scheme Scheme = kInline>
   static std::unique_ptr<typed_value<T>> from_message(message_type msg);
+
+  template <typename... Args>
+  inline static std::unique_ptr<typed_value<T>> from_buffer(Args... args);
 };
 
 template <typename T, storage_scheme Scheme = kInline>
@@ -36,9 +59,8 @@ class typed_value_impl_ : public typed_value<T> {
   temporary<T, Scheme> tmp;
 
   template <typename... Args>
-  typed_value_impl_(Args... args) : tmp(std::forward<Args>(args)...) {}
-
-  virtual T* get(void) override { return &(tmp.value()); }
+  typed_value_impl_(Args... args)
+      : typed_value<T>(&tmp, Scheme), tmp(std::forward<Args>(args)...) {}
 
   virtual bool recastable(void) const override { return false; }
 
@@ -62,6 +84,14 @@ class typed_value_impl_ : public typed_value<T> {
     return msg;
   }
 };
+
+template <typename T>
+template <typename... Args>
+inline std::unique_ptr<typed_value<T>> typed_value<T>::from_buffer(
+    Args... args) {
+  return make_value<typed_value_impl_<T, kBuffer>>(
+      tags::use_buffer<T>(std::forward<Args>(args)...));
+}
 
 template <typename T>
 template <storage_scheme Scheme>
@@ -99,10 +129,9 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
                                  ? dynamic_cast<buffer_value*>(value)
                                  : nullptr;
     if (try_buff) {
-      auto typed = make_value<typed_value_impl_<T, kBuffer>>(tags::no_init{});
-      auto offset = try_buff->payload<T>();
-      ::new (&typed->tmp.data)
-          std::shared_ptr<T>(std::move(try_buff->buffer), offset);
+      auto* payload = try_buff->payload<T>();
+      auto typed =
+          typed_value<T>::from_buffer(std::move(try_buff->buffer), payload);
       delete value;
       return std::move(typed);
     } else {

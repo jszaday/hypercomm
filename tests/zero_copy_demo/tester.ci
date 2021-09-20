@@ -6,7 +6,8 @@ mainmodule tester {
 
     array [Max] locality : hypercomm::locality_base_ {
         entry locality(int);
-        entry void run(CkMessage*);
+        entry [threaded] void run(CkMessage*);
+        entry void done(void);
     };
 
     initproc void enroll_polymorphs(void);
