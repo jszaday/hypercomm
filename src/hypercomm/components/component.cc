@@ -57,10 +57,12 @@ void component::activate(void) {
 // at the specified port
 inline incoming_type::iterator find_gap(incoming_type& incoming,
                                         const component::port_type& which) {
-  auto search = incoming.rbegin();
-  for (; search != incoming.rend(); search++) {
-    if (search->find(which) == search->end()) {
-      return search.base() - 1;
+  if (!incoming.empty()) {
+    auto search = incoming.rbegin();
+    for (; search != incoming.rend(); search++) {
+      if (search->find(which) == search->end()) {
+        return search.base() - 1;
+      }
     }
   }
   return std::end(incoming);
