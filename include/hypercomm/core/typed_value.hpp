@@ -110,9 +110,9 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
                                  ? dynamic_cast<buffer_value*>(value)
                                  : nullptr;
     if (try_buff) {
-      auto* ptr = try_buff->payload<T>();
+      auto* payload = try_buff->payload<T>();
       auto typed =
-          typed_value<T>::from_buffer(std::move(try_buff->buffer), ptr);
+          typed_value<T>::from_buffer(std::move(try_buff->buffer), payload);
       delete value;
       return std::move(typed);
     } else {
