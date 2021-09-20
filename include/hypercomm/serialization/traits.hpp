@@ -82,11 +82,6 @@ struct built_in<
 };
 
 template <class T, typename Enable = void>
-struct is_pupable {
-  enum { value = false };
-};
-
-template <class T, typename Enable = void>
 struct is_message {
   enum { value = false };
 };
@@ -97,14 +92,32 @@ struct is_message<
   enum { value = true };
 };
 
-template <class T>
-struct is_pupable<T, typename std::enable_if<is_message<T>::value>::type> {
-  enum { value = true };
-};
-
 template <class T, typename Enable = void>
 struct is_polymorphic {
   enum { value = false };
+};
+
+template <class T, typename Enable = void>
+struct idiosyncratic_ptr {
+  enum { value = false };
+};
+
+template <class T>
+struct idiosyncratic_ptr<T,
+                         typename std::enable_if<is_message<T>::value>::type> {
+  enum { value = true };
+};
+
+template <class T>
+struct idiosyncratic_ptr<
+    T, typename std::enable_if<is_polymorphic<T>::value>::type> {
+  enum { value = true };
+};
+
+template <class T>
+struct idiosyncratic_ptr<
+    T, typename std::enable_if<zero_copyable<T>::value>::type> {
+  enum { value = true };
 };
 
 using serdes_state = serdes::state_t;
@@ -134,11 +147,6 @@ struct is_polymorphic<
            std::is_base_of<hypercomm::polymorph, T>::value ||
            std::is_base_of<hypercomm::polymorph::trait, T>::value ||
            std::is_base_of<hypercomm::proxy, T>::value>::type> {
-  enum { value = true };
-};
-
-template <class T>
-struct is_pupable<T, typename std::enable_if<is_polymorphic<T>::value>::type> {
   enum { value = true };
 };
 

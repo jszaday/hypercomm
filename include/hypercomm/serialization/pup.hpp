@@ -1,6 +1,7 @@
 #ifndef __HYPERCOMM_PUP_HPP__
 #define __HYPERCOMM_PUP_HPP__
 
+#include "../core/config.hpp"
 #include "construction.hpp"
 #include "enrollment.hpp"
 #include "serdes.hpp"
@@ -28,6 +29,19 @@ inline size_t size(const T& t) {
   sizer s;
   pup(s, const_cast<T&>(t));
   return s.size();
+}
+
+template <typename T, typename Enable = void>
+struct quick_sizer;
+
+template <typename T>
+struct quick_sizer<T, typename std::enable_if<is_bytes<T>()>::type> {
+  inline static std::size_t impl(const T& t) { return sizeof(T); }
+};
+
+template <typename T>
+inline std::size_t quick_size(const T& t) {
+  return quick_sizer<T>::impl(t);
 }
 
 template <typename T>
@@ -225,23 +239,55 @@ struct pack_helper<T, typename std::enable_if<is_polymorph<T>::value>::type> {
 };
 
 template <typename T, typename IdentifyFn>
-inline static void pack_ptr(serdes& s, std::shared_ptr<T>& p,
+inline static void pack_ptr(serdes& s, std::shared_ptr<T>& t,
                             const IdentifyFn& f) {
-  if (!p) {
+  if (!t) {
     ptr_record rec(nullptr);
     pup(s, rec);
   } else {
-    auto search = s.records.find(p);
-    if (search != s.records.end()) {
-      ptr_record rec(search->second);
-      pup(s, rec);
-    } else {
+    auto search = s.records.find(t);
+    if (search == s.records.end()) {
       auto id = s.records.size() + 1;
-      ptr_record rec(id, f());
-      pup(s, rec);
-      s.records[p] = id;
-      pack_helper<T>::pack(s, *p);
+      auto ins = s.records.emplace(
+          std::piecewise_construct, std::forward_as_tuple(t),
+          std::forward_as_tuple(ptr_record::INSTANCE, id, f()));
+      CkAssertMsg(ins.second, "insertion did not occur!");
+      pup(s, ins.first->second);
+      pack_helper<T>::pack(s, *t);
+    } else {
+      pup(s, ptr_record::ref(search->second));
     }
+  }
+}
+
+template <typename T>
+void unpack_ptr(serdes& s, ptr_record& rec, std::shared_ptr<T>& t) {
+  if (rec.is_null()) {
+    ::new (&t) std::shared_ptr<T>();
+  } else if (rec.is_instance()) {
+    if (is_bytes<T>()) {
+      ::new (&t) std::shared_ptr<T>(std::move(s.source.lock()),
+                                    reinterpret_cast<T*>(s.current));
+
+      s.advance<T>();
+    } else {
+      // allocate memory for the object
+      auto* p = (T*)aligned_alloc(alignof(T), sizeof(T));
+      // then reconstruct it
+      pup(s, *p);
+      // the object must be reconstructed before any shared
+      // ptrs in case it's shared_from_this enabled. it will
+      // result in subtle failures otherwise.
+      ::new (&t) std::shared_ptr<T>(p, [](T* p) {
+        p->~T();
+        free(p);
+      });
+    }
+    CkAssertMsg(s.put_instance(rec.id, t), "instance insertion did not occur!");
+  } else if (rec.is_reference()) {
+    ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.id));
+  } else {
+    CkAbort("unknown record type %d", static_cast<int>(rec.ty));
   }
 }
 }  // namespace
@@ -261,15 +307,16 @@ struct puper<ptr_record> {
   using impl_type = typename std::underlying_type<ptr_record::type_t>::type;
 
   inline static void impl(serdes& s, ptr_record& t) {
-    auto& ty = *(reinterpret_cast<impl_type*>(&t.t));
+    auto& ty = *(reinterpret_cast<impl_type*>(&t.ty));
     s | ty;
     switch (ty) {
       case ptr_record::REFERENCE:
-        pup(s, t.d.reference.id);
+        pup(s, t.id);
         break;
+      case ptr_record::DEFERRED:
       case ptr_record::INSTANCE:
-        pup(s, t.d.instance.id);
-        pup(s, t.d.instance.ty);
+        pup(s, t.id);
+        pup(s, t.size);
         break;
       case ptr_record::IGNORE:
         break;
@@ -310,14 +357,14 @@ class puper<std::shared_ptr<T>,
       } else {
         std::shared_ptr<polymorph> p;
         if (rec.is_instance()) {
-          p.reset(hypercomm::instantiate(rec.d.instance.ty));
-          CkAssertMsg(s.put_instance(rec.d.instance.id, p),
+          p.reset(hypercomm::instantiate(rec.size));
+          CkAssertMsg(s.put_instance(rec.id, p),
                       "instance insertion did not occur!");
           p->__pup__(s);
         } else if (rec.is_reference()) {
-          p = s.get_instance<polymorph>(rec.d.reference.id);
+          p = s.get_instance<polymorph>(rec.id);
         } else {
-          CkAbort("unknown record type %d", static_cast<int>(rec.t));
+          CkAbort("unknown record type %d", static_cast<int>(rec.ty));
         }
         ::new (&t) std::shared_ptr<T>(std::dynamic_pointer_cast<T>(p));
       }
@@ -444,46 +491,66 @@ class puper<std::shared_ptr<T>, typename std::enable_if<std::is_base_of<
 };
 
 template <typename T>
-struct puper<std::shared_ptr<T>,
-             typename std::enable_if<!hypercomm::is_pupable<T>::value>::type> {
-  inline static void unpack(serdes& s, std::shared_ptr<T>& t) {
-    ptr_record rec;
-    pup(s, rec);
-    if (rec.is_null()) {
-      ::new (&t) std::shared_ptr<T>();
-    } else if (rec.is_instance()) {
-      if (is_bytes<T>()) {
-        ::new (&t) std::shared_ptr<T>(std::move(s.source.lock()),
-                                      reinterpret_cast<T*>(s.current));
-
-        s.advance<T>();
-      } else {
-        // allocate memory for the object
-        auto* p = (T*)aligned_alloc(alignof(T), sizeof(T));
-        // then reconstruct it
-        pup(s, *p);
-        // the object must be reconstructed before any shared
-        // ptrs in case it's shared_from_this enabled. it will
-        // result in subtle failures otherwise.
-        ::new (&t) std::shared_ptr<T>(p, [](T* p) {
-          p->~T();
-          free(p);
-        });
-      }
-      CkAssertMsg(s.put_instance(rec.d.instance.id, t),
-                  "instance insertion did not occur!");
-    } else if (rec.is_reference()) {
-      ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.d.reference.id));
-    } else {
-      CkAbort("unknown record type %d", static_cast<int>(rec.t));
-    }
-  }
-
+struct puper<
+    std::shared_ptr<T>,
+    typename std::enable_if<!hypercomm::idiosyncratic_ptr<T>::value>::type> {
   inline static void impl(serdes& s, std::shared_ptr<T>& t) {
     if (s.unpacking()) {
-      unpack(s, t);
+      ptr_record rec;
+      pup(s, rec);
+      unpack_ptr(s, rec, t);
     } else {
       pack_ptr(s, t, []() { return 0; });
+    }
+  }
+};
+
+template <typename T>
+struct puper<
+    std::shared_ptr<T>,
+    typename std::enable_if<hypercomm::zero_copyable<T>::value>::type> {
+  inline static void impl(serdes& s, std::shared_ptr<T>& t) {
+    if (s.sizing() || s.packing()) {
+      auto search = t ? s.records.find(t) : std::end(s.records);
+      if (search == std::end(s.records)) {
+        // use (quick size) to determine the size of the object
+        // without running through another serdes cycle
+        std::size_t size = t ? quick_size(*t) : 0;
+        // if we can defer it (and it's worthwhile to do so)
+        if (s.deferrable && size >= kZeroCopySize) {
+          // then do so (creating a record)
+          auto id = s.records.size() + 1;
+          auto ins = s.records.emplace(
+              std::piecewise_construct, std::forward_as_tuple(t),
+              std::forward_as_tuple(ptr_record::DEFERRED, id, size));
+          CkAssertMsg(ins.second, "insertion did not occur!");
+          // record the record
+          auto& rec = ins.first->second;
+          pup(s, rec);
+          s.put_deferred(rec, t);
+        } else {
+          // otherwise use the default codepath
+          pack_ptr(s, t, []() { return 0; });
+        }
+      } else {
+        // this is consistent with the default
+        // codepath (albeit without search)
+        pup(s, ptr_record::ref(search->second));
+      }
+    } else {
+      // unpack the record
+      ptr_record rec;
+      pup(s, rec);
+      // if it was deferred
+      if (rec.is_deferred()) {
+        CkAssertMsg(s.deferrable, "did not expect deferred values!");
+        // record a reference to this pointer so it
+        // can be updated later on
+        s.put_deferred(rec, t);
+      } else {
+        // if not, simply unpack the pointer
+        unpack_ptr(s, rec, t);
+      }
     }
   }
 };

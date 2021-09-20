@@ -15,17 +15,75 @@ class sizer;
 class packer;
 class unpacker;
 
+struct generic_ptr_ {
+  virtual void reset(const std::shared_ptr<void>&) = 0;
+};
+
+template <typename T>
+struct generic_ptr_impl_ : public generic_ptr_ {
+  std::shared_ptr<T>& ptr;
+  generic_ptr_impl_(std::shared_ptr<T>& _) : ptr(_) {}
+  virtual void reset(const std::shared_ptr<void>& _) override {
+    auto typed = std::static_pointer_cast<T>(_);
+    new (&this->ptr) std::shared_ptr<T>(std::move(typed));
+  }
+};
+
+struct deferred_ {
+  std::size_t size;
+  std::vector<std::unique_ptr<generic_ptr_>> ptrs;
+
+  template <typename T>
+  inline void push_back(std::shared_ptr<T>& _) {
+    ptrs.emplace_back(new generic_ptr_impl_<T>(_));
+  }
+
+  inline void reset(std::shared_ptr<void>&& _) {
+    for (auto& ptr : this->ptrs) {
+      ptr->reset(_);
+    }
+  }
+};
+
+// records whether a ptr-type is a back-reference or an instance
+struct ptr_record {
+  enum type_t : std::uint8_t { UNKNOWN, IGNORE, REFERENCE, INSTANCE, DEFERRED };
+
+  type_t ty;
+  ptr_id_t id;
+  std::size_t size;
+
+  ptr_record(void) : ty(UNKNOWN) {}
+
+  ptr_record(std::nullptr_t) : ty(IGNORE) {}
+
+  ptr_record(const type_t& _1, const ptr_id_t& _2, const std::size_t& _3 = 0x0)
+      : ty(_1), id(_2), size(_3) {}
+
+  inline static ptr_record ref(const ptr_record& rec) {
+    return ptr_record((rec.ty == INSTANCE) ? REFERENCE : rec.ty, rec.id,
+                      rec.size);
+  }
+
+  inline bool is_null() const { return ty == IGNORE; }
+  inline bool is_instance() const { return ty == INSTANCE; }
+  inline bool is_reference() const { return ty == REFERENCE; }
+  inline bool is_deferred() const { return ty == DEFERRED; }
+};
+
 class serdes {
   template <typename K, typename V>
   using owner_less_map = std::map<K, V, std::owner_less<K>>;
 
+  std::map<ptr_id_t, deferred_> deferred;
   std::map<ptr_id_t, std::weak_ptr<void>> instances;
 
  public:
-  owner_less_map<std::weak_ptr<void>, ptr_id_t> records;
+  owner_less_map<std::weak_ptr<void>, ptr_record> records;
 
   enum state_t { SIZING, PACKING, UNPACKING };
 
+  bool deferrable = false;
   const std::weak_ptr<void> source;
   const char* start;
   char* current;
@@ -51,6 +109,13 @@ class serdes {
 
   serdes(serdes&&) = delete;
   serdes(const serdes&) = delete;
+
+  template <typename T>
+  inline void put_deferred(const ptr_record& rec, const std::shared_ptr<T>& t) {
+    auto& def = this->deferred[rec.id];
+    def.size = rec.size;
+    def.push_back(t);
+  }
 
   inline bool packing() const { return state == state_t::PACKING; }
   inline bool unpacking() const { return state == state_t::UNPACKING; }
@@ -120,36 +185,6 @@ class packer : public serdes {
 class unpacker : public serdes {
  public:
   unpacker(const std::shared_ptr<void>& _1, const char* _2) : serdes(_1, _2) {}
-};
-
-// records whether a ptr-type is a back-reference or an instance
-struct ptr_record {
-  union data_t {
-    struct s_reference {
-      ptr_id_t id;
-    } reference;
-    struct s_instance {
-      ptr_id_t id;
-      polymorph_id_t ty;
-    } instance;
-  };
-
-  enum type_t : std::uint8_t { UNKNOWN, IGNORE, REFERENCE, INSTANCE };
-
-  data_t d;
-  type_t t;
-
-  ptr_record() : t(UNKNOWN) {}
-  ptr_record(std::nullptr_t) : t(IGNORE) {}
-  ptr_record(const ptr_id_t& id) : t(REFERENCE) { d.reference.id = id; }
-  ptr_record(const ptr_id_t& id, const polymorph_id_t& ty) : t(INSTANCE) {
-    d.instance.id = id;
-    d.instance.ty = ty;
-  }
-
-  inline bool is_null() const { return t == IGNORE; }
-  inline bool is_instance() const { return t == INSTANCE; }
-  inline bool is_reference() const { return t == REFERENCE; }
 };
 
 }  // namespace hypercomm

@@ -18,8 +18,10 @@ struct locality : public vil<CBase_locality, int> {
     auto f = this->make_future();
     auto g = this->make_future();
 
-    auto value = hypercomm::make_unit_value();
-    f.set(std::move(value));
+    using test_type = std::shared_ptr<int>;
+    test_type t(new test_type::element_type(42));
+    auto value = make_typed_value<std::tuple<test_type, test_type>>(t, t);
+    f.set(msg2value(value->release()));
 
     do {
       CthYield();
@@ -29,6 +31,10 @@ struct locality : public vil<CBase_locality, int> {
     auto list = { f, g };
     auto pair = wait_any(std::begin(list), std::end(list));
     CkEnforce(f.equals(*pair.second));
+
+    value = value2typed<std::tuple<test_type, test_type>>(std::move(pair.first));
+    CkEnforce(t != std::get<0>(value->value()));
+    CkEnforce(std::get<0>(value->value()) == std::get<1>(value->value()));
 
     this->contribute(CkCallback(CkCallback::ckExit));
   }
