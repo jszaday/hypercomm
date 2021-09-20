@@ -58,7 +58,7 @@ struct main : public CBase_main {
 
 template <typename T>
 struct big_data {
-  static constexpr std::size_t kStep = 128;
+  static constexpr std::size_t kStep = 256;
   static constexpr std::size_t kGoal = kStep * 1024;
   static constexpr std::size_t kSize = kGoal / sizeof(T) + 1;
 
@@ -89,14 +89,17 @@ using data_type = int;
 PUPbytes(big_data<data_type>);
 
 struct locality : public vil<CBase_locality, int> {
+  int n;
+  bool sender;
+  double bandwidth;
   entry_port_ptr port;
   comproxy<mailbox<big_data<data_type>>> mb;
-  int n;
 
   locality(int _1)
       : n(_1),
         port(std::make_shared<persistent_port>(0x420)),
         mb(this->emplace_component<mailbox<big_data<data_type>>>()) {
+    this->manual_mode(port);
     this->connect(port, mb, 0);
     this->activate_component(mb);
   }
@@ -110,7 +113,7 @@ struct locality : public vil<CBase_locality, int> {
     auto& numReps = cfg.numReps;
     auto& numSkip = cfg.numSkip;
     auto& mine = this->__index__();
-    auto sender = mine == cfg.senderIdx;
+    sender = mine == cfg.senderIdx;
 
     // return the value to the sender
     auto rts = sender ? nullptr
@@ -121,8 +124,7 @@ struct locality : public vil<CBase_locality, int> {
     auto senti = sender ? std::make_shared<sentinel_callback>() : nullptr;
     // creates an appropriately sized buffer for our data
     std::shared_ptr<big_data<data_type>> buffer(
-      sender ? new big_data<data_type>(sender) : nullptr
-    );
+        new big_data<data_type>(sender));
 
     double startTime = 0;
     for (auto rep = 0; rep < (numReps + numSkip); rep++) {
@@ -132,9 +134,10 @@ struct locality : public vil<CBase_locality, int> {
 
       // bounce numIters messages back and forth between the communicators
       for (auto it = 0; it < numIters; it++) {
+        // post the receive buffer
+        this->post_buffer(port, buffer, size);
+
         if (sender) {
-          // use the same buffer for send/receive
-          this->post_buffer(port, buffer, size);
           auto mem = typed_value<big_data<data_type>>::from_buffer(buffer);
           interceptor::send_async(thisProxy[receiverIdx], port, std::move(mem));
           this->mb->put_request({}, senti);
@@ -153,12 +156,20 @@ struct locality : public vil<CBase_locality, int> {
     double endTime = CkWallTimer();
     double time = endTime - startTime;
     tmp = ((2.0 * size) / (1000 * 1000)) * numIters * numReps;
+    this->bandwidth = tmp / time;
 
+    CkCallback cb(CkIndex_locality::done(), thisProxy);
+    if (sender) CkStartQD(cb);
+  }
+
+  void done(void) {
+    auto& mine = this->__index__();
+    auto size = big_data<data_type>::kSize * sizeof(data_type);
     CkAssert(this->buffers[port].empty());
 
     if (sender) {
       CkPrintf("%d> avg bandwidth for %lu was %g MiB/s\n", mine, size,
-               tmp / time);
+               bandwidth);
 
       CkExit();
     }

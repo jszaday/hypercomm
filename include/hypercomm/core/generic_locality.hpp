@@ -52,6 +52,10 @@ class generic_locality_ : public virtual common_functions_ {
   void activate_component(const component_id_t& id);
   void invalidate_component(const component::id_t& id);
 
+  inline void manual_mode(const entry_port_ptr& port) {
+    this->outstanding[port];
+  }
+
   void post_buffer(const entry_port_ptr& port,
                    const std::shared_ptr<void>& buffer, const std::size_t& size,
                    const CkNcpyBufferPost& mode = {CK_BUFFER_UNREG,

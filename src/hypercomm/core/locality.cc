@@ -163,6 +163,9 @@ struct zero_copy_payload_ {
   entry_port_ptr dst_;
 
  public:
+  zero_copy_payload_(generic_locality_* _1, const entry_port_ptr& _2)
+      : parent_(_1), dst_(_2) {}
+
   zero_copy_payload_(generic_locality_* _1, entry_port_ptr&& _2)
       : parent_(_1), dst_(std::move(_2)) {}
 
@@ -181,6 +184,15 @@ struct zero_copy_payload_ {
   }
 };
 
+template <typename... Args>
+static inline void init_buffer_(CkNcpyBuffer* buffer,
+                                const CkNcpyBufferPost& mode,
+                                const std::size_t& size, Args... args) {
+  auto* ptr = new std::shared_ptr<void>(std::forward<Args>(args)...);
+  new (buffer) CkNcpyBuffer(ptr->get(), size, mode.regMode, mode.deregMode);
+  buffer->setRef(ptr);
+}
+
 void generic_locality_::post_buffer(const entry_port_ptr& port,
                                     const std::shared_ptr<void>& buffer,
                                     const std::size_t& size,
@@ -197,12 +209,22 @@ void generic_locality_::post_buffer(const entry_port_ptr& port,
 
   inner_type inner;
   auto outer = this->outstanding.find(port);
+  // determine whether we fulfill any outstanding buffers
   if (outer == std::end(this->outstanding) ||
       (inner = find_applicable(outer->second)) == std::end(outer->second)) {
+    // if not, save it for the future
     this->buffers[port].emplace_back(buffer, size, mode);
   } else {
-    NOT_IMPLEMENTED;
+    // create a CkNcpyBuffer to receive data into the buffer
+    CkNcpyBuffer dest;
+    init_buffer_(&dest, mode, size, buffer);
+    dest.cb = CkCallback((CkCallbackFn)&zero_copy_payload_::action_,
+                         new zero_copy_payload_(this, port));
+    // send the value request
+    dest.get(**inner);
+    // clean up
     outer->second.erase(inner);
+    QdProcess(1);
   }
 }
 
@@ -220,15 +242,12 @@ outstanding_iterator generic_locality_::poll_buffer(CkNcpyBuffer* buffer,
         std::begin(queue), std::end(queue),
         [&](const value_type& info) { return (std::get<1>(info) >= goal); });
     if (inner != std::end(queue)) {
-      // if found, take ownership of it
-      auto* ptr = new std::shared_ptr<void>(std::move(std::get<0>(*inner)));
-      auto& mode = std::get<2>(*inner);
-      new (buffer) CkNcpyBuffer(ptr->get(), std::get<1>(*inner), mode.regMode,
-                                mode.deregMode);
-      buffer->setRef(ptr);
+      // if found, take ownership of it (and form a buffer)
+      init_buffer_(buffer, std::get<2>(*inner), std::get<1>(*inner),
+                   std::move(std::get<0>(*inner)));
       // remove the buffer from the queue
       queue.erase(inner);
-      // then, if its empty, delete it (delay future seeks)
+      // then, if it's empty, delete it (avoid future seeks)
       if (queue.empty()) {
         this->buffers.erase(outer);
       }
@@ -262,6 +281,7 @@ void generic_locality_::demux_message(message* msg) {
       dest.get(*src);
     } else {
       search->second.emplace_back(std::move(src));
+      QdCreate(1);
     }
   } else {
     this->receive_value(port, msg2value(msg));
