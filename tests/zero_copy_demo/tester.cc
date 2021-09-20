@@ -68,18 +68,17 @@ struct big_data {
   static constexpr T kMagic = 0x69696969;
   T data[kSize];
 
-  big_data(const int& seed, const bool& magicify) {
-    data[0] = seed;
+  big_data(const bool& init) {
     auto end = data + kSize;
-    for (auto it = data + 1; magicify && it < end; it += kStep) {
+    for (auto it = data; init && it < end; it += kStep) {
       *it = kMagic;
     }
   }
 
   bool is_valid(void) const {
-    auto end = data + kSize;
     auto valid = true;
-    for (auto it = data + 1; valid && it < end; it += kStep) {
+    auto end = data + kSize;
+    for (auto it = data; valid && it < end; it += kStep) {
       valid = valid && (*it == kMagic);
     }
     return valid;
@@ -103,6 +102,7 @@ struct locality : public vil<CBase_locality, int> {
   }
 
   void run(CkMessage* msg) {
+    auto size = big_data<data_type>::kSize * sizeof(data_type);
     auto cfg = typed_value<configuration>::from_message(msg)->value();
     auto senderIdx = conv2idx<CkArrayIndex>(cfg.senderIdx);
     auto receiverIdx = conv2idx<CkArrayIndex>(cfg.receiverIdx);
@@ -119,6 +119,10 @@ struct locality : public vil<CBase_locality, int> {
 
     // implements a primitive form of completion detection
     auto senti = sender ? std::make_shared<sentinel_callback>() : nullptr;
+    // creates an appropriately sized buffer for our data
+    std::shared_ptr<big_data<data_type>> buffer(
+      sender ? new big_data<data_type>(sender) : nullptr
+    );
 
     double startTime = 0;
     for (auto rep = 0; rep < (numReps + numSkip); rep++) {
@@ -129,7 +133,9 @@ struct locality : public vil<CBase_locality, int> {
       // bounce numIters messages back and forth between the communicators
       for (auto it = 0; it < numIters; it++) {
         if (sender) {
-          auto mem = make_typed_value<big_data<data_type>>(it, false);
+          // use the same buffer for send/receive
+          this->post_buffer(port, buffer, size);
+          auto mem = wrap_buffer<big_data<data_type>>(buffer);
           interceptor::send_async(thisProxy[receiverIdx], port, std::move(mem));
           this->mb->put_request({}, senti);
         } else {
@@ -146,8 +152,9 @@ struct locality : public vil<CBase_locality, int> {
     double tmp;
     double endTime = CkWallTimer();
     double time = endTime - startTime;
-    auto size = big_data<data_type>::kSize * sizeof(data_type);
     tmp = ((2.0 * size) / (1000 * 1000)) * numIters * numReps;
+
+    CkAssert(this->buffers[port].empty());
 
     if (sender) {
       CkPrintf("%d> avg bandwidth for %lu was %g MiB/s\n", mine, size,

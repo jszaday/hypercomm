@@ -40,6 +40,14 @@ struct no_init {};
 
 struct allocate {};
 
+template <typename T>
+struct use_buffer {
+  std::shared_ptr<T> buffer;
+
+  template <typename... Args>
+  use_buffer(Args... args) : buffer(std::forward<Args>(args)...) {}
+};
+
 using reconstruct = PUP::reconstruct;
 }  // namespace tags
 
@@ -78,6 +86,7 @@ struct temporary<T, kBuffer> {
   temporary(const tags::no_init&) {}
   temporary(const tags::reconstruct&) {}
   temporary(const tags::allocate&) : data(::operator new(sizeof(T))) {}
+  temporary(tags::use_buffer<T>&& _) : data(std::move(_.buffer)) {}
 
   template <typename... Args>
   temporary(Args... args) : temporary(tags::allocate{}) {

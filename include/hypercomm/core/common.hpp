@@ -39,8 +39,8 @@ using component_port_t = std::pair<component::id_t, component::port_type>;
 using component_map =
     std::unordered_map<component::id_t, std::unique_ptr<component>>;
 
-template <typename Key>
-using message_queue = comparable_map<Key, std::deque<component::value_type>>;
+template <typename T>
+using mapped_queue = comparable_map<entry_port_ptr, std::deque<T>>;
 
 message* repack_to_port(const entry_port_ptr& port,
                         component::value_type&& value);

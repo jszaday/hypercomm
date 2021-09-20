@@ -84,6 +84,12 @@ inline std::unique_ptr<typed_value<T>> make_typed_value(Args... args) {
   return make_value<typed_value_impl_<T>>(std::forward<Args>(args)...);
 }
 
+template <typename T, typename... Args>
+inline std::unique_ptr<typed_value<T>> wrap_buffer(Args... args) {
+  return make_value<typed_value_impl_<T, kBuffer>>(
+      tags::use_buffer<T>(std::forward<Args>(args)...));
+}
+
 inline std::unique_ptr<typed_value<unit_type>> make_unit_value(void) {
   return make_typed_value<unit_type>(tags::no_init{});
 }
@@ -99,10 +105,8 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
                                  ? dynamic_cast<buffer_value*>(value)
                                  : nullptr;
     if (try_buff) {
-      auto typed = make_value<typed_value_impl_<T, kBuffer>>(tags::no_init{});
-      auto offset = try_buff->payload<T>();
-      ::new (&typed->tmp.data)
-          std::shared_ptr<T>(std::move(try_buff->buffer), offset);
+      auto typed =
+          wrap_buffer<T>(std::move(try_buff->buffer), try_buff->payload<T>());
       delete value;
       return std::move(typed);
     } else {

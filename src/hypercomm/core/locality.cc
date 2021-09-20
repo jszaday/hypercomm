@@ -168,8 +168,9 @@ struct zero_copy_payload_ {
 
   static void action_(zero_copy_payload_* self, CkDataMsg* msg) {
     auto* buf = (CkNcpyBuffer*)(msg->data);
-    std::shared_ptr<void> ptr(const_cast<void*>(buf->ptr), CkRdmaFree);
-    auto val = make_value<buffer_value>(std::move(ptr), buf->cnt);
+    auto* ptr = (std::shared_ptr<void>*)buf->getRef();
+    auto val = make_value<buffer_value>(std::move(*ptr), buf->cnt);
+    delete ptr;
     buf->deregisterMem();
     CkFreeMsg(msg);
 
@@ -180,6 +181,40 @@ struct zero_copy_payload_ {
   }
 };
 
+void generic_locality_::poll_buffer(CkNcpyBuffer* buffer,
+                                    const entry_port_ptr& port,
+                                    const std::size_t& goal) {
+  using value_type = typename decltype(this->buffers)::mapped_type::value_type;
+  // seek the queue of buffers from the map
+  auto outer = this->buffers.find(port);
+  if (outer != std::end(this->buffers)) {
+    auto& queue = outer->second;
+    // and within it, seek a buffer large enough to accomodate the request
+    auto inner = std::find_if(
+        std::begin(queue), std::end(queue),
+        [&](const value_type& info) { return (std::get<1>(info) >= goal); });
+    if (inner != std::end(queue)) {
+      // if found, take ownership of it
+      auto* ptr = new std::shared_ptr<void>(std::move(std::get<0>(*inner)));
+      auto& mode = std::get<2>(*inner);
+      new (buffer) CkNcpyBuffer(ptr->get(), std::get<1>(*inner), mode.regMode,
+                                mode.deregMode);
+      buffer->setRef(ptr);
+      // remove the buffer from the queue
+      queue.erase(inner);
+      // then, if its empty, delete it (delay future seeks)
+      if (queue.empty()) {
+        this->buffers.erase(outer);
+      }
+      return;
+    }
+  }
+  // if nothing is avail., create a preregistered buffer to receive data
+  auto* ptr = new std::shared_ptr<void>(CkRdmaAlloc(goal), CkRdmaFree);
+  new (buffer) CkNcpyBuffer(ptr->get(), goal, CK_BUFFER_PREREG);
+  buffer->setRef(ptr);
+}
+
 void generic_locality_::demux_message(message* msg) {
   this->update_context();
   auto port = std::move(msg->dst);
@@ -188,10 +223,10 @@ void generic_locality_::demux_message(message* msg) {
     PUP::fromMem p(msg->payload);
     p | src;
 
-    void* mem = CkRdmaAlloc(src.cnt);
-    CkCallback cb((CkCallbackFn)&zero_copy_payload_::action_,
-                  new zero_copy_payload_(this, std::move(port)));
-    CkNcpyBuffer dest(mem, src.cnt, cb, CK_BUFFER_PREREG);
+    CkNcpyBuffer dest;
+    this->poll_buffer(&dest, port, src.cnt);
+    dest.cb = CkCallback((CkCallbackFn)&zero_copy_payload_::action_,
+                         new zero_copy_payload_(this, std::move(port)));
 
     dest.get(src);
   } else {
