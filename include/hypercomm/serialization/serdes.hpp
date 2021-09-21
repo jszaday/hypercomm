@@ -17,15 +17,22 @@ class unpacker;
 
 struct generic_ptr_ {
   virtual void reset(const std::shared_ptr<void>&) = 0;
+  virtual std::shared_ptr<void> lock(void) = 0;
 };
 
 template <typename T>
 struct generic_ptr_impl_ : public generic_ptr_ {
   std::shared_ptr<T>& ptr;
   generic_ptr_impl_(std::shared_ptr<T>& _) : ptr(_) {}
+
   virtual void reset(const std::shared_ptr<void>& _) override {
     auto typed = std::static_pointer_cast<T>(_);
     new (&this->ptr) std::shared_ptr<T>(std::move(typed));
+  }
+
+  virtual std::shared_ptr<void> lock(void) override {
+    CkAssertMsg(this->ptr, "pointer died before pup!");
+    return std::static_pointer_cast<void>(this->ptr);
   }
 };
 
@@ -83,24 +90,25 @@ class serdes {
 
   enum state_t { SIZING, PACKING, UNPACKING };
 
-  bool deferrable = false;
+  bool deferrable;
   const std::weak_ptr<void> source;
   const char* start;
   char* current;
   const state_t state;
 
-  serdes(const std::shared_ptr<void>& _1, const char* _2)
+  serdes(const std::shared_ptr<void>& _1, const char* _2, const bool& _3)
       : source(_1),
         start(_2),
         current(const_cast<char*>(_2)),
-        state(UNPACKING) {}
+        state(UNPACKING),
+        deferrable(_3) {}
 
-  serdes(const char* _1, const state_t& _2)
-      : start(_1), current(const_cast<char*>(_1)), state(_2) {}
+  serdes(const char* _1, const state_t& _2, const bool& _3)
+      : start(_1), current(const_cast<char*>(_1)), state(_2), deferrable(_3) {}
 
-  serdes(const char* _1) : serdes(_1, PACKING) {}
+  serdes(const char* _1, const bool& _2) : serdes(_1, PACKING, _2) {}
 
-  serdes(void) : serdes(nullptr, SIZING) {}
+  serdes(const bool& _1) : serdes(nullptr, SIZING, _1) {}
 
  public:
   friend class sizer;
@@ -111,10 +119,34 @@ class serdes {
   serdes(const serdes&) = delete;
 
   template <typename T>
-  inline void put_deferred(const ptr_record& rec, const std::shared_ptr<T>& t) {
+  inline void put_deferred(const ptr_record& rec, std::shared_ptr<T>& t) {
     auto& def = this->deferred[rec.id];
     def.size = rec.size;
     def.push_back(t);
+  }
+
+  using deferred_type =
+      std::tuple<ptr_id_t, std::size_t, std::shared_ptr<void>>;
+  inline void get_deferred(std::vector<deferred_type>& vect) {
+    using value_type = decltype(this->deferred)::value_type;
+
+    std::transform(std::begin(this->deferred), std::end(this->deferred),
+                   std::back_inserter(vect),
+                   [](const value_type& pair) -> deferred_type {
+                     auto& inst = pair.second;
+                     return std::make_tuple(pair.first, inst.size,
+                                            inst.ptrs.front()->lock());
+                   });
+
+#if CMK_ERROR_CHECKING
+    auto sorted =
+        std::is_sorted(std::begin(vect), std::end(vect),
+                       [](const deferred_type& lhs, const deferred_type& rhs) {
+                         return std::get<0>(lhs) - std::get<1>(rhs);
+                       });
+
+    CkAssertMsg(sorted, "resulting vector was unsorted!");
+#endif
   }
 
   inline bool packing() const { return state == state_t::PACKING; }
@@ -174,17 +206,19 @@ class serdes {
 
 class sizer : public serdes {
  public:
-  sizer(void) = default;
+  sizer(const bool& _1 = false) : serdes(_1) {}
 };
 
 class packer : public serdes {
  public:
-  packer(const char* _1) : serdes(_1) {}
+  packer(const char* _1, const bool& _2 = false) : serdes(_1, _2) {}
 };
 
 class unpacker : public serdes {
  public:
-  unpacker(const std::shared_ptr<void>& _1, const char* _2) : serdes(_1, _2) {}
+  unpacker(const std::shared_ptr<void>& _1, const char* _2,
+           const bool& _3 = false)
+      : serdes(_1, _2, _3) {}
 };
 
 }  // namespace hypercomm

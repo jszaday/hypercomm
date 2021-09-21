@@ -9,6 +9,8 @@
 
 #include "utilities/hash.hpp"
 
+#define NOT_IMPLEMENTED CkAbort("not yet implemented!")
+
 namespace hypercomm {
 
 namespace utilities {

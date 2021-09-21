@@ -8,12 +8,85 @@ namespace hypercomm {
 CkpvDeclare(CProxy_interceptor, interceptor_);
 
 namespace detail {
-void delete_value_(hyper_value* value, CkDataMsg* msg) {
-  delete value;
+void delete_value_(const void*, CkDataMsg* msg) {
   auto* buf = (CkNcpyBuffer*)(msg->data);
+  auto* ptr = (std::shared_ptr<void>*)buf->getRef();
   buf->deregisterMem();
   CkFreeMsg(msg);
+  delete ptr;
 }
+
+message* pack_deferrable_(const entry_port_ptr& port,
+                          component::value_type&& uniq) {
+  std::shared_ptr<hyper_value> value(uniq.release());
+  std::vector<serdes::deferred_type> deferred;
+  std::vector<CkNcpyBuffer> buffers;
+  // find the size of the value, and extract any
+  // buffers to be deferred (and sent via RDMA)
+  auto pupSize = ([&](void) {
+    sizer s(true);
+    value->pup(s);
+    s.get_deferred(deferred);
+    return s.size();
+  })();
+  auto hasDeferred = !deferred.empty();
+  auto msgSize = pupSize;
+  // add an offset for the std::vector's size
+  if (hasDeferred) {
+    msgSize += sizeof(std::size_t);
+  }
+  // for every deferred block of memory
+  for (auto& tup : deferred) {
+    // create a (shared) pointer to the memory
+    auto* ptr = new std::shared_ptr<void>(std::move(std::get<2>(tup)));
+    auto& size = std::get<1>(tup);
+    // create a callback to delete the value (on this PE)
+    CkCallback cb((CkCallbackFn)&delete_value_, nullptr);
+    // set up the CkNcpyBuffer
+    buffers.emplace_back(ptr->get(), size, cb, CK_BUFFER_REG);
+    auto& buffer = buffers.back();
+    buffer.setRef(ptr);
+    // and "PUP" it
+    msgSize += PUP::size(buffer);
+  }
+  // set up the message
+  auto msg = message::make_message(msgSize, port);
+  msg->set_zero_copy(hasDeferred);
+  // PUP the buffers first (so the receiver can
+  // access them without offsets)
+  PUP::toMem p(msg->payload);
+  if (hasDeferred) {
+    p | buffers;
+  }
+  // then PUP the value (with deference)
+  packer s(p.get_current_pointer(), hasDeferred);
+  value->pup(s);
+  CkAssertMsg((p.size() + s.size()) == msgSize, "size mismatch!");
+  return msg;
+}
+
+message* repack_to_port(const entry_port_ptr& port,
+                        component::value_type&& value) {
+  if (value->pupable) {
+    return pack_deferrable_(port, std::move(value));
+  } else {
+    auto msg = value ? static_cast<message*>(value->release())
+                     : message::make_null_message(port);
+    auto env = UsrToEnv(msg);
+    auto msgIdx = env->getMsgIdx();
+    if (msgIdx == message::__idx) {
+      env->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
+      msg->dst = port;
+      return msg;
+    } else {
+      // TODO repack to hypercomm in this case (when HYPERCOMM_NO_COPYING is
+      // undefined)
+      CkAbort("expected a hypercomm msg, but got %s instead\n",
+              _msgTable[msgIdx]->name);
+    }
+  }
+}
+
 }  // namespace detail
 
 namespace messaging {
