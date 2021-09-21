@@ -15,6 +15,26 @@ class sizer;
 class packer;
 class unpacker;
 
+// records whether a ptr-type is a back-reference or an instance
+struct ptr_record {
+  enum kind_t : std::uint8_t { INVALID, IGNORED, REFERENCE, INSTANCE };
+
+  kind_t kind;
+  ptr_id_t id;
+  polymorph_id_t ty;
+
+  ptr_record(const ptr_record&) = default;
+  ptr_record(const kind_t& _ = INVALID) : kind(_) {}
+  ptr_record(std::nullptr_t) : ptr_record(IGNORED) {}
+  ptr_record(const ptr_id_t& _1) : kind(REFERENCE), id(_1) {}
+  ptr_record(const ptr_id_t& _1, const polymorph_id_t& _2)
+      : kind(INSTANCE), id(_1), ty(_2) {}
+
+  inline bool is_null() const { return kind == IGNORED; }
+  inline bool is_instance() const { return kind == INSTANCE; }
+  inline bool is_reference() const { return kind == REFERENCE; }
+};
+
 class serdes {
   template <typename K, typename V>
   using owner_less_map = std::map<K, V, std::owner_less<K>>;
@@ -22,7 +42,7 @@ class serdes {
   std::map<ptr_id_t, std::weak_ptr<void>> instances;
 
  public:
-  owner_less_map<std::weak_ptr<void>, ptr_id_t> records;
+  owner_less_map<std::weak_ptr<void>, ptr_record> records;
 
   enum state_t { SIZING, PACKING, UNPACKING };
 
@@ -120,36 +140,6 @@ class packer : public serdes {
 class unpacker : public serdes {
  public:
   unpacker(const std::shared_ptr<void>& _1, const char* _2) : serdes(_1, _2) {}
-};
-
-// records whether a ptr-type is a back-reference or an instance
-struct ptr_record {
-  union data_t {
-    struct s_reference {
-      ptr_id_t id;
-    } reference;
-    struct s_instance {
-      ptr_id_t id;
-      polymorph_id_t ty;
-    } instance;
-  };
-
-  enum type_t : std::uint8_t { UNKNOWN, IGNORE, REFERENCE, INSTANCE };
-
-  data_t d;
-  type_t t;
-
-  ptr_record() : t(UNKNOWN) {}
-  ptr_record(std::nullptr_t) : t(IGNORE) {}
-  ptr_record(const ptr_id_t& id) : t(REFERENCE) { d.reference.id = id; }
-  ptr_record(const ptr_id_t& id, const polymorph_id_t& ty) : t(INSTANCE) {
-    d.instance.id = id;
-    d.instance.ty = ty;
-  }
-
-  inline bool is_null() const { return t == IGNORE; }
-  inline bool is_instance() const { return t == INSTANCE; }
-  inline bool is_reference() const { return t == REFERENCE; }
 };
 
 }  // namespace hypercomm
