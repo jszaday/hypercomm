@@ -3,8 +3,8 @@
 
 #include "../reductions/contribution.hpp"
 #include "../messaging/packing.hpp"
+#include "zero_copy_value.hpp"
 #include "config.hpp"
-#include "value.hpp"
 
 namespace hypercomm {
 
