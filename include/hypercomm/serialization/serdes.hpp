@@ -17,22 +17,22 @@ class unpacker;
 
 // records whether a ptr-type is a back-reference or an instance
 struct ptr_record {
-  enum type_t : std::uint8_t { INVALID, IGNORED, REFERENCE, INSTANCE };
+  enum kind_t : std::uint8_t { INVALID, IGNORED, REFERENCE, INSTANCE };
 
-  type_t t;
+  kind_t kind;
   ptr_id_t id;
   polymorph_id_t ty;
 
   ptr_record(const ptr_record&) = default;
-  ptr_record(const type_t _ = INVALID) : t(_) {}
+  ptr_record(const kind_t& _ = INVALID) : kind(_) {}
   ptr_record(std::nullptr_t) : ptr_record(IGNORED) {}
-  ptr_record(const ptr_id_t& _1) : t(REFERENCE), id(_1) {}
+  ptr_record(const ptr_id_t& _1) : kind(REFERENCE), id(_1) {}
   ptr_record(const ptr_id_t& _1, const polymorph_id_t& _2)
-      : t(INSTANCE), id(_1), ty(_2) {}
+      : kind(INSTANCE), id(_1), ty(_2) {}
 
-  inline bool is_null() const { return t == IGNORED; }
-  inline bool is_instance() const { return t == INSTANCE; }
-  inline bool is_reference() const { return t == REFERENCE; }
+  inline bool is_null() const { return kind == IGNORED; }
+  inline bool is_instance() const { return kind == INSTANCE; }
+  inline bool is_reference() const { return kind == REFERENCE; }
 };
 
 class serdes {

@@ -225,28 +225,29 @@ struct pack_helper<T, typename std::enable_if<is_polymorph<T>::value>::type> {
 };
 
 template <typename T, typename IdentifyFn>
-inline static void pack_ptr(serdes& s, std::shared_ptr<T>& p,
-                            const IdentifyFn& f) {
-  if (!p) {
-    ptr_record rec(nullptr);
-    pup(s, rec);
-  } else {
-    auto search = s.records.find(p);
+inline static void pack_ptr(serdes& s, std::shared_ptr<T>& t,
+                            const IdentifyFn& fn) {
+  if ((bool)t) {
+    auto search = s.records.find(t);
     if (search == s.records.end()) {
       auto id = s.records.size() + 1;
       auto pair =
-          s.records.emplace(std::piecewise_construct, std::make_tuple(p),
-                            std::make_tuple(id, f()));
+          s.records.emplace(std::piecewise_construct, std::make_tuple(t),
+                            std::make_tuple(id, fn()));
       auto& rec = pair.first->second;
       pup(s, rec);
-      pack_helper<T>::pack(s, *p);
+      pack_helper<T>::pack(s, *t);
     } else {
-      ptr_record rec(search->second);
-      if (search->second.is_instance()) {
-        rec.t = ptr_record::REFERENCE;
+      auto& other = search->second;
+      ptr_record rec(other);
+      if (other.is_instance()) {
+        rec.kind = ptr_record::REFERENCE;
       }
       pup(s, rec);
     }
+  } else {
+    ptr_record rec(nullptr);
+    pup(s, rec);
   }
 }
 }  // namespace
@@ -263,23 +264,23 @@ struct puper<T, typename std::enable_if<is_polymorph<T>::value &&
 
 template <>
 struct puper<ptr_record> {
-  using impl_type = typename std::underlying_type<ptr_record::type_t>::type;
+  using impl_type = typename std::underlying_type<ptr_record::kind_t>::type;
 
-  inline static void impl(serdes& s, ptr_record& t) {
-    auto& ty = *(reinterpret_cast<impl_type*>(&t.t));
-    s | ty;
-    switch (ty) {
+  inline static void impl(serdes& s, ptr_record& rec) {
+    auto& k = *(reinterpret_cast<impl_type*>(&rec.kind));
+    s | k;
+    switch (k) {
       case ptr_record::REFERENCE:
-        pup(s, t.id);
+        pup(s, rec.id);
         break;
       case ptr_record::INSTANCE:
-        pup(s, t.id);
-        pup(s, t.ty);
+        pup(s, rec.id);
+        pup(s, rec.ty);
         break;
       case ptr_record::IGNORED:
         break;
       default:
-        CkAbort("unknown record type %d", static_cast<int>(ty));
+        CkAbort("unknown record type %d", static_cast<int>(k));
         break;
     }
   }
@@ -322,7 +323,7 @@ class puper<std::shared_ptr<T>,
         } else if (rec.is_reference()) {
           p = s.get_instance<polymorph>(rec.id);
         } else {
-          CkAbort("unknown record type %d", static_cast<int>(rec.t));
+          CkAbort("unknown record type %d", static_cast<int>(rec.kind));
         }
         ::new (&t) std::shared_ptr<T>(std::dynamic_pointer_cast<T>(p));
       }
@@ -480,7 +481,7 @@ struct puper<std::shared_ptr<T>,
     } else if (rec.is_reference()) {
       ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.id));
     } else {
-      CkAbort("unknown record type %d", static_cast<int>(rec.t));
+      CkAbort("unknown record type %d", static_cast<int>(rec.kind));
     }
   }
 
