@@ -15,7 +15,7 @@ constexpr bool is_bytes(void) {
 }
 
 template <typename T, typename Enable = void>
-struct zero_copyable {
+struct is_zero_copyable {
   static constexpr auto value = is_bytes<T>();
 };
 
@@ -82,11 +82,6 @@ struct built_in<
 };
 
 template <class T, typename Enable = void>
-struct is_pupable {
-  enum { value = false };
-};
-
-template <class T, typename Enable = void>
 struct is_message {
   enum { value = false };
 };
@@ -94,11 +89,6 @@ struct is_message {
 template <class T>
 struct is_message<
     T, typename std::enable_if<std::is_base_of<CkMessage, T>::value>::type> {
-  enum { value = true };
-};
-
-template <class T>
-struct is_pupable<T, typename std::enable_if<is_message<T>::value>::type> {
   enum { value = true };
 };
 
@@ -137,9 +127,11 @@ struct is_polymorphic<
   enum { value = true };
 };
 
-template <class T>
-struct is_pupable<T, typename std::enable_if<is_polymorphic<T>::value>::type> {
-  enum { value = true };
+template <class T, typename Enable = void>
+struct is_idiosyncratic_ptr {
+  static constexpr auto value = is_zero_copyable<T>::value ||
+                                is_polymorphic<T>::value ||
+                                is_message<T>::value;
 };
 
 template <template <typename...> class C, typename... Ts>

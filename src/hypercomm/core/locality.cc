@@ -268,8 +268,14 @@ void generic_locality_::demux_message(message* msg) {
   this->update_context();
   auto port = std::move(msg->dst);
   if (msg->is_zero_copy()) {
-    std::unique_ptr<CkNcpyBuffer> src(new CkNcpyBuffer);
+    std::size_t bufferCount;
     PUP::fromMem p(msg->payload);
+    p | bufferCount;
+
+    CkEnforceMsg(bufferCount == 1,
+                 "can only support one buffer at a time for now.\n");
+
+    std::unique_ptr<CkNcpyBuffer> src(new CkNcpyBuffer);
     p | *src;
     CkFreeMsg(msg);
 

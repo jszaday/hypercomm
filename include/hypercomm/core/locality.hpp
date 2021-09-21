@@ -257,29 +257,6 @@ void deliver(const element_proxy<Index>& proxy, message* msg) {
   interceptor::send_async(base, msg);
 }
 
-// TODO this should probably be renamed to "pack_to_port"
-message* repack_to_port(const entry_port_ptr& port,
-                        component::value_type&& value) {
-  auto msg = value ? static_cast<message*>(value->release())
-                   : message::make_null_message(port);
-  auto env = UsrToEnv(msg);
-  auto msgIdx = env->getMsgIdx();
-
-  env->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
-
-  if (msgIdx == message::__idx) {
-    // TODO should this be a move?
-    msg->dst = port;
-
-    return msg;
-  } else {
-    // TODO repack to hypercomm in this case (when HYPERCOMM_NO_COPYING is
-    // undefined)
-    CkAbort("expected a hypercomm msg, but got %s instead\n",
-            _msgTable[msgIdx]->name);
-  }
-}
-
 void generic_locality_::loopback(const entry_port_ptr& port,
                                  component::value_type&& value) {
   auto elt = dynamic_cast<ArrayElement*>(this);

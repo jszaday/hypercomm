@@ -22,7 +22,7 @@ class typed_value : public hyper_value {
   using type = T;
 
   typed_value(const void* _1, const storage_scheme& _2)
-      : storage(_1), scheme(_2) {}
+      : hyper_value(true), storage(_1), scheme(_2) {}
 
   // avoids a costly virtual method dispatch
   inline T* get(void) noexcept {
@@ -64,16 +64,13 @@ class typed_value_impl_ : public typed_value<T> {
 
   virtual bool recastable(void) const override { return false; }
 
-  std::pair<const void*, std::size_t> try_zero_copy(void) const override {
-    if (zero_copyable<T>::value) {
-      auto& val = this->value();
-      auto size = hypercomm::size(val);
-      if (size >= kZeroCopySize) {
-        return std::make_pair(&val, size);
-      }
+  virtual void pup(serdes& s) override {
+    if (Scheme == kInline) {
+      std::shared_ptr<T> ptr(this->shared_from_this(), this->get());
+      s | ptr;
+    } else {
+      s | this->tmp;
     }
-
-    return std::make_pair(nullptr, 0x0);
   }
 
   virtual hyper_value::message_type release(void) override {
@@ -125,7 +122,7 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
   if (try_cast) {
     return std::unique_ptr<typed_value<T>>(try_cast);
   } else if (value->recastable()) {
-    buffer_value* try_buff = (zero_copyable<T>::value)
+    buffer_value* try_buff = (is_zero_copyable<T>::value)
                                  ? dynamic_cast<buffer_value*>(value)
                                  : nullptr;
     if (try_buff) {

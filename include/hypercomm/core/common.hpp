@@ -5,8 +5,6 @@
 #include "../components/component.hpp"
 #include "callback.hpp"
 
-#define NOT_IMPLEMENTED CkAbort("not yet implemented!")
-
 namespace hypercomm {
 
 template <typename T>
@@ -41,9 +39,6 @@ using component_map =
 
 template <typename T>
 using mapped_queue = comparable_map<entry_port_ptr, std::deque<T>>;
-
-message* repack_to_port(const entry_port_ptr& port,
-                        component::value_type&& value);
 
 generic_locality_* access_context_(void);
 
