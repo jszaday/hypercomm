@@ -232,15 +232,20 @@ inline static void pack_ptr(serdes& s, std::shared_ptr<T>& p,
     pup(s, rec);
   } else {
     auto search = s.records.find(p);
-    if (search != s.records.end()) {
-      ptr_record rec(search->second);
-      pup(s, rec);
-    } else {
+    if (search == s.records.end()) {
       auto id = s.records.size() + 1;
-      ptr_record rec(id, f());
+      auto pair =
+          s.records.emplace(std::piecewise_construct, std::make_tuple(p),
+                            std::make_tuple(id, f()));
+      auto& rec = pair.first->second;
       pup(s, rec);
-      s.records[p] = id;
       pack_helper<T>::pack(s, *p);
+    } else {
+      ptr_record rec(search->second);
+      if (search->second.is_instance()) {
+        rec.t = ptr_record::REFERENCE;
+      }
+      pup(s, rec);
     }
   }
 }
@@ -265,13 +270,13 @@ struct puper<ptr_record> {
     s | ty;
     switch (ty) {
       case ptr_record::REFERENCE:
-        pup(s, t.d.reference.id);
+        pup(s, t.id);
         break;
       case ptr_record::INSTANCE:
-        pup(s, t.d.instance.id);
-        pup(s, t.d.instance.ty);
+        pup(s, t.id);
+        pup(s, t.ty);
         break;
-      case ptr_record::IGNORE:
+      case ptr_record::IGNORED:
         break;
       default:
         CkAbort("unknown record type %d", static_cast<int>(ty));
@@ -310,12 +315,12 @@ class puper<std::shared_ptr<T>,
       } else {
         std::shared_ptr<polymorph> p;
         if (rec.is_instance()) {
-          p.reset(hypercomm::instantiate(rec.d.instance.ty));
-          CkAssertMsg(s.put_instance(rec.d.instance.id, p),
+          p.reset(hypercomm::instantiate(rec.ty));
+          CkAssertMsg(s.put_instance(rec.id, p),
                       "instance insertion did not occur!");
           p->__pup__(s);
         } else if (rec.is_reference()) {
-          p = s.get_instance<polymorph>(rec.d.reference.id);
+          p = s.get_instance<polymorph>(rec.id);
         } else {
           CkAbort("unknown record type %d", static_cast<int>(rec.t));
         }
@@ -470,10 +475,10 @@ struct puper<std::shared_ptr<T>,
           free(p);
         });
       }
-      CkAssertMsg(s.put_instance(rec.d.instance.id, t),
+      CkAssertMsg(s.put_instance(rec.id, t),
                   "instance insertion did not occur!");
     } else if (rec.is_reference()) {
-      ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.d.reference.id));
+      ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.id));
     } else {
       CkAbort("unknown record type %d", static_cast<int>(rec.t));
     }
