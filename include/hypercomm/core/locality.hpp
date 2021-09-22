@@ -342,9 +342,10 @@ bool vil<Base, Index>::check_future(const future& f) const {
   }
 }
 
-template <typename Index>
-void forwarding_callback<Index>::send(callback::value_type&& value) {
-  send2port(this->proxy, this->port, std::move(value));
+void forwarding_callback<CkArrayIndex>::send(callback::value_type&& value) {
+  const auto& base =
+      static_cast<const CProxyElement_locality_base_&>(this->proxy->c_proxy());
+  interceptor::send_async(base, this->ep, std::move(value));
 }
 
 void entry_port::on_completion(const component&) {

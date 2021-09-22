@@ -15,6 +15,7 @@ class endpoint {
   const int idx_;
   const entry_port_ptr port_;
 
+  endpoint(PUP::reconstruct) : endpoint(0x0) {}
   endpoint(const int& _) : idx_(_), port_(nullptr) {}
   endpoint(const entry_port_ptr& _) : idx_(demux()), port_(_) {}
   endpoint(std::tuple<int, const entry_port_ptr&>&& pair)
@@ -36,6 +37,11 @@ class endpoint {
   inline hash_code hash(void) const {
     return hash_combine(utilities::hash<int>()(this->idx_),
                         utilities::hash<entry_port_ptr>()(this->port_));
+  }
+
+  inline void pup(serdes& s) {
+    s | const_cast<int&>(this->idx_);
+    s | const_cast<entry_port_ptr&>(this->port_);
   }
 
   template <typename T>

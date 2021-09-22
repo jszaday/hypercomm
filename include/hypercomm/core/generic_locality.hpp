@@ -58,8 +58,9 @@ class generic_locality_ : public virtual common_functions_ {
   void activate_component(const component_id_t& id);
   void invalidate_component(const component::id_t& id);
 
-  inline void manual_mode(const entry_port_ptr& port) {
-    this->outstanding[port];
+  template <typename T>
+  inline is_valid_endpoint_t<T> manual_mode(const T& ep) {
+    this->outstanding[ep];
   }
 
   template <typename T>

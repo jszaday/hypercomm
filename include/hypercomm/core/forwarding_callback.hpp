@@ -6,20 +6,24 @@
 namespace hypercomm {
 
 template <typename Index>
-struct forwarding_callback : public core::callback {
-  element_ptr<Index> proxy;
-  entry_port_ptr port;
+struct forwarding_callback;
 
-  forwarding_callback(PUP::reconstruct) {}
+template <>
+struct forwarding_callback<CkArrayIndex> : public core::callback {
+  element_ptr<CkArrayIndex> proxy;
+  endpoint ep;
 
-  forwarding_callback(const element_ptr<Index>& _1, const entry_port_ptr& _2)
-      : proxy(_1), port(_2) {}
+  forwarding_callback(PUP::reconstruct tag) : ep(tag) {}
+
+  template <typename T>
+  forwarding_callback(const element_ptr<CkArrayIndex>& _1, const T& _2)
+      : proxy(_1), ep(_2) {}
 
   virtual void send(core::callback::value_type&&) override;
 
   virtual void __pup__(serdes& s) override {
-    s | proxy;
-    s | port;
+    s | this->proxy;
+    this->ep.pup(s);
   }
 };
 
