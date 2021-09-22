@@ -1,6 +1,7 @@
 #ifndef __HYPERCOMM_PUP_HPP__
 #define __HYPERCOMM_PUP_HPP__
 
+#include "../core/config.hpp"
 #include "construction.hpp"
 #include "enrollment.hpp"
 #include "serdes.hpp"
@@ -28,6 +29,19 @@ inline size_t size(const T& t) {
   sizer s;
   pup(s, const_cast<T&>(t));
   return s.size();
+}
+
+template <typename T, typename Enable = void>
+struct quick_sizer;
+
+template <typename T>
+struct quick_sizer<T, typename std::enable_if<is_bytes<T>()>::type> {
+  inline static std::size_t impl(const T& t) { return sizeof(T); }
+};
+
+template <typename T>
+inline std::size_t quick_size(const T& t) {
+  return quick_sizer<T>::impl(t);
 }
 
 template <typename T>
@@ -97,11 +111,10 @@ struct puper<T, typename std::enable_if<PUP::as_bytes<T>::value>::type> {
   inline static void impl(serdes& s, T& t) { s.copy(&t); }
 };
 
-// template <typename T>
-// struct puper<temporary<T, kBuffer>> {
-//   inline static void impl(serdes& s, temporary<T, kBuffer>& t) { s | t.data;
-//   }
-// };
+template <typename T>
+struct puper<temporary<T, kBuffer>> {
+  inline static void impl(serdes& s, temporary<T, kBuffer>& t) { s | t.data; }
+};
 
 template <typename T>
 struct puper<temporary<T, kInline>> {
@@ -225,7 +238,7 @@ struct pack_helper<T, typename std::enable_if<is_polymorph<T>::value>::type> {
 };
 
 template <typename T, typename IdentifyFn>
-inline static void pack_ptr(serdes& s, std::shared_ptr<T>& t,
+inline static void pack_ptr(serdes& s, ptr_record** out, std::shared_ptr<T>& t,
                             const IdentifyFn& fn) {
   if ((bool)t) {
     auto search = s.records.find(t);
@@ -234,9 +247,8 @@ inline static void pack_ptr(serdes& s, std::shared_ptr<T>& t,
       auto pair =
           s.records.emplace(std::piecewise_construct, std::make_tuple(t),
                             std::make_tuple(id, fn()));
-      auto& rec = pair.first->second;
-      pup(s, rec);
-      pack_helper<T>::pack(s, *t);
+      CkAssertMsg(pair.second, "insertion did not occur!");
+      *out = &(pair.first->second);
     } else {
       auto& other = search->second;
       ptr_record rec(other);
@@ -248,6 +260,50 @@ inline static void pack_ptr(serdes& s, std::shared_ptr<T>& t,
   } else {
     ptr_record rec(nullptr);
     pup(s, rec);
+  }
+}
+
+template <typename T, typename IdentifyFn>
+inline static void pack_ptr(serdes& s, std::shared_ptr<T>& t,
+                            const IdentifyFn& fn) {
+  ptr_record* rec = nullptr;
+  pack_ptr(s, &rec, t, fn);
+  if (rec != nullptr) {
+    CkAssertMsg(rec->is_instance(), "expecting an instance!");
+    pup(s, *rec);
+    pack_helper<T>::pack(s, *t);
+  }
+}
+
+template <typename T>
+inline static void unpack_ptr(serdes& s, ptr_record& rec,
+                              std::shared_ptr<T>& t) {
+  if (rec.is_null()) {
+    ::new (&t) std::shared_ptr<T>();
+  } else if (rec.is_instance()) {
+    if (is_bytes<T>()) {
+      ::new (&t) std::shared_ptr<T>(std::move(s.observe_source()),
+                                    reinterpret_cast<T*>(s.current));
+
+      s.advance<T>();
+    } else {
+      // allocate memory for the object
+      auto* p = (T*)aligned_alloc(alignof(T), sizeof(T));
+      // then reconstruct it
+      pup(s, *p);
+      // the object must be reconstructed before any shared
+      // ptrs in case it's shared_from_this enabled. it will
+      // result in subtle failures otherwise.
+      ::new (&t) std::shared_ptr<T>(p, [](T* p) {
+        p->~T();
+        free(p);
+      });
+    }
+    CkAssertMsg(s.put_instance(rec.id, t), "instance insertion did not occur!");
+  } else if (rec.is_reference()) {
+    ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.id));
+  } else {
+    CkAbort("unknown record type %d", static_cast<int>(rec.kind));
   }
 }
 }  // namespace
@@ -273,6 +329,7 @@ struct puper<ptr_record> {
       case ptr_record::REFERENCE:
         pup(s, rec.id);
         break;
+      case ptr_record::DEFERRED:
       case ptr_record::INSTANCE:
         pup(s, rec.id);
         pup(s, rec.ty);
@@ -450,44 +507,56 @@ class puper<std::shared_ptr<T>, typename std::enable_if<std::is_base_of<
 };
 
 template <typename T>
-struct puper<std::shared_ptr<T>,
-             typename std::enable_if<!hypercomm::is_pupable<T>::value>::type> {
-  inline static void unpack(serdes& s, std::shared_ptr<T>& t) {
-    ptr_record rec;
-    pup(s, rec);
-    if (rec.is_null()) {
-      ::new (&t) std::shared_ptr<T>();
-    } else if (rec.is_instance()) {
-      if (is_bytes<T>()) {
-        ::new (&t) std::shared_ptr<T>(std::move(s.source.lock()),
-                                      reinterpret_cast<T*>(s.current));
-
-        s.advance<T>();
-      } else {
-        // allocate memory for the object
-        auto* p = (T*)aligned_alloc(alignof(T), sizeof(T));
-        // then reconstruct it
-        pup(s, *p);
-        // the object must be reconstructed before any shared
-        // ptrs in case it's shared_from_this enabled. it will
-        // result in subtle failures otherwise.
-        ::new (&t) std::shared_ptr<T>(p, [](T* p) {
-          p->~T();
-          free(p);
-        });
-      }
-      CkAssertMsg(s.put_instance(rec.id, t),
-                  "instance insertion did not occur!");
-    } else if (rec.is_reference()) {
-      ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.id));
-    } else {
-      CkAbort("unknown record type %d", static_cast<int>(rec.kind));
-    }
-  }
-
+struct puper<
+    std::shared_ptr<T>,
+    typename std::enable_if<hypercomm::is_zero_copyable<T>::value>::type> {
   inline static void impl(serdes& s, std::shared_ptr<T>& t) {
     if (s.unpacking()) {
-      unpack(s, t);
+      // unpack the record
+      ptr_record rec;
+      pup(s, rec);
+      // if it was deferred
+      if (rec.is_deferred()) {
+        // record a reference to this pointer so it
+        // can be updated later on
+        s.put_deferred(rec, t);
+      } else {
+        // if not, simply unpack the pointer
+        unpack_ptr(s, rec, t);
+      }
+    } else {
+      ptr_record* rec = nullptr;
+      pack_ptr(s, &rec, t, []() { return 0; });
+      if (rec != nullptr) {
+        CkAssertMsg(rec->is_instance(), "expecting an instance!");
+        // use (quick size) to determine the size of the object
+        // without running through another serdes cycle
+        std::size_t size = t ? quick_size(*t) : 0;
+        // if we can defer it (and it's worthwhile to do so)
+        if (s.deferrable && size >= kZeroCopySize) {
+          // update the type of the record
+          rec->kind = ptr_record::DEFERRED;
+          pup(s, *rec);
+          // and defer it
+          s.put_deferred(*rec, t);
+        } else {
+          pup(s, *rec);
+          pack_helper<T>::pack(s, *t);
+        }
+      }
+    }
+  }
+};
+
+template <typename T>
+struct puper<
+    std::shared_ptr<T>,
+    typename std::enable_if<!hypercomm::is_idiosyncratic_ptr<T>::value>::type> {
+  inline static void impl(serdes& s, std::shared_ptr<T>& t) {
+    if (s.unpacking()) {
+      ptr_record rec;
+      pup(s, rec);
+      unpack_ptr(s, rec, t);
     } else {
       pack_ptr(s, t, []() { return 0; });
     }
@@ -525,14 +594,6 @@ struct puper<std::tuple<Ts...>,
              typename std::enable_if<(sizeof...(Ts) == 0)>::type> {
   inline static void impl(serdes& s, std::tuple<Ts...>& t) {}
 };
-
-namespace {
-template <typename T>
-bool is_uninitialized(std::weak_ptr<T> const& weak) {
-  using wt = std::weak_ptr<T>;
-  return !weak.owner_before(wt{}) && !wt{}.owner_before(weak);
-}
-}  // namespace
 
 template <typename T>
 inline void pup(serdes& s, const T& t) {

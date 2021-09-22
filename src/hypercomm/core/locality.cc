@@ -160,25 +160,31 @@ void generic_locality_::receive_message(CkMessage* msg) {
 struct zero_copy_payload_ {
  private:
   generic_locality_* parent_;
-  entry_port_ptr dst_;
+  std::shared_ptr<zero_copy_value> val_;
+  CkNcpyBuffer* src_;
 
  public:
-  zero_copy_payload_(generic_locality_* _1, const entry_port_ptr& _2)
-      : parent_(_1), dst_(_2) {}
-
-  zero_copy_payload_(generic_locality_* _1, entry_port_ptr&& _2)
-      : parent_(_1), dst_(std::move(_2)) {}
+  zero_copy_payload_(generic_locality_* _1,
+                     const std::shared_ptr<zero_copy_value>& _2,
+                     CkNcpyBuffer* _3)
+      : parent_(_1), val_(_2), src_(_3) {}
 
   static void action_(zero_copy_payload_* self, CkDataMsg* msg) {
     auto* buf = (CkNcpyBuffer*)(msg->data);
     auto* ptr = (std::shared_ptr<void>*)buf->getRef();
-    auto val = make_value<buffer_value>(std::move(*ptr), buf->cnt);
-    delete ptr;
     buf->deregisterMem();
     CkFreeMsg(msg);
 
-    self->parent_->update_context();
-    self->parent_->receive_value(self->dst_, std::move(val));
+    CkAssertMsg(self->val_->receive(self->src_, std::move(*ptr)),
+                "buffer deregistration failed!");
+    delete ptr;
+
+    if (self->val_->ready()) {
+      auto& dst = self->val_->msg->dst;
+      std::unique_ptr<hyper_value> val((hyper_value*)self->val_.get());
+      self->parent_->update_context();
+      self->parent_->receive_value(dst, std::move(val));
+    }
 
     delete self;
   }
@@ -203,7 +209,7 @@ void generic_locality_::post_buffer(const entry_port_ptr& port,
   auto find_applicable = [&](mapped_type& queue) -> inner_type {
     return std::find_if(std::begin(queue), std::end(queue),
                         [&](const inner_type::value_type& buffer) {
-                          return buffer->cnt <= size;
+                          return buffer.second->cnt <= size;
                         });
   };
 
@@ -215,13 +221,15 @@ void generic_locality_::post_buffer(const entry_port_ptr& port,
     // if not, save it for the future
     this->buffers[port].emplace_back(buffer, size, mode);
   } else {
+    auto& pair = *inner;
     // create a CkNcpyBuffer to receive data into the buffer
     CkNcpyBuffer dest;
     init_buffer_(&dest, mode, size, buffer);
-    dest.cb = CkCallback((CkCallbackFn)&zero_copy_payload_::action_,
-                         new zero_copy_payload_(this, port));
+    dest.cb = CkCallback(
+        (CkCallbackFn)&zero_copy_payload_::action_,
+        new zero_copy_payload_(this, std::move(pair.first), pair.second));
     // send the value request
-    dest.get(**inner);
+    dest.get(*pair.second);
     // clean up
     outer->second.erase(inner);
     QdProcess(1);
@@ -229,11 +237,12 @@ void generic_locality_::post_buffer(const entry_port_ptr& port,
 }
 
 using outstanding_iterator = generic_locality_::outstanding_iterator;
-outstanding_iterator generic_locality_::poll_buffer(CkNcpyBuffer* buffer,
-                                                    const entry_port_ptr& port,
-                                                    const std::size_t& goal) {
+outstanding_iterator generic_locality_::poll_buffer(
+    CkNcpyBuffer* buffer, const std::shared_ptr<zero_copy_value>& val,
+    const std::size_t& goal) {
   using value_type = typename decltype(this->buffers)::mapped_type::value_type;
   // seek the queue of buffers from the map
+  auto& port = val->msg->dst;
   auto outer = this->buffers.find(port);
   if (outer != std::end(this->buffers)) {
     auto& queue = outer->second;
@@ -265,25 +274,31 @@ outstanding_iterator generic_locality_::poll_buffer(CkNcpyBuffer* buffer,
 }
 
 void generic_locality_::demux_message(message* msg) {
-  this->update_context();
-  auto port = std::move(msg->dst);
   if (msg->is_zero_copy()) {
-    std::unique_ptr<CkNcpyBuffer> src(new CkNcpyBuffer);
+    // will be deleted by zero_copy_payload_
+    std::shared_ptr<zero_copy_value> val(new zero_copy_value(msg),
+                                         [](void*) {});
     PUP::fromMem p(msg->payload);
-    p | *src;
-    CkFreeMsg(msg);
+    p | val->buffers;
+    val->offset = p.get_current_pointer();
 
-    CkNcpyBuffer dest;
-    auto search = this->poll_buffer(&dest, port, src->cnt);
-    if (search == std::end(this->outstanding)) {
-      dest.cb = CkCallback((CkCallbackFn)&zero_copy_payload_::action_,
-                           new zero_copy_payload_(this, std::move(port)));
-      dest.get(*src);
-    } else {
-      search->second.emplace_back(std::move(src));
-      QdCreate(1);
+    for (auto& src : val->buffers) {
+      CkNcpyBuffer dest;
+      auto search = this->poll_buffer(&dest, val, src.cnt);
+      if (search == std::end(this->outstanding)) {
+        dest.cb = CkCallback((CkCallbackFn)&zero_copy_payload_::action_,
+                             new zero_copy_payload_(this, val, &src));
+        dest.get(src);
+      } else {
+        search->second.emplace_back(val, &src);
+        QdCreate(1);
+      }
     }
   } else {
+    // this ensures the port gets deleted (since message's
+    // destructor isn't called via CkFreeMsg)
+    auto port = std::move(msg->dst);
+    this->update_context();
     this->receive_value(port, msg2value(msg));
   }
 }

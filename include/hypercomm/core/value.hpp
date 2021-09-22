@@ -20,15 +20,15 @@ class hyper_value {
   using source_type = std::shared_ptr<value_source>;
 
   source_type source;
+  const bool pupable;
 
+  hyper_value(const bool& _ = false) : pupable(_) {}
   virtual ~hyper_value() = default;
-  virtual message_type release(void) = 0;
-
-  virtual bool recastable(void) const = 0;
-
-  virtual std::pair<const void*, std::size_t> try_zero_copy(void) const {
-    return std::make_pair(nullptr, 0);
+  virtual void pup_buffer(serdes& s, const bool& encapsulate) {
+    NOT_IMPLEMENTED;
   }
+  virtual message_type release(void) = 0;
+  virtual bool recastable(void) const = 0;
 };
 
 inline void try_return(value_ptr&& value) {

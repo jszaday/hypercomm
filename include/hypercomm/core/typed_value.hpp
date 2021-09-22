@@ -3,8 +3,8 @@
 
 #include "../reductions/contribution.hpp"
 #include "../messaging/packing.hpp"
+#include "zero_copy_value.hpp"
 #include "config.hpp"
-#include "value.hpp"
 
 namespace hypercomm {
 
@@ -22,7 +22,7 @@ class typed_value : public hyper_value {
   using type = T;
 
   typed_value(const void* _1, const storage_scheme& _2)
-      : storage(_1), scheme(_2) {}
+      : hyper_value(true), storage(_1), scheme(_2) {}
 
   // avoids a costly virtual method dispatch
   inline T* get(void) noexcept {
@@ -64,16 +64,17 @@ class typed_value_impl_ : public typed_value<T> {
 
   virtual bool recastable(void) const override { return false; }
 
-  std::pair<const void*, std::size_t> try_zero_copy(void) const override {
-    if (zero_copyable<T>::value) {
-      auto& val = this->value();
-      auto size = hypercomm::size(val);
-      if (size >= kZeroCopySize) {
-        return std::make_pair(&val, size);
+  virtual void pup_buffer(serdes& s, const bool& encapsulate) override {
+    if (encapsulate) {
+      if (Scheme == kInline) {
+        std::shared_ptr<T> ptr(s.observe_source(), this->get());
+        s | ptr;
+      } else {
+        s | this->tmp;
       }
+    } else {
+      s | this->value();
     }
-
-    return std::make_pair(nullptr, 0x0);
   }
 
   virtual hyper_value::message_type release(void) override {
@@ -118,30 +119,41 @@ inline std::unique_ptr<typed_value<unit_type>> make_unit_value(void) {
   return make_typed_value<unit_type>(tags::no_init{});
 }
 
+namespace {
+template <typename T>
+inline std::unique_ptr<typed_value<T>> value2typed(zero_copy_value* value) {
+  auto src = std::shared_ptr<message>(value->msg);
+  auto result = make_value<typed_value_impl_<T, kBuffer>>(tags::no_init{});
+
+  unpacker s(src, value->offset, true);
+  result->pup_buffer(s, true);
+  auto n_deferred = s.n_deferred();
+
+  CkAssertMsg(n_deferred == value->values.size(),
+              "deferred counts did not match!");
+  for (auto i = 0; i < n_deferred; i++) {
+    s.reset_deferred(i, std::move(value->values[i]));
+  }
+
+  return std::move(result);
+}
+}  // namespace
+
 template <typename T>
 std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
-  auto* value = ptr.release();
-  auto* try_cast = dynamic_cast<typed_value<T>*>(value);
-  if (try_cast) {
-    return std::unique_ptr<typed_value<T>>(try_cast);
-  } else if (value->recastable()) {
-    buffer_value* try_buff = (zero_copyable<T>::value)
-                                 ? dynamic_cast<buffer_value*>(value)
-                                 : nullptr;
-    if (try_buff) {
-      auto* payload = try_buff->payload<T>();
-      auto typed =
-          typed_value<T>::from_buffer(std::move(try_buff->buffer), payload);
-      delete value;
-      return std::move(typed);
-    } else {
-      auto typed = typed_value<T>::from_message(value->release());
-      typed->source = value->source;
-      delete value;
-      return std::move(typed);
-    }
+  auto* value = ptr.get();
+  if (typed_value<T>* p1 = dynamic_cast<typed_value<T>*>(value)) {
+    return std::unique_ptr<typed_value<T>>((typed_value<T>*)ptr.release());
+  } else if (zero_copy_value* p2 = dynamic_cast<zero_copy_value*>(value)) {
+    return value2typed<T>(p2);
+  } else if (buffer_value* p3 = dynamic_cast<buffer_value*>(value)) {
+    auto* payload = p3->payload<T>();
+    auto typed = typed_value<T>::from_buffer(std::move(p3->buffer), payload);
+    return std::move(typed);
   } else {
-    CkAbort("invalid cast!");
+    auto typed = typed_value<T>::from_message(value->release());
+    typed->source = value->source;
+    return std::move(typed);
   }
 }
 }  // namespace hypercomm

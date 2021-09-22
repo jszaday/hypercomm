@@ -61,7 +61,7 @@ struct __msg__ : public CMessage___msg__ {
 
 inline value_ptr msg2value(message *msg) {
   if (msg->is_null()) {
-    CkFreeMsg(msg);
+    delete msg;
     return nullptr;
   } else {
     CkAssertMsg(!msg->is_zero_copy(), "value for msg unavailable!");
