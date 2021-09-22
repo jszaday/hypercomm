@@ -161,15 +161,14 @@ void generic_locality_::receive_message(CkMessage* msg) {
 struct zero_copy_payload_ {
  private:
   generic_locality_* parent_;
-  value_handler_fn_ fn_;
   std::shared_ptr<zero_copy_value> val_;
   CkNcpyBuffer* src_;
 
  public:
-  zero_copy_payload_(generic_locality_* _1, value_handler_fn_ _2,
+  zero_copy_payload_(generic_locality_* _1,
                      const std::shared_ptr<zero_copy_value>& _3,
                      CkNcpyBuffer* _4)
-      : parent_(_1), fn_(_2), val_(_3), src_(_4) {}
+      : parent_(_1), val_(_3), src_(_4) {}
 
   static void action_(zero_copy_payload_* self, CkDataMsg* msg) {
     auto* buf = (CkNcpyBuffer*)(msg->data);
@@ -182,10 +181,10 @@ struct zero_copy_payload_ {
     delete ptr;
 
     if (self->val_->ready()) {
-      auto& dst = self->val_->msg->dst;
       std::unique_ptr<hyper_value> val((hyper_value*)self->val_.get());
       self->parent_->update_context();
-      self->fn_(self->parent_, dst, std::move(val));
+      auto& ep = self->val_->ep;
+      (ep.get_handler())(self->parent_, ep.port_, std::move(val));
     }
 
     delete self;
@@ -201,7 +200,7 @@ static inline void init_buffer_(CkNcpyBuffer* buffer,
   buffer->setRef(ptr);
 }
 
-void generic_locality_::post_buffer(const entry_port_ptr& port,
+void generic_locality_::post_buffer(const endpoint& ep,
                                     const std::shared_ptr<void>& buffer,
                                     const std::size_t& size,
                                     const CkNcpyBufferPost& mode) {
@@ -216,12 +215,12 @@ void generic_locality_::post_buffer(const entry_port_ptr& port,
   };
 
   inner_type inner;
-  auto outer = this->outstanding.find(port);
+  auto outer = this->outstanding.find(ep);
   // determine whether we fulfill any outstanding buffers
   if (outer == std::end(this->outstanding) ||
       (inner = find_applicable(outer->second)) == std::end(outer->second)) {
     // if not, save it for the future
-    this->buffers[port].emplace_back(buffer, size, mode);
+    this->buffers[ep].emplace_back(buffer, size, mode);
   } else {
     auto fn = CkIndex_locality_base_::default_value_handler();
     auto& pair = *inner;
@@ -230,7 +229,7 @@ void generic_locality_::post_buffer(const entry_port_ptr& port,
     init_buffer_(&dest, mode, size, buffer);
     dest.cb = CkCallback(
         (CkCallbackFn)&zero_copy_payload_::action_,
-        new zero_copy_payload_(this, fn, std::move(pair.first), pair.second));
+        new zero_copy_payload_(this, std::move(pair.first), pair.second));
     // send the value request
     dest.get(*pair.second);
     // clean up
@@ -245,8 +244,8 @@ outstanding_iterator generic_locality_::poll_buffer(
     const std::size_t& goal) {
   using value_type = typename decltype(this->buffers)::mapped_type::value_type;
   // seek the queue of buffers from the map
-  auto& port = val->msg->dst;
-  auto outer = this->buffers.find(port);
+  auto& ep = val->ep;
+  auto outer = this->buffers.find(ep);
   if (outer != std::end(this->buffers)) {
     auto& queue = outer->second;
     // and within it, seek a buffer large enough to accomodate the request
@@ -266,7 +265,7 @@ outstanding_iterator generic_locality_::poll_buffer(
       return std::end(this->outstanding);
     }
   }
-  auto search = this->outstanding.find(port);
+  auto search = this->outstanding.find(ep);
   if (search == std::end(this->outstanding)) {
     // if nothing is avail., create a preregistered buffer to receive data
     auto* ptr = new std::shared_ptr<void>(CkRdmaAlloc(goal), CkRdmaFree);
@@ -291,7 +290,7 @@ void generic_locality_::receive_value(message* msg,
       auto search = this->poll_buffer(&dest, val, src.cnt);
       if (search == std::end(this->outstanding)) {
         dest.cb = CkCallback((CkCallbackFn)&zero_copy_payload_::action_,
-                             new zero_copy_payload_(this, fn, val, &src));
+                             new zero_copy_payload_(this, val, &src));
         dest.get(src);
       } else {
         search->second.emplace_back(val, &src);

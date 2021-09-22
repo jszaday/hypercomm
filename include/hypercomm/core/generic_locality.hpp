@@ -17,10 +17,15 @@ class generic_locality_ : public virtual common_functions_ {
 
   entry_port_map entry_ports;
   component_map components;
-  mapped_queue<std::pair<std::shared_ptr<zero_copy_value>, CkNcpyBuffer*>>
+
+  template <typename T>
+  using endpoint_queue = endpoint_map<std::deque<T>>;
+  endpoint_queue<std::pair<std::shared_ptr<zero_copy_value>, CkNcpyBuffer*>>
       outstanding;
-  mapped_queue<std::tuple<std::shared_ptr<void>, std::size_t, CkNcpyBufferPost>>
+  endpoint_queue<
+      std::tuple<std::shared_ptr<void>, std::size_t, CkNcpyBufferPost>>
       buffers;
+
   mapped_queue<component::value_type> port_queue;
   std::vector<component_id_t> invalidations;
   component_id_t component_authority = 0;
@@ -57,10 +62,15 @@ class generic_locality_ : public virtual common_functions_ {
     this->outstanding[port];
   }
 
-  void post_buffer(const entry_port_ptr& port,
-                   const std::shared_ptr<void>& buffer, const std::size_t& size,
-                   const CkNcpyBufferPost& mode = {CK_BUFFER_UNREG,
-                                                   CK_BUFFER_DEREG});
+  template <typename T>
+  inline is_valid_endpoint_t<T> post_buffer(
+      const T& ep, const std::shared_ptr<void>& buffer, const std::size_t& size,
+      const CkNcpyBufferPost& mode = {CK_BUFFER_UNREG, CK_BUFFER_DEREG}) {
+    this->post_buffer(endpoint(ep), buffer, size, mode);
+  }
+
+  void post_buffer(const endpoint& ep, const std::shared_ptr<void>& buffer,
+                   const std::size_t& size, const CkNcpyBufferPost& mode);
 
   inline void try_collect(const component_id_t& which) {
     this->try_collect(this->components[which]);

@@ -236,7 +236,7 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
       msg = nullptr;
     } else {
       auto& port = opts.value_.ep_.port_;
-      auto fn = CkIndex_locality_base_::get_value_handler(opts.value_.ep_.idx_);
+      auto fn = opts.value_.ep_.get_handler();
 #if CMK_VERBOSE
       CkPrintf("pe%d> delivering a value to port %s of idx %s.\n", CkMyPe(),
                (port->to_string()).c_str(),

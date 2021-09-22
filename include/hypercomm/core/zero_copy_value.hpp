@@ -2,17 +2,21 @@
 #define __HYPERCOMM_CORE_ZC_VALUE_HPP__
 
 #include "value.hpp"
-#include "../messaging/common.hpp"
+#include "../messaging/destination.hpp"
 
 namespace hypercomm {
 struct zero_copy_value : public hyper_value {
   std::vector<CkNcpyBuffer> buffers;
   std::vector<std::shared_ptr<void>> values;
   std::size_t nReceived;
+  endpoint ep;
   message* msg;
   char* offset;
 
-  zero_copy_value(message* _) : msg(_), nReceived(0) {}
+  zero_copy_value(message* _)
+      : msg(_),
+        nReceived(0),
+        ep(std::forward_as_tuple(UsrToEnv(_)->getEpIdx(), _->dst)) {}
 
   virtual message_type release(void) override { NOT_IMPLEMENTED; }
 

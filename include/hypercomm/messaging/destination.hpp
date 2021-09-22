@@ -24,15 +24,36 @@ class endpoint {
     return this->port_ || (this->idx_ != demux());
   }
 
+  inline value_handler_fn_ get_handler(void) const {
+    return CkIndex_locality_base_::get_value_handler(this->idx_);
+  }
+
+  inline bool operator==(const endpoint& other) const {
+    return (this->idx_ == other.idx_) &&
+           comparable_comparator<entry_port_ptr>()(this->port_, other.port_);
+  }
+
+  inline hash_code hash(void) const {
+    return hash_combine(utilities::hash<int>()(this->idx_),
+                        utilities::hash<entry_port_ptr>()(this->port_));
+  }
+
   template <typename T>
   static constexpr bool constructible_from(void) {
     return std::is_constructible<endpoint, const T&>::value;
   }
 };
 
+struct endpoint_hasher {
+  inline hash_code operator()(const endpoint& ep) const { return ep.hash(); }
+};
+
 template <typename T>
 using is_valid_endpoint_t =
     typename std::enable_if<endpoint::constructible_from<T>()>::type;
+
+template <typename T>
+using endpoint_map = std::unordered_map<endpoint, T, endpoint_hasher>;
 
 class destination {
   union u_options {
