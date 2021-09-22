@@ -122,8 +122,8 @@ inline std::unique_ptr<typed_value<unit_type>> make_unit_value(void) {
 namespace {
 template <typename T>
 inline std::unique_ptr<typed_value<T>> value2typed(zero_copy_value* value) {
+  auto src = std::shared_ptr<message>(value->msg);
   auto result = make_value<typed_value_impl_<T, kBuffer>>(tags::no_init{});
-  auto src = std::shared_ptr<void>(value->msg, CkFreeMsg);
 
   unpacker s(src, value->offset, true);
   result->pup_buffer(s, true);

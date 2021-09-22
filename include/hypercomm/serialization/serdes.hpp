@@ -40,8 +40,7 @@ struct ptr_record {
   ptr_id_t id;
   polymorph_id_t ty;
 
-  ptr_record(const ptr_record& other)
-      : kind(other.kind), id(other.id), ty(other.ty) {}
+  ptr_record(const ptr_record&) = default;
   ptr_record(const kind_t& _ = INVALID) : kind(_) {}
   ptr_record(std::nullptr_t) : ptr_record(IGNORED) {}
   ptr_record(const ptr_id_t& _1) : kind(REFERENCE), id(_1) {}

@@ -295,8 +295,11 @@ void generic_locality_::demux_message(message* msg) {
       }
     }
   } else {
+    // this ensures the port gets deleted (since message's
+    // destructor isn't called via CkFreeMsg)
+    auto port = std::move(msg->dst);
     this->update_context();
-    this->receive_value(msg->dst, msg2value(msg));
+    this->receive_value(port, msg2value(msg));
   }
 }
 
