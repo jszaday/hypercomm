@@ -17,8 +17,12 @@ class endpoint {
 
   endpoint(const int& _) : idx_(_), port_(nullptr) {}
   endpoint(const entry_port_ptr& _) : idx_(demux()), port_(_) {}
+  endpoint(std::tuple<int, const entry_port_ptr&>&& pair)
+      : idx_(std::get<0>(pair)), port_(std::get<1>(pair)) {}
 
-  inline bool valid(void) const { return this->port_ || (this->idx_ != demux()); }
+  inline bool valid(void) const {
+    return this->port_ || (this->idx_ != demux());
+  }
 
   template <typename T>
   static constexpr bool constructible_from(void) {

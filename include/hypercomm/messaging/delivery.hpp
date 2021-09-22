@@ -24,20 +24,18 @@ struct payload {
 
   union u_options_ {
     struct s_value_ {
-      value_ptr value_;
       endpoint ep_;
+      value_ptr value_;
 
-      template <typename... Args>
-      s_value_(value_ptr&& val, Args... args)
-          : value_(std::forward<value_ptr>(val)),
-            ep_(std::forward<Args>(args)...) {}
+      template <typename T>
+      s_value_(const T& _1, value_ptr&& _2)
+          : ep_(_1), value_(std::forward<value_ptr>(_2)) {}
     } value_;
 
     CkMessage* msg_;
 
-    u_options_(const entry_port_ptr& _1, value_ptr&& _2) {
-      new (&this->value_) s_value_(std::move(_2), _1);
-    }
+    template <typename T>
+    u_options_(const T& _1, value_ptr&& _2) : value_(_1, std::move(_2)) {}
 
     u_options_(CkMessage* _1) : msg_(_1) {}
 
