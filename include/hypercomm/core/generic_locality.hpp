@@ -1,10 +1,7 @@
 #ifndef __HYPERCOMM_CORE_GENLOC_HPP__
 #define __HYPERCOMM_CORE_GENLOC_HPP__
 
-#include "../messaging/destination.hpp"
 #include "../messaging/interceptor.hpp"
-
-#include "module.hpp"
 
 /* TODO consider introducing a simplified connection API that
  *     utilizes "port authorities", aka port id counters, to

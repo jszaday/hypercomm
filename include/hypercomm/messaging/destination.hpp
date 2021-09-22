@@ -2,8 +2,34 @@
 #define __HYPERCOMM_MESSAGING_DESTINATION_HPP__
 
 #include "../core/common.hpp"
+#include "../core/module.hpp"
 
 namespace hypercomm {
+
+class endpoint {
+  inline static const int& demux(void) {
+    return CkIndex_locality_base_::idx_demux_CkMessage();
+  }
+
+ public:
+  const int idx_;
+  const entry_port_ptr port_;
+
+  endpoint(const int& _) : idx_(_), port_(nullptr) {}
+  endpoint(const entry_port_ptr& _) : idx_(demux()), port_(_) {}
+
+  inline bool valid(void) const { return this->port_ || (this->idx_ != demux()); }
+
+  template <typename T>
+  static constexpr bool constructible_from(void) {
+    return std::is_constructible<endpoint, const T&>::value;
+  }
+};
+
+template <typename T>
+using is_valid_endpoint_t =
+    typename std::enable_if<endpoint::constructible_from<T>()>::type;
+
 class destination {
   union u_options {
     callback_ptr cb;
