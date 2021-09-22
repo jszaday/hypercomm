@@ -29,7 +29,8 @@ struct ptr_record {
   ptr_id_t id;
   polymorph_id_t ty;
 
-  ptr_record(const ptr_record&) = default;
+  ptr_record(const ptr_record& other)
+  : kind(other.kind), id(other.id), ty(other.ty) {}
   ptr_record(const kind_t& _ = INVALID) : kind(_) {}
   ptr_record(std::nullptr_t) : ptr_record(IGNORED) {}
   ptr_record(const ptr_id_t& _1) : kind(REFERENCE), id(_1) {}
@@ -73,6 +74,7 @@ struct deferred_ {
   }
 
   inline void reset(std::shared_ptr<void>&& _) {
+    CkAssertMsg(!this->ptrs.empty(), "expected to reset at least one value!");
     for (auto& ptr : this->ptrs) {
       ptr->reset(_);
     }
@@ -149,6 +151,15 @@ class serdes {
 
     CkAssertMsg(sorted, "resulting vector was unsorted!");
 #endif
+  }
+
+  inline std::size_t n_deferred(void) const { return this->deferred.size(); }
+
+  inline void reset_deferred(const std::size_t& idx,
+                             std::shared_ptr<void>&& value) {
+    auto it = std::begin(this->deferred);
+    std::advance(it, idx);
+    (it->second).reset(std::move(value));
   }
 
   inline bool packing() const { return state == state_t::PACKING; }

@@ -2,7 +2,7 @@
 #define __HYPERCOMM_MESSAGING_DELIVERY_HPP__
 
 #include "../core/entry_port.hpp"
-#include "../core/value.hpp"
+#include "../core/zero_copy_value.hpp"
 
 namespace hypercomm {
 

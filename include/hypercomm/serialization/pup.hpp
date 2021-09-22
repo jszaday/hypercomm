@@ -269,7 +269,7 @@ inline static void pack_ptr(serdes& s, std::shared_ptr<T>& t,
   ptr_record* rec = nullptr;
   pack_ptr(s, &rec, t, fn);
   if (rec != nullptr) {
-    CkAssert(rec->is_instance());
+    CkAssertMsg(rec->is_instance(), "expecting an instance!");
     pup(s, *rec);
     pack_helper<T>::pack(s, *t);
   }
@@ -528,6 +528,7 @@ struct puper<
       ptr_record* rec = nullptr;
       pack_ptr(s, &rec, t, []() { return 0; });
       if (rec != nullptr) {
+        CkAssertMsg(rec->is_instance(), "expecting an instance!");
         // use (quick size) to determine the size of the object
         // without running through another serdes cycle
         std::size_t size = t ? quick_size(*t) : 0;

@@ -115,30 +115,41 @@ inline std::unique_ptr<typed_value<unit_type>> make_unit_value(void) {
   return make_typed_value<unit_type>(tags::no_init{});
 }
 
+namespace {
+template <typename T>
+inline std::unique_ptr<typed_value<T>> value2typed(zero_copy_value* value) {
+  auto result = make_value<typed_value_impl_<T, kBuffer>>(tags::no_init{});
+  auto src = std::shared_ptr<void>(value->msg, CkFreeMsg);
+
+  unpacker s(src, value->offset, true);
+  result->pup(s);
+  auto n_deferred = s.n_deferred();
+
+  CkAssertMsg(n_deferred == value->values.size(),
+              "deferred counts did not match!");
+  for (auto i = 0; i < n_deferred; i++) {
+    s.reset_deferred(i, std::move(value->values[i]));
+  }
+
+  return std::move(result);
+}
+}  // namespace
+
 template <typename T>
 std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
-  auto* value = ptr.release();
-  auto* try_cast = dynamic_cast<typed_value<T>*>(value);
-  if (try_cast) {
-    return std::unique_ptr<typed_value<T>>(try_cast);
-  } else if (value->recastable()) {
-    buffer_value* try_buff = (is_zero_copyable<T>::value)
-                                 ? dynamic_cast<buffer_value*>(value)
-                                 : nullptr;
-    if (try_buff) {
-      auto* payload = try_buff->payload<T>();
-      auto typed =
-          typed_value<T>::from_buffer(std::move(try_buff->buffer), payload);
-      delete value;
-      return std::move(typed);
-    } else {
-      auto typed = typed_value<T>::from_message(value->release());
-      typed->source = value->source;
-      delete value;
-      return std::move(typed);
-    }
+  auto* value = ptr.get();
+  if (typed_value<T>* p1 = dynamic_cast<typed_value<T>*>(value)) {
+    return std::unique_ptr<typed_value<T>>((typed_value<T>*)ptr.release());
+  } else if (zero_copy_value* p2 = dynamic_cast<zero_copy_value*>(value)) {
+    return value2typed<T>(p2);
+  } else if (buffer_value* p3 = dynamic_cast<buffer_value*>(value)) {
+    auto* payload = p3->payload<T>();
+    auto typed = typed_value<T>::from_buffer(std::move(p3->buffer), payload);
+    return std::move(typed);
   } else {
-    CkAbort("invalid cast!");
+    auto typed = typed_value<T>::from_message(value->release());
+    typed->source = value->source;
+    return std::move(typed);
   }
 }
 }  // namespace hypercomm

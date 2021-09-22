@@ -20,7 +20,8 @@ class generic_locality_ : public virtual common_functions_ {
 
   entry_port_map entry_ports;
   component_map components;
-  mapped_queue<std::pair<std::shared_ptr<zero_copy_value>, CkNcpyBuffer*>> outstanding;
+  mapped_queue<std::pair<std::shared_ptr<zero_copy_value>, CkNcpyBuffer*>>
+      outstanding;
   mapped_queue<std::tuple<std::shared_ptr<void>, std::size_t, CkNcpyBufferPost>>
       buffers;
   mapped_queue<component::value_type> port_queue;
