@@ -25,15 +25,19 @@ message* pack_deferrable_(const entry_port_ptr& port,
   // buffers to be deferred (and sent via RDMA)
   auto pupSize = ([&](void) {
     sizer s(true);
-    value->pup(s);
+    s.reset_source(value);
+    value->pup_buffer(s, true);
     s.get_deferred(deferred);
     return s.size();
   })();
   auto hasDeferred = !deferred.empty();
   auto msgSize = pupSize;
-  // add an offset for the std::vector's size
   if (hasDeferred) {
+    // add an offset for the std::vector's size
     msgSize += sizeof(std::size_t);
+  } else {
+    // otherwise, drop the overhead of encapsulation
+    msgSize -= ptr_record::instance_size;
   }
   // for every deferred block of memory
   for (auto& tup : deferred) {
@@ -60,7 +64,7 @@ message* pack_deferrable_(const entry_port_ptr& port,
   }
   // then PUP the value (with deference)
   packer s(p.get_current_pointer(), hasDeferred);
-  value->pup(s);
+  value->pup_buffer(s, hasDeferred);
   CkAssertMsg((p.size() + s.size()) == msgSize, "size mismatch!");
   return msg;
 }

@@ -7,6 +7,14 @@
 
 namespace hypercomm {
 
+namespace detail {
+template <typename T>
+bool is_uninitialized(std::weak_ptr<T> const& weak) {
+  using wt = std::weak_ptr<T>;
+  return !weak.owner_before(wt{}) && !wt{}.owner_before(weak);
+}
+}  // namespace detail
+
 using ptr_id_t = std::size_t;
 using polymorph_id_t = std::size_t;
 struct ptr_record;
@@ -25,12 +33,15 @@ struct ptr_record {
     INSTANCE
   };
 
+  static constexpr auto instance_size =
+      sizeof(kind_t) + sizeof(ptr_id_t) + sizeof(polymorph_id_t);
+
   kind_t kind;
   ptr_id_t id;
   polymorph_id_t ty;
 
   ptr_record(const ptr_record& other)
-  : kind(other.kind), id(other.id), ty(other.ty) {}
+      : kind(other.kind), id(other.id), ty(other.ty) {}
   ptr_record(const kind_t& _ = INVALID) : kind(_) {}
   ptr_record(std::nullptr_t) : ptr_record(IGNORED) {}
   ptr_record(const ptr_id_t& _1) : kind(REFERENCE), id(_1) {}
@@ -88,12 +99,12 @@ class serdes {
   std::map<ptr_id_t, deferred_> deferred;
   std::map<ptr_id_t, std::weak_ptr<void>> instances;
 
+  std::weak_ptr<void> source;
+
  public:
   owner_less_map<std::weak_ptr<void>, ptr_record> records;
 
   enum state_t { SIZING, PACKING, UNPACKING };
-
-  const std::weak_ptr<void> source;
   const char* start;
   char* current;
   const state_t state;
@@ -120,6 +131,19 @@ class serdes {
 
   serdes(serdes&&) = delete;
   serdes(const serdes&) = delete;
+
+  inline std::shared_ptr<void> observe_source(void) const {
+    if (detail::is_uninitialized(this->source)) {
+      return nullptr;
+    } else {
+      return this->source.lock();
+    }
+  }
+
+  template <typename T>
+  inline void reset_source(const std::shared_ptr<T>& t) {
+    this->source = t;
+  }
 
   template <typename T>
   inline void put_deferred(const ptr_record& rec, std::shared_ptr<T>& t) {

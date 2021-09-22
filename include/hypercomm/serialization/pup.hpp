@@ -282,7 +282,7 @@ inline static void unpack_ptr(serdes& s, ptr_record& rec,
     ::new (&t) std::shared_ptr<T>();
   } else if (rec.is_instance()) {
     if (is_bytes<T>()) {
-      ::new (&t) std::shared_ptr<T>(std::move(s.source.lock()),
+      ::new (&t) std::shared_ptr<T>(std::move(s.observe_source()),
                                     reinterpret_cast<T*>(s.current));
 
       s.advance<T>();
@@ -594,14 +594,6 @@ struct puper<std::tuple<Ts...>,
              typename std::enable_if<(sizeof...(Ts) == 0)>::type> {
   inline static void impl(serdes& s, std::tuple<Ts...>& t) {}
 };
-
-namespace {
-template <typename T>
-bool is_uninitialized(std::weak_ptr<T> const& weak) {
-  using wt = std::weak_ptr<T>;
-  return !weak.owner_before(wt{}) && !wt{}.owner_before(weak);
-}
-}  // namespace
 
 template <typename T>
 inline void pup(serdes& s, const T& t) {

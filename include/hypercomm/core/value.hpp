@@ -14,9 +14,7 @@ class value_source {
   virtual void take_back(value_ptr&&) = 0;
 };
 
-// the shared from this facilities are almost _never_ init'd
-// so they are here, largely, for behind-the-scenes serdes use
-class hyper_value : public std::enable_shared_from_this<hyper_value> {
+class hyper_value {
  public:
   using message_type = CkMessage*;
   using source_type = std::shared_ptr<value_source>;
@@ -26,7 +24,9 @@ class hyper_value : public std::enable_shared_from_this<hyper_value> {
 
   hyper_value(const bool& _ = false) : pupable(_) {}
   virtual ~hyper_value() = default;
-  virtual void pup(serdes& s) { NOT_IMPLEMENTED; }
+  virtual void pup_buffer(serdes& s, const bool& encapsulate) {
+    NOT_IMPLEMENTED;
+  }
   virtual message_type release(void) = 0;
   virtual bool recastable(void) const = 0;
 };

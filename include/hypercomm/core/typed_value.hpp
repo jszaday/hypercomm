@@ -64,12 +64,16 @@ class typed_value_impl_ : public typed_value<T> {
 
   virtual bool recastable(void) const override { return false; }
 
-  virtual void pup(serdes& s) override {
-    if (Scheme == kInline) {
-      std::shared_ptr<T> ptr(this->shared_from_this(), this->get());
-      s | ptr;
+  virtual void pup_buffer(serdes& s, const bool& encapsulate) override {
+    if (encapsulate) {
+      if (Scheme == kInline) {
+        std::shared_ptr<T> ptr(s.observe_source(), this->get());
+        s | ptr;
+      } else {
+        s | this->tmp;
+      }
     } else {
-      s | this->tmp;
+      s | this->value();
     }
   }
 
@@ -122,7 +126,7 @@ inline std::unique_ptr<typed_value<T>> value2typed(zero_copy_value* value) {
   auto src = std::shared_ptr<void>(value->msg, CkFreeMsg);
 
   unpacker s(src, value->offset, true);
-  result->pup(s);
+  result->pup_buffer(s, true);
   auto n_deferred = s.n_deferred();
 
   CkAssertMsg(n_deferred == value->values.size(),
