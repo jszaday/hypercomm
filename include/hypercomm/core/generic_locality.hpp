@@ -147,7 +147,7 @@ void generic_locality_::open(const entry_port_ptr& ours,
 
 template <void fn(generic_locality_*, const entry_port_ptr&,
                   component::value_type&&)>
-void CkIndex_locality_base_::value_handler(void* self, message* msg) {
+void CkIndex_locality_base_::value_handler(message* msg, CkMigratable* self) {
   auto* obj = (locality_base_*)self;
   dynamic_cast<generic_locality_*>(obj)->receive_value(msg, fn);
 }

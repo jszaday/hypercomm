@@ -38,7 +38,7 @@ class CkIndex_locality_base_ {
 
   template <void fn(generic_locality_*, const entry_port_ptr&,
                     component::value_type&&)>
-  static void value_handler(void* base, message* msg);
+  static void value_handler(message* msg, CkMigratable* base);
 };
 
 // NOTE ( hypercomm claims absolute control over these )
