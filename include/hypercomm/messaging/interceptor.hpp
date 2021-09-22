@@ -52,15 +52,19 @@ class interceptor : public CBase_interceptor {
   void deliver(const CkArrayID& aid, const CkArrayIndex& raw,
                detail::payload_ptr&&, const bool& immediate);
 
-  inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
-                                const entry_port_ptr& port, value_ptr&& value) {
+  template <typename T>
+  inline static is_valid_endpoint_t<T> send_async(const CkArrayID& aid,
+                                                  const CkArrayIndex& idx,
+                                                  const T& ep,
+                                                  value_ptr&& value) {
     interceptor::send_async(aid, idx,
-                            detail::make_payload(port, std::move(value)));
+                            detail::make_payload(ep, std::move(value)));
   }
 
-  inline static void send_async(const CProxyElement_ArrayElement& proxy,
-                                const entry_port_ptr& port, value_ptr&& value) {
-    interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(), port,
+  template <typename T>
+  inline static is_valid_endpoint_t<T> send_async(
+      const CProxyElement_ArrayElement& proxy, const T& ep, value_ptr&& value) {
+    interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(), ep,
                             std::move(value));
   }
 

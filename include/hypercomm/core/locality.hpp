@@ -135,11 +135,6 @@ class vil : public Base,
     }
   }
 
-  /* NOTE ( this is a mechanism for demux'ing an incoming message
-   *        to the appropriate entry port )
-   */
-  virtual void demux(message* msg) override { this->demux_message(msg); }
-
   virtual const Index& __index__(void) const {
     return reinterpret_index<Index>(this->__base_index__());
   }
@@ -347,9 +342,10 @@ bool vil<Base, Index>::check_future(const future& f) const {
   }
 }
 
-template <typename Index>
-void forwarding_callback<Index>::send(callback::value_type&& value) {
-  send2port(this->proxy, this->port, std::move(value));
+void forwarding_callback<CkArrayIndex>::send(callback::value_type&& value) {
+  const auto& base =
+      static_cast<const CProxyElement_locality_base_&>(this->proxy->c_proxy());
+  interceptor::send_async(base, this->ep, std::move(value));
 }
 
 void entry_port::on_completion(const component&) {

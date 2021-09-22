@@ -7,12 +7,38 @@
 
 namespace hypercomm {
 
+class locality_base_;
+class generic_locality_;
+
+using value_handler_fn_ = void (*)(generic_locality_*, const entry_port_ptr&,
+                                   component::value_type&&);
+
 class CkIndex_locality_base_ {
  public:
   static int __idx;
   static const int& idx_demux_CkMessage(void);
   static const int& idx_execute_CkMessage(void);
   static const int& idx_replace_downstream_CkMessage(void);
+
+  static value_handler_fn_ get_value_handler(const int& epIdx);
+  static void put_value_handler(const int& epIdx, const value_handler_fn_& fn);
+
+  inline static value_handler_fn_ default_value_handler(void) {
+    return get_value_handler(idx_demux_CkMessage());
+  }
+
+  template <void fn(generic_locality_*, const entry_port_ptr&,
+                    component::value_type&&)>
+  static int register_value_handler(const char* name, const int& flags = 0) {
+    auto epIdx = CkRegisterEp(name, (CkCallFnPtr)&value_handler<fn>,
+                              message::index(), __idx, flags);
+    put_value_handler(epIdx, fn);
+    return epIdx;
+  }
+
+  template <void fn(generic_locality_*, const entry_port_ptr&,
+                    component::value_type&&)>
+  static void value_handler(message* msg, CkMigratable* base);
 };
 
 // NOTE ( hypercomm claims absolute control over these )
@@ -29,7 +55,6 @@ class locality_base_ : public manageable_base_ {
   using base_index_type = CkArrayIndex;
 
   virtual void execute(CkMessage* msg) = 0;
-  virtual void demux(message* msg) = 0;
   virtual void replace_downstream(CkMessage* msg) { NOT_IMPLEMENTED; }
 
   inline const CkArrayIndex& __base_index__(void) const {

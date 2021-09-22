@@ -3,6 +3,7 @@
 
 #include "../core/entry_port.hpp"
 #include "../core/zero_copy_value.hpp"
+#include "destination.hpp"
 
 namespace hypercomm {
 
@@ -23,17 +24,18 @@ struct payload {
 
   union u_options_ {
     struct s_value_ {
-      entry_port_ptr port_;
+      endpoint ep_;
       value_ptr value_;
-      // a value may be null, so we only check the port for validity
-      inline bool valid(void) const { return (bool)this->port_; }
+
+      template <typename T>
+      s_value_(const T& _1, value_ptr&& _2)
+          : ep_(_1), value_(std::forward<value_ptr>(_2)) {}
     } value_;
 
     CkMessage* msg_;
 
-    u_options_(const entry_port_ptr& _1, value_ptr&& _2) {
-      new (&this->value_) s_value_{.port_ = _1, .value_ = std::move(_2)};
-    }
+    template <typename T>
+    u_options_(const T& _1, value_ptr&& _2) : value_(_1, std::move(_2)) {}
 
     u_options_(CkMessage* _1) : msg_(_1) {}
 
@@ -47,22 +49,22 @@ struct payload {
 
   payload(CkMessage* _1) : options_(_1), type_(kMessage) {}
   payload(CkMarshalledMessage&& _1) : payload(_1.getMessage()) {}
-  payload(const entry_port_ptr& _1, value_ptr&& _2)
+
+  template <typename T>
+  payload(const T& _1, value_ptr&& _2)
       : options_(_1, std::move(_2)), type_(kValue) {}
 
   ~payload() {
-    if (this->type_ == kMessage && this->options_.msg_) {
+    if (this->type_ == kValue) {
+      this->options_.value_.~s_value_();
+    } else if (this->type_ == kMessage && this->options_.msg_) {
       CkFreeMsg(this->options_.msg_);
-    } else if (this->type_ == kValue) {
-      auto& pair = this->options_.value_;
-      pair.port_.~entry_port_ptr();
-      pair.value_.~value_ptr();
     }
   }
 
   inline bool valid(void) const {
     return (this->type_ == kMessage && this->options_.msg_) ||
-           (this->type_ == kValue && this->options_.value_.valid());
+           (this->type_ == kValue && this->options_.value_.ep_.valid());
   }
 
   static void process(ArrayElement* elt, payload_ptr&&, const bool& immediate);
@@ -74,9 +76,12 @@ struct payload {
       this->options_.msg_ = nullptr;
       return msg;
     } else {
-      auto& value = this->options_.value_;
       // pack the value with its destination port to form a message
-      return repack_to_port(std::move(value.port_), std::move(value.value_));
+      auto& value = this->options_.value_;
+      auto* msg =
+          repack_to_port(std::move(value.ep_.port_), std::move(value.value_));
+      UsrToEnv(msg)->setEpIdx(value.ep_.idx_);
+      return msg;
     }
   }
 };

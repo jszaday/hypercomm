@@ -76,15 +76,13 @@ message* repack_to_port(const entry_port_ptr& port,
   } else {
     auto msg = value ? static_cast<message*>(value->release())
                      : message::make_null_message(port);
-    auto env = UsrToEnv(msg);
-    auto msgIdx = env->getMsgIdx();
-    if (msgIdx == message::__idx) {
-      env->setEpIdx(CkIndex_locality_base_::idx_demux_CkMessage());
+    auto msgIdx = UsrToEnv(msg)->getMsgIdx();
+    if (msgIdx == message::index()) {
       msg->dst = port;
       return msg;
     } else {
-      // TODO repack to hypercomm in this case (when HYPERCOMM_NO_COPYING is
-      // undefined)
+      // TODO repack to hypercomm in this case
+      //     (unless HYPERCOMM_NO_COPYING is defined)
       CkAbort("expected a hypercomm msg, but got %s instead\n",
               _msgTable[msgIdx]->name);
     }
@@ -237,7 +235,8 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
       cast->receive_message(msg);
       msg = nullptr;
     } else {
-      auto& port = opts.value_.port_;
+      auto& port = opts.value_.ep_.port_;
+      auto fn = opts.value_.ep_.get_handler();
 #if CMK_VERBOSE
       CkPrintf("pe%d> delivering a value to port %s of idx %s.\n", CkMyPe(),
                (port->to_string()).c_str(),
@@ -246,7 +245,7 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
       // update context so everything's kosher
       cast->update_context();
       // dump both the port and value since we don't need them after this
-      cast->receive_value(std::move(port), std::move(opts.value_.value_));
+      fn(cast, std::move(port), std::move(opts.value_.value_));
     }
   } else {
     auto& aid = elt->ckGetArrayID();

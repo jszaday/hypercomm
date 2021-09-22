@@ -1,11 +1,32 @@
 #include <hypercomm/core/module.hpp>
 #include <hypercomm/core/locality_map.hpp>
+#include <hypercomm/core/generic_locality.hpp>
 #include <hypercomm/messaging/common.hpp>
 
 namespace hypercomm {
 
-void call_demux_(CkMessage* msg, locality_base_* obj) {
-  obj->demux((message*)msg);
+using value_handler_map_ = std::map<int, value_handler_fn_>;
+CksvDeclare(value_handler_map_, handlers_);
+
+void CkIndex_locality_base_::put_value_handler(const int& epIdx,
+                                               const value_handler_fn_& fn) {
+  auto ins = CksvAccess(handlers_).emplace(epIdx, fn);
+  CkAssertMsg(ins.second, "insertion did not occur!");
+}
+
+value_handler_fn_ CkIndex_locality_base_::get_value_handler(const int& epIdx) {
+  auto& handlers = CksvAccess(handlers_);
+  auto search = handlers.find(epIdx);
+  if (search == std::end(handlers)) {
+    return nullptr;
+  } else {
+    return search->second;
+  }
+}
+
+void call_demux_(generic_locality_* self, const entry_port_ptr& port,
+                 component::value_type&& value) {
+  self->receive_value(port, std::move(value));
 }
 
 void call_execute_(CkMessage* msg, locality_base_* obj) { obj->execute(msg); }
@@ -15,10 +36,8 @@ void call_replace_downstream_(CkMessage* msg, locality_base_* obj) {
 }
 
 const int& CkIndex_locality_base_::idx_demux_CkMessage(void) {
-  static int epIdx =
-      CkRegisterEp("hypercomm::locality_base_::demux(CkMessage*)",
-                   reinterpret_cast<CkCallFnPtr>(call_demux_),
-                   CMessage_CkMessage::__idx, CkIndex_locality_base_::__idx, 0);
+  static int epIdx = register_value_handler<call_demux_>(
+      "hypercomm::locality_base_::demux(CkMessage*)");
   return epIdx;
 }
 

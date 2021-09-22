@@ -148,11 +148,12 @@ generic_locality_::~generic_locality_() {
 void generic_locality_::receive_message(CkMessage* msg) {
   auto* env = UsrToEnv(msg);
   auto epIdx = env->getEpIdx();
-  if (epIdx == CkIndex_locality_base_::idx_demux_CkMessage()) {
-    CkAssert(env->getMsgIdx() == message::index());
-    this->demux_message((message*)msg);
-  } else {
+  auto fn = CkIndex_locality_base_::get_value_handler(epIdx);
+  if (fn == nullptr) {
     _entryTable[epIdx]->call(msg, dynamic_cast<CkMigratable*>(this));
+  } else {
+    CkAssert(env->getMsgIdx() == message::index());
+    this->receive_value((message*)msg, fn);
   }
 }
 
@@ -165,9 +166,9 @@ struct zero_copy_payload_ {
 
  public:
   zero_copy_payload_(generic_locality_* _1,
-                     const std::shared_ptr<zero_copy_value>& _2,
-                     CkNcpyBuffer* _3)
-      : parent_(_1), val_(_2), src_(_3) {}
+                     const std::shared_ptr<zero_copy_value>& _3,
+                     CkNcpyBuffer* _4)
+      : parent_(_1), val_(_3), src_(_4) {}
 
   static void action_(zero_copy_payload_* self, CkDataMsg* msg) {
     auto* buf = (CkNcpyBuffer*)(msg->data);
@@ -180,10 +181,10 @@ struct zero_copy_payload_ {
     delete ptr;
 
     if (self->val_->ready()) {
-      auto& dst = self->val_->msg->dst;
       std::unique_ptr<hyper_value> val((hyper_value*)self->val_.get());
       self->parent_->update_context();
-      self->parent_->receive_value(dst, std::move(val));
+      auto& ep = self->val_->ep;
+      (ep.get_handler())(self->parent_, ep.port_, std::move(val));
     }
 
     delete self;
@@ -199,7 +200,7 @@ static inline void init_buffer_(CkNcpyBuffer* buffer,
   buffer->setRef(ptr);
 }
 
-void generic_locality_::post_buffer(const entry_port_ptr& port,
+void generic_locality_::post_buffer(const endpoint& ep,
                                     const std::shared_ptr<void>& buffer,
                                     const std::size_t& size,
                                     const CkNcpyBufferPost& mode) {
@@ -214,13 +215,14 @@ void generic_locality_::post_buffer(const entry_port_ptr& port,
   };
 
   inner_type inner;
-  auto outer = this->outstanding.find(port);
+  auto outer = this->outstanding.find(ep);
   // determine whether we fulfill any outstanding buffers
   if (outer == std::end(this->outstanding) ||
       (inner = find_applicable(outer->second)) == std::end(outer->second)) {
     // if not, save it for the future
-    this->buffers[port].emplace_back(buffer, size, mode);
+    this->buffers[ep].emplace_back(buffer, size, mode);
   } else {
+    auto fn = CkIndex_locality_base_::default_value_handler();
     auto& pair = *inner;
     // create a CkNcpyBuffer to receive data into the buffer
     CkNcpyBuffer dest;
@@ -242,8 +244,8 @@ outstanding_iterator generic_locality_::poll_buffer(
     const std::size_t& goal) {
   using value_type = typename decltype(this->buffers)::mapped_type::value_type;
   // seek the queue of buffers from the map
-  auto& port = val->msg->dst;
-  auto outer = this->buffers.find(port);
+  auto& ep = val->ep;
+  auto outer = this->buffers.find(ep);
   if (outer != std::end(this->buffers)) {
     auto& queue = outer->second;
     // and within it, seek a buffer large enough to accomodate the request
@@ -263,7 +265,7 @@ outstanding_iterator generic_locality_::poll_buffer(
       return std::end(this->outstanding);
     }
   }
-  auto search = this->outstanding.find(port);
+  auto search = this->outstanding.find(ep);
   if (search == std::end(this->outstanding)) {
     // if nothing is avail., create a preregistered buffer to receive data
     auto* ptr = new std::shared_ptr<void>(CkRdmaAlloc(goal), CkRdmaFree);
@@ -273,7 +275,8 @@ outstanding_iterator generic_locality_::poll_buffer(
   return search;
 }
 
-void generic_locality_::demux_message(message* msg) {
+void generic_locality_::receive_value(message* msg,
+                                      const value_handler_fn_& fn) {
   if (msg->is_zero_copy()) {
     // will be deleted by zero_copy_payload_
     std::shared_ptr<zero_copy_value> val(new zero_copy_value(msg),
@@ -299,7 +302,7 @@ void generic_locality_::demux_message(message* msg) {
     // destructor isn't called via CkFreeMsg)
     auto port = std::move(msg->dst);
     this->update_context();
-    this->receive_value(port, msg2value(msg));
+    fn(this, port, msg2value(msg));
   }
 }
 

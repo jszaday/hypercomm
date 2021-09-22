@@ -2,8 +2,65 @@
 #define __HYPERCOMM_MESSAGING_DESTINATION_HPP__
 
 #include "../core/common.hpp"
+#include "../core/module.hpp"
 
 namespace hypercomm {
+
+class endpoint {
+  inline static const int& demux(void) {
+    return CkIndex_locality_base_::idx_demux_CkMessage();
+  }
+
+ public:
+  const int idx_;
+  const entry_port_ptr port_;
+
+  endpoint(PUP::reconstruct) : endpoint(0x0) {}
+  endpoint(const int& _) : idx_(_), port_(nullptr) {}
+  endpoint(const entry_port_ptr& _) : idx_(demux()), port_(_) {}
+  endpoint(std::tuple<int, const entry_port_ptr&>&& pair)
+      : idx_(std::get<0>(pair)), port_(std::get<1>(pair)) {}
+
+  inline bool valid(void) const {
+    return this->port_ || (this->idx_ != demux());
+  }
+
+  inline value_handler_fn_ get_handler(void) const {
+    return CkIndex_locality_base_::get_value_handler(this->idx_);
+  }
+
+  inline bool operator==(const endpoint& other) const {
+    return (this->idx_ == other.idx_) &&
+           comparable_comparator<entry_port_ptr>()(this->port_, other.port_);
+  }
+
+  inline hash_code hash(void) const {
+    return hash_combine(utilities::hash<int>()(this->idx_),
+                        utilities::hash<entry_port_ptr>()(this->port_));
+  }
+
+  inline void pup(serdes& s) {
+    s | const_cast<int&>(this->idx_);
+    s | const_cast<entry_port_ptr&>(this->port_);
+  }
+
+  template <typename T>
+  static constexpr bool constructible_from(void) {
+    return std::is_constructible<endpoint, const T&>::value;
+  }
+};
+
+struct endpoint_hasher {
+  inline hash_code operator()(const endpoint& ep) const { return ep.hash(); }
+};
+
+template <typename T>
+using is_valid_endpoint_t =
+    typename std::enable_if<endpoint::constructible_from<T>()>::type;
+
+template <typename T>
+using endpoint_map = std::unordered_map<endpoint, T, endpoint_hasher>;
+
 class destination {
   union u_options {
     callback_ptr cb;

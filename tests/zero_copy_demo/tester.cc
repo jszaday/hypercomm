@@ -10,11 +10,19 @@ constexpr auto kMaxReps = 129;
 constexpr auto kDecompFactor = DECOMP_FACTOR;
 constexpr auto kVerbose = false;
 
+int kMailboxAddress;
+
+void receive_value(generic_locality_*, const entry_port_ptr&, value_ptr&&);
+
 void enroll_polymorphs(void) {
   hypercomm::init_polymorph_registry();
 
   if (CkMyRank() == 0) {
     hypercomm::enroll<persistent_port>();
+
+    kMailboxAddress =
+        CkIndex_locality_base_::register_value_handler<receive_value>(
+            "mailbox");
   }
 }
 
@@ -92,15 +100,11 @@ struct locality : public vil<CBase_locality, int> {
   int n;
   bool sender;
   double bandwidth;
-  entry_port_ptr port;
   comproxy<mailbox<big_data<data_type>>> mb;
 
   locality(int _1)
-      : n(_1),
-        port(std::make_shared<persistent_port>(0x420)),
-        mb(this->emplace_component<mailbox<big_data<data_type>>>()) {
-    this->manual_mode(port);
-    this->connect(port, mb, 0);
+      : n(_1), mb(this->emplace_component<mailbox<big_data<data_type>>>()) {
+    this->manual_mode(kMailboxAddress);
     this->activate_component(mb);
   }
 
@@ -118,7 +122,7 @@ struct locality : public vil<CBase_locality, int> {
     // return the value to the sender
     auto rts = sender ? nullptr
                       : std::make_shared<forwarding_callback<CkArrayIndex>>(
-                            make_proxy(thisProxy[senderIdx]), port);
+                            make_proxy(thisProxy[senderIdx]), kMailboxAddress);
 
     // implements a primitive form of completion detection
     auto senti = sender ? std::make_shared<sentinel_callback>() : nullptr;
@@ -135,11 +139,12 @@ struct locality : public vil<CBase_locality, int> {
       // bounce numIters messages back and forth between the communicators
       for (auto it = 0; it < numIters; it++) {
         // post the receive buffer
-        this->post_buffer(port, buffer, size);
+        this->post_buffer(kMailboxAddress, buffer, size);
 
         if (sender) {
           auto mem = typed_value<big_data<data_type>>::from_buffer(buffer);
-          interceptor::send_async(thisProxy[receiverIdx], port, std::move(mem));
+          interceptor::send_async(thisProxy[receiverIdx], kMailboxAddress,
+                                  std::move(mem));
           this->mb->put_request({}, senti);
         } else {
           this->mb->put_request({}, rts);
@@ -165,7 +170,7 @@ struct locality : public vil<CBase_locality, int> {
   void done(void) {
     auto& mine = this->__index__();
     auto size = big_data<data_type>::kSize * sizeof(data_type);
-    CkAssert(this->buffers[port].empty());
+    CkAssert(this->buffers[kMailboxAddress].empty());
 
     if (sender) {
       CkPrintf("%d> avg bandwidth for %lu was %g MiB/s\n", mine, size,
@@ -175,6 +180,11 @@ struct locality : public vil<CBase_locality, int> {
     }
   }
 };
+
+void receive_value(generic_locality_* self, const entry_port_ptr&,
+                   value_ptr&& val) {
+  ((locality*)self)->mb->receive_value(0, std::move(val));
+}
 
 #define CK_TEMPLATES_ONLY
 #include "tester.def.h"
