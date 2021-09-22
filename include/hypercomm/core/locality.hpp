@@ -135,11 +135,6 @@ class vil : public Base,
     }
   }
 
-  /* NOTE ( this is a mechanism for demux'ing an incoming message
-   *        to the appropriate entry port )
-   */
-  virtual void demux(message* msg) override { this->demux_message(msg); }
-
   virtual const Index& __index__(void) const {
     return reinterpret_index<Index>(this->__base_index__());
   }

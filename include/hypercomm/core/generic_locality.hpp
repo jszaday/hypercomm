@@ -36,9 +36,12 @@ class generic_locality_ : public virtual common_functions_ {
   virtual ~generic_locality_();
 
   void update_context(void);
-  void demux_message(message* msg);
+
   void receive_message(CkMessage* msg);
-  void receive_value(const entry_port_ptr& port, component::value_type&& value);
+
+  void receive_value(message* msg, const value_handler_fn_& fn);
+  void receive_value(const entry_port_ptr&, component::value_type&&);
+
   void loopback(const entry_port_ptr& port, component::value_type&& value);
   bool has_value(const entry_port_ptr& port) const;
 
@@ -140,6 +143,13 @@ void generic_locality_::open(const entry_port_ptr& ours,
   }
 #endif
   this->resync_port_queue(pair.first);
+}
+
+template <void fn(generic_locality_*, const entry_port_ptr&,
+                  component::value_type&&)>
+void CkIndex_locality_base_::value_handler(void* self, message* msg) {
+  auto* obj = (locality_base_*)self;
+  dynamic_cast<generic_locality_*>(obj)->receive_value(msg, fn);
 }
 
 }  // namespace hypercomm

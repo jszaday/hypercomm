@@ -148,11 +148,12 @@ generic_locality_::~generic_locality_() {
 void generic_locality_::receive_message(CkMessage* msg) {
   auto* env = UsrToEnv(msg);
   auto epIdx = env->getEpIdx();
-  if (epIdx == CkIndex_locality_base_::idx_demux_CkMessage()) {
-    CkAssert(env->getMsgIdx() == message::index());
-    this->demux_message((message*)msg);
-  } else {
+  auto fn = CkIndex_locality_base_::get_value_handler(epIdx);
+  if (fn == nullptr) {
     _entryTable[epIdx]->call(msg, dynamic_cast<CkMigratable*>(this));
+  } else {
+    CkAssert(env->getMsgIdx() == message::index());
+    this->receive_value((message*)msg, fn);
   }
 }
 
@@ -160,14 +161,15 @@ void generic_locality_::receive_message(CkMessage* msg) {
 struct zero_copy_payload_ {
  private:
   generic_locality_* parent_;
+  value_handler_fn_ fn_;
   std::shared_ptr<zero_copy_value> val_;
   CkNcpyBuffer* src_;
 
  public:
-  zero_copy_payload_(generic_locality_* _1,
-                     const std::shared_ptr<zero_copy_value>& _2,
-                     CkNcpyBuffer* _3)
-      : parent_(_1), val_(_2), src_(_3) {}
+  zero_copy_payload_(generic_locality_* _1, value_handler_fn_ _2,
+                     const std::shared_ptr<zero_copy_value>& _3,
+                     CkNcpyBuffer* _4)
+      : parent_(_1), fn_(_2), val_(_3), src_(_4) {}
 
   static void action_(zero_copy_payload_* self, CkDataMsg* msg) {
     auto* buf = (CkNcpyBuffer*)(msg->data);
@@ -183,7 +185,7 @@ struct zero_copy_payload_ {
       auto& dst = self->val_->msg->dst;
       std::unique_ptr<hyper_value> val((hyper_value*)self->val_.get());
       self->parent_->update_context();
-      self->parent_->receive_value(dst, std::move(val));
+      self->fn_(self->parent_, dst, std::move(val));
     }
 
     delete self;
@@ -221,13 +223,14 @@ void generic_locality_::post_buffer(const entry_port_ptr& port,
     // if not, save it for the future
     this->buffers[port].emplace_back(buffer, size, mode);
   } else {
+    auto fn = CkIndex_locality_base_::default_value_handler();
     auto& pair = *inner;
     // create a CkNcpyBuffer to receive data into the buffer
     CkNcpyBuffer dest;
     init_buffer_(&dest, mode, size, buffer);
     dest.cb = CkCallback(
         (CkCallbackFn)&zero_copy_payload_::action_,
-        new zero_copy_payload_(this, std::move(pair.first), pair.second));
+        new zero_copy_payload_(this, fn, std::move(pair.first), pair.second));
     // send the value request
     dest.get(*pair.second);
     // clean up
@@ -273,7 +276,8 @@ outstanding_iterator generic_locality_::poll_buffer(
   return search;
 }
 
-void generic_locality_::demux_message(message* msg) {
+void generic_locality_::receive_value(message* msg,
+                                      const value_handler_fn_& fn) {
   if (msg->is_zero_copy()) {
     // will be deleted by zero_copy_payload_
     std::shared_ptr<zero_copy_value> val(new zero_copy_value(msg),
@@ -287,7 +291,7 @@ void generic_locality_::demux_message(message* msg) {
       auto search = this->poll_buffer(&dest, val, src.cnt);
       if (search == std::end(this->outstanding)) {
         dest.cb = CkCallback((CkCallbackFn)&zero_copy_payload_::action_,
-                             new zero_copy_payload_(this, val, &src));
+                             new zero_copy_payload_(this, fn, val, &src));
         dest.get(src);
       } else {
         search->second.emplace_back(val, &src);
@@ -299,7 +303,7 @@ void generic_locality_::demux_message(message* msg) {
     // destructor isn't called via CkFreeMsg)
     auto port = std::move(msg->dst);
     this->update_context();
-    this->receive_value(port, msg2value(msg));
+    fn(this, port, msg2value(msg));
   }
 }
 
