@@ -152,8 +152,7 @@ void generic_locality_::receive_message(CkMessage* msg) {
   if (fn == nullptr) {
     _entryTable[epIdx]->call(msg, dynamic_cast<CkMigratable*>(this));
   } else {
-    CkAssert(env->getMsgIdx() == message::index());
-    this->receive_value((message*)msg, fn);
+    this->receive_value(msg, fn);
   }
 }
 
@@ -275,9 +274,12 @@ outstanding_iterator generic_locality_::poll_buffer(
   return search;
 }
 
-void generic_locality_::receive_value(message* msg,
+void generic_locality_::receive_value(CkMessage* raw,
                                       const value_handler_fn_& fn) {
-  if (msg->is_zero_copy()) {
+  auto* env = UsrToEnv(raw);
+  message* msg =
+      (env->getMsgIdx() == message::index()) ? (message*)raw : nullptr;
+  if (msg && msg->is_zero_copy()) {
     // will be deleted by zero_copy_payload_
     std::shared_ptr<zero_copy_value> val(new zero_copy_value(msg),
                                          [](void*) {});
@@ -298,11 +300,15 @@ void generic_locality_::receive_value(message* msg,
       }
     }
   } else {
-    // this ensures the port gets deleted (since message's
-    // destructor isn't called via CkFreeMsg)
-    auto port = std::move(msg->dst);
     this->update_context();
-    fn(this, port, msg2value(msg));
+    if (msg) {
+      // this ensures the port is deleted (since message's
+      // destructor isn't called via CkFreeMsg)
+      auto port = std::move(msg->dst);
+      fn(this, port, msg2value(msg));
+    } else {
+      fn(this, nullptr, msg2value(raw));
+    }
   }
 }
 
