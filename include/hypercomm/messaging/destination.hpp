@@ -50,6 +50,16 @@ class endpoint {
   }
 };
 
+struct endpoint_source : public virtual value_source,
+                         public std::enable_shared_from_this<endpoint_source> {
+  endpoint ep_;
+
+  template <typename... Args>
+  endpoint_source(Args... args) : ep_(std::forward<Args>(args)...) {}
+
+  virtual void take_back(value_ptr&&) override;
+};
+
 struct endpoint_hasher {
   inline hash_code operator()(const endpoint& ep) const { return ep.hash(); }
 };

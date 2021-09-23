@@ -31,14 +31,14 @@ class CkIndex_locality_base_ {
                     component::value_type&&)>
   static int register_value_handler(const char* name, const int& flags = 0) {
     auto epIdx = CkRegisterEp(name, (CkCallFnPtr)&value_handler<fn>,
-                              message::index(), __idx, flags);
+                              CMessage_CkMessage::__idx, __idx, flags);
     put_value_handler(epIdx, fn);
     return epIdx;
   }
 
   template <void fn(generic_locality_*, const entry_port_ptr&,
                     component::value_type&&)>
-  static void value_handler(message* msg, CkMigratable* base);
+  static void value_handler(CkMessage* msg, CkMigratable* base);
 };
 
 // NOTE ( hypercomm claims absolute control over these )

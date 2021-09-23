@@ -152,8 +152,7 @@ void generic_locality_::receive_message(CkMessage* msg) {
   if (fn == nullptr) {
     _entryTable[epIdx]->call(msg, dynamic_cast<CkMigratable*>(this));
   } else {
-    CkAssert(env->getMsgIdx() == message::index());
-    this->receive_value((message*)msg, fn);
+    this->receive_value(msg, fn);
   }
 }
 
@@ -184,7 +183,9 @@ struct zero_copy_payload_ {
       std::unique_ptr<hyper_value> val((hyper_value*)self->val_.get());
       self->parent_->update_context();
       auto& ep = self->val_->ep;
-      (ep.get_handler())(self->parent_, ep.port_, std::move(val));
+      auto fn = ep.get_handler();
+      val->source = std::make_shared<endpoint_source>(ep);
+      fn(self->parent_, ep.port_, std::move(val));
     }
 
     delete self;
@@ -275,9 +276,11 @@ outstanding_iterator generic_locality_::poll_buffer(
   return search;
 }
 
-void generic_locality_::receive_value(message* msg,
+void generic_locality_::receive_value(CkMessage* raw,
                                       const value_handler_fn_& fn) {
-  if (msg->is_zero_copy()) {
+  auto epIdx = UsrToEnv(raw)->getMsgIdx();
+  message* msg = (epIdx == message::index()) ? (message*)raw : nullptr;
+  if (msg && msg->is_zero_copy()) {
     // will be deleted by zero_copy_payload_
     std::shared_ptr<zero_copy_value> val(new zero_copy_value(msg),
                                          [](void*) {});
@@ -298,11 +301,14 @@ void generic_locality_::receive_value(message* msg,
       }
     }
   } else {
-    // this ensures the port gets deleted (since message's
-    // destructor isn't called via CkFreeMsg)
-    auto port = std::move(msg->dst);
     this->update_context();
-    fn(this, port, msg2value(msg));
+    // this ensures the port is deleted (since message's
+    // destructor isn't called via CkFreeMsg)
+    auto port = msg ? std::move(msg->dst) : nullptr;
+    auto value = msg ? msg2value(msg) : msg2value(raw);
+    value->source =
+        std::make_shared<endpoint_source>(std::forward_as_tuple(epIdx, port));
+    fn(this, port, std::move(value));
   }
 }
 
