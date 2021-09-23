@@ -183,7 +183,9 @@ struct zero_copy_payload_ {
       std::unique_ptr<hyper_value> val((hyper_value*)self->val_.get());
       self->parent_->update_context();
       auto& ep = self->val_->ep;
-      (ep.get_handler())(self->parent_, ep.port_, std::move(val));
+      auto fn = ep.get_handler();
+      val->source = std::make_shared<endpoint_source>(ep);
+      fn(self->parent_, ep.port_, std::move(val));
     }
 
     delete self;
@@ -276,9 +278,8 @@ outstanding_iterator generic_locality_::poll_buffer(
 
 void generic_locality_::receive_value(CkMessage* raw,
                                       const value_handler_fn_& fn) {
-  auto* env = UsrToEnv(raw);
-  message* msg =
-      (env->getMsgIdx() == message::index()) ? (message*)raw : nullptr;
+  auto epIdx = UsrToEnv(raw)->getMsgIdx();
+  message* msg = (epIdx == message::index()) ? (message*)raw : nullptr;
   if (msg && msg->is_zero_copy()) {
     // will be deleted by zero_copy_payload_
     std::shared_ptr<zero_copy_value> val(new zero_copy_value(msg),
@@ -301,14 +302,13 @@ void generic_locality_::receive_value(CkMessage* raw,
     }
   } else {
     this->update_context();
-    if (msg) {
-      // this ensures the port is deleted (since message's
-      // destructor isn't called via CkFreeMsg)
-      auto port = std::move(msg->dst);
-      fn(this, port, msg2value(msg));
-    } else {
-      fn(this, nullptr, msg2value(raw));
-    }
+    // this ensures the port is deleted (since message's
+    // destructor isn't called via CkFreeMsg)
+    auto port = msg ? std::move(msg->dst) : nullptr;
+    auto value = msg ? msg2value(msg) : msg2value(raw);
+    value->source =
+        std::make_shared<endpoint_source>(std::forward_as_tuple(epIdx, port));
+    fn(this, port, std::move(value));
   }
 }
 

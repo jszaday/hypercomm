@@ -235,17 +235,20 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
       cast->receive_message(msg);
       msg = nullptr;
     } else {
-      auto& port = opts.value_.ep_.port_;
-      auto fn = opts.value_.ep_.get_handler();
+      auto& ep = opts.value_.ep_;
+      auto& port = ep.port_;
+      auto& value = opts.value_.value_;
+      auto fn = ep.get_handler();
 #if CMK_VERBOSE
       CkPrintf("pe%d> delivering a value to port %s of idx %s.\n", CkMyPe(),
                (port->to_string()).c_str(),
                utilities::idx2str(elt->ckGetArrayIndex()).c_str());
 #endif
-      // update context so everything's kosher
+      // update context and source so everything's kosher
+      value->source = std::make_shared<endpoint_source>(ep);
       cast->update_context();
       // dump both the port and value since we don't need them after this
-      fn(cast, std::move(port), std::move(opts.value_.value_));
+      fn(cast, std::move(port), std::move(value));
     }
   } else {
     auto& aid = elt->ckGetArrayID();

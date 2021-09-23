@@ -359,6 +359,15 @@ void entry_port::on_invalidation(const component&) {
 void entry_port::take_back(value_ptr&& value) {
   access_context_()->receive_value(this->shared_from_this(), std::move(value));
 }
+
+void endpoint_source::take_back(value_ptr&& value) {
+  auto fn = this->ep_.get_handler();
+  auto self = this->shared_from_this();
+  if (self != value->source) {
+    value->source = std::move(self);
+  }
+  fn(access_context_(), this->ep_.port_, std::move(value));
+}
 }  // namespace hypercomm
 
 #include "wait_any.hpp"
