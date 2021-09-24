@@ -131,22 +131,23 @@ struct puper<std::array<T, N>,
   }
 };
 
-inline std::shared_ptr<PUP::er> make_puper(const serdes& s) {
+using pup_ptr = std::unique_ptr<PUP::er>;
+inline std::unique_ptr<PUP::er> make_puper(const serdes& s) {
   switch (s.state) {
     case serdes_state::UNPACKING: {
       using pup_type = typename puper_for<serdes_state::UNPACKING>::type;
-      return std::make_shared<pup_type>(s.current);
+      return pup_ptr(new pup_type(s.current));
     }
     case serdes_state::PACKING: {
       using pup_type = typename puper_for<serdes_state::PACKING>::type;
-      return std::make_shared<pup_type>(s.current);
+      return pup_ptr(new pup_type(s.current));
     }
     case serdes_state::SIZING: {
       using pup_type = typename puper_for<serdes_state::SIZING>::type;
-      return std::make_shared<pup_type>();
+      return pup_ptr(new pup_type);
     }
     default: {
-      return {};
+      return pup_ptr();
     }
   }
 }
