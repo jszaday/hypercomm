@@ -9,7 +9,7 @@
 
 namespace hypercomm {
 constexpr std::size_t kMinPortSize = HYPERCOMM_PORT_SIZE;
-constexpr std::size_t kZeroCopySize = 128 * 1024;
+constexpr std::size_t kZeroCopySize = 32 * 1024;
 }  // namespace hypercomm
 
 #endif

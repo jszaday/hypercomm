@@ -274,6 +274,7 @@ inline static void pack_ptr(serdes& s, std::shared_ptr<T>& t,
     pack_helper<T>::pack(s, *t);
   }
 }
+
 template <typename T>
 inline static void instance_unpack(serdes& s, std::shared_ptr<T>& t) {
   if (is_bytes<T>()) {
@@ -551,7 +552,8 @@ struct puper<
         std::size_t size = t ? quick_size(*t) : 0;
         // if we can defer it (and it's worthwhile to do so)
         if (s.deferrable && size >= kZeroCopySize) {
-          // update the type of the record
+          // update the kind/size of the record
+          rec->ty = size;
           rec->kind = ptr_record::DEFERRED;
           pup(s, *rec);
           // and defer it
