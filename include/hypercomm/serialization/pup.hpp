@@ -374,18 +374,21 @@ class puper<std::shared_ptr<T>,
       if (rec.is_null()) {
         ::new (&t) std::shared_ptr<T>();
       } else {
-        std::shared_ptr<polymorph> p;
-        if (rec.is_instance()) {
-          p.reset(hypercomm::instantiate(rec.ty));
-          CkAssertMsg(s.put_instance(rec.id, p),
-                      "instance insertion did not occur!");
-          p->__pup__(s);
-        } else if (rec.is_reference()) {
-          p = s.get_instance<polymorph>(rec.id);
-        } else {
-          CkAbort("unknown record type %d", static_cast<int>(rec.kind));
-        }
-        ::new (&t) std::shared_ptr<T>(std::dynamic_pointer_cast<T>(p));
+        std::shared_ptr<polymorph> p(([&](void) {
+          if (rec.is_instance()) {
+            std::shared_ptr<polymorph> p(hypercomm::instantiate(rec.ty));
+            CkAssertMsg(s.put_instance(rec.id, p),
+                        "instance insertion did not occur!");
+            p->__pup__(s);
+            return std::move(p);
+          } else if (rec.is_reference()) {
+            return s.get_instance<polymorph>(rec.id);
+          } else {
+            CkAbort("unknown record type %d", static_cast<int>(rec.kind));
+          }
+        })());
+        ::new (&t)
+            std::shared_ptr<T>(std::dynamic_pointer_cast<T>(std::move(p)));
       }
     } else {
       auto p = cast_to_packable(t, skip_cast<T>());
