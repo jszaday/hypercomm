@@ -276,30 +276,32 @@ inline static void pack_ptr(serdes& s, std::shared_ptr<T>& t,
 }
 
 template <typename T>
-inline static void unpack_ptr(serdes& s, ptr_record& rec,
-                              std::shared_ptr<T>& t) {
+inline static void instance_unpack(serdes& s, std::shared_ptr<T>& t) {
+  if (is_bytes<T>()) {
+    ::new (&t) std::shared_ptr<T>(std::move(s.observe_source()),
+                                  reinterpret_cast<T*>(s.current));
+
+    s.advance<T>();
+  } else {
+    // allocate memory for the object
+    auto* p = (T*)aligned_alloc(alignof(T), sizeof(T));
+    // then reconstruct it
+    pup(s, *p);
+    // the object must be reconstructed before any shared
+    // ptrs in case it's shared_from_this enabled. it will
+    // result in subtle failures otherwise.
+    ::new (&t) std::shared_ptr<T>(p, [](T* p) {
+      p->~T();
+      free(p);
+    });
+  }
+}
+
+template <typename T>
+inline static void default_unpack(serdes& s, ptr_record& rec,
+                                  std::shared_ptr<T>& t) {
   if (rec.is_null()) {
     ::new (&t) std::shared_ptr<T>();
-  } else if (rec.is_instance()) {
-    if (is_bytes<T>()) {
-      ::new (&t) std::shared_ptr<T>(std::move(s.observe_source()),
-                                    reinterpret_cast<T*>(s.current));
-
-      s.advance<T>();
-    } else {
-      // allocate memory for the object
-      auto* p = (T*)aligned_alloc(alignof(T), sizeof(T));
-      // then reconstruct it
-      pup(s, *p);
-      // the object must be reconstructed before any shared
-      // ptrs in case it's shared_from_this enabled. it will
-      // result in subtle failures otherwise.
-      ::new (&t) std::shared_ptr<T>(p, [](T* p) {
-        p->~T();
-        free(p);
-      });
-    }
-    CkAssertMsg(s.put_instance(rec.id, t), "instance insertion did not occur!");
   } else if (rec.is_reference()) {
     ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.id));
   } else {
@@ -506,6 +508,17 @@ class puper<std::shared_ptr<T>, typename std::enable_if<std::is_base_of<
   }
 };
 
+template <typename T, typename Enable = void>
+struct zero_copy_fallback {
+  inline static void unpack(serdes& s, std::shared_ptr<T>& t) {
+    instance_unpack(s, t);
+  }
+
+  inline static void pack(serdes& s, std::shared_ptr<T>& t) {
+    pack_helper<T>::pack(s, *t);
+  }
+};
+
 template <typename T>
 struct puper<
     std::shared_ptr<T>,
@@ -520,9 +533,14 @@ struct puper<
         // record a reference to this pointer so it
         // can be updated later on
         s.put_deferred(rec, t);
+      } else if (rec.is_instance()) {
+        // if it's an instance, go through the fallback routine
+        zero_copy_fallback<T>::unpack(s, t);
+        CkAssertMsg(s.put_instance(rec.id, t),
+                    "instance insertion did not occur!");
       } else {
         // if not, simply unpack the pointer
-        unpack_ptr(s, rec, t);
+        default_unpack(s, rec, t);
       }
     } else {
       ptr_record* rec = nullptr;
@@ -534,14 +552,15 @@ struct puper<
         std::size_t size = t ? quick_size(*t) : 0;
         // if we can defer it (and it's worthwhile to do so)
         if (s.deferrable && size >= kZeroCopySize) {
-          // update the type of the record
+          // update the kind/size of the record
+          rec->ty = size;
           rec->kind = ptr_record::DEFERRED;
           pup(s, *rec);
           // and defer it
           s.put_deferred(*rec, t);
         } else {
           pup(s, *rec);
-          pack_helper<T>::pack(s, *t);
+          zero_copy_fallback<T>::pack(s, t);
         }
       }
     }
@@ -556,7 +575,13 @@ struct puper<
     if (s.unpacking()) {
       ptr_record rec;
       pup(s, rec);
-      unpack_ptr(s, rec, t);
+      if (rec.is_instance()) {
+        instance_unpack(s, t);
+        CkAssertMsg(s.put_instance(rec.id, t),
+                    "instance insertion did not occur!");
+      } else {
+        default_unpack(s, rec, t);
+      }
     } else {
       pack_ptr(s, t, []() { return 0; });
     }
