@@ -275,7 +275,7 @@ inline static void pack_ptr(serdes& s, std::shared_ptr<T>& t,
   }
 }
 template <typename T>
-inline static void unpack_instance(serdes& s, std::shared_ptr<T>& t) {
+inline static void instance_unpack(serdes& s, std::shared_ptr<T>& t) {
   if (is_bytes<T>()) {
     ::new (&t) std::shared_ptr<T>(std::move(s.observe_source()),
                                   reinterpret_cast<T*>(s.current));
@@ -297,16 +297,12 @@ inline static void unpack_instance(serdes& s, std::shared_ptr<T>& t) {
 }
 
 template <typename T>
-inline static void unpack_ptr(serdes& s, ptr_record& rec,
-                              std::shared_ptr<T>& t) {
+inline static void default_unpack(serdes& s, ptr_record& rec,
+                                  std::shared_ptr<T>& t) {
   if (rec.is_null()) {
     ::new (&t) std::shared_ptr<T>();
   } else if (rec.is_reference()) {
     ::new (&t) std::shared_ptr<T>(s.get_instance<T>(rec.id));
-  } else if (rec.is_instance()) {
-    unpack_instance(s, t);
-
-    CkAssertMsg(s.put_instance(rec.id, t), "instance insertion did not occur!");
   } else {
     CkAbort("unknown record type %d", static_cast<int>(rec.kind));
   }
@@ -514,7 +510,7 @@ class puper<std::shared_ptr<T>, typename std::enable_if<std::is_base_of<
 template <typename T, typename Enable = void>
 struct zero_copy_fallback {
   inline static void unpack(serdes& s, std::shared_ptr<T>& t) {
-    unpack_instance(s, t);
+    instance_unpack(s, t);
   }
 
   inline static void pack(serdes& s, std::shared_ptr<T>& t) {
@@ -543,7 +539,7 @@ struct puper<
                     "instance insertion did not occur!");
       } else {
         // if not, simply unpack the pointer
-        unpack_ptr(s, rec, t);
+        default_unpack(s, rec, t);
       }
     } else {
       ptr_record* rec = nullptr;
@@ -577,7 +573,13 @@ struct puper<
     if (s.unpacking()) {
       ptr_record rec;
       pup(s, rec);
-      unpack_ptr(s, rec, t);
+      if (rec.is_instance()) {
+        instance_unpack(s, t);
+        CkAssertMsg(s.put_instance(rec.id, t),
+                    "instance insertion did not occur!");
+      } else {
+        default_unpack(s, rec, t);
+      }
     } else {
       pack_ptr(s, t, []() { return 0; });
     }
