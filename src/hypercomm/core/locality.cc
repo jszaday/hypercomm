@@ -83,7 +83,7 @@ void generic_locality_::invalidate_port(const entry_port_ptr& port) {
 }
 
 void generic_locality_::resync_port_queue(entry_port_iterator& it) {
-  const auto port = it->first;
+  auto& port = it->first;
   auto search = port_queue.find(port);
   if (search != port_queue.end()) {
     auto& buffer = search->second;

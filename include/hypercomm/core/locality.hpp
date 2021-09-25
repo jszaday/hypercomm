@@ -282,9 +282,8 @@ inline void send2future(const future& f, component::value_type&& value) {
   // TODO ( do not assume array-issuedness )
   auto src = std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(f.source);
   CkAssertMsg(src, "future must be from a locality!");
-  auto port = std::make_shared<future_port>(f);
   // TODO ( send immediately looking forward! )
-  send2port(src, port, std::move(value));
+  send2port(src, std::make_shared<future_port>(f), std::move(value));
 }
 
 template <typename Index>
@@ -335,8 +334,7 @@ bool vil<Base, Index>::check_future(const future& f) const {
   auto home = std::dynamic_pointer_cast<generic_element_proxy>(f.source);
   auto elt = this->__element__();
   if (home && home->equals(*elt)) {
-    auto port = std::make_shared<future_port>(f);
-    return this->has_value(std::move(port));
+    return this->has_value(std::make_shared<future_port>(f));
   } else {
     return false;
   }
