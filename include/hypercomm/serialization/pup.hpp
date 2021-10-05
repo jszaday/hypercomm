@@ -377,8 +377,8 @@ class puper<std::shared_ptr<T>,
         std::shared_ptr<polymorph> p(([&](void) {
           if (rec.is_instance()) {
             std::shared_ptr<polymorph> p(hypercomm::instantiate(rec.ty));
-            CkAssertMsg(s.put_instance(rec.id, p),
-                        "instance insertion did not occur!");
+            auto ins = s.put_instance(rec.id, p);
+            CkAssertMsg(ins, "instance insertion did not occur!");
             p->__pup__(s);
             return std::move(p);
           } else if (rec.is_reference()) {
