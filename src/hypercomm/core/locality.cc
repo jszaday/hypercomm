@@ -175,8 +175,8 @@ struct zero_copy_payload_ {
     buf->deregisterMem();
     CkFreeMsg(msg);
 
-    CkAssertMsg(self->val_->receive(self->src_, std::move(*ptr)),
-                "buffer deregistration failed!");
+    auto rcvd = self->val_->receive(self->src_, std::move(*ptr));
+    CkAssertMsg(rcvd, "buffer deregistration failed!");
     delete ptr;
 
     if (self->val_->ready()) {
