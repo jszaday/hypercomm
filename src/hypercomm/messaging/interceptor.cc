@@ -115,20 +115,37 @@ const int& interceptor::deliver_handler(void) {
   return CmiAutoRegister(interceptor::deliver_handler_);
 }
 
-void interceptor::deliver_handler_(void* env) {
-  auto* imsg = (interceptor_msg_*)env;
-  auto* msg = (CkMessage*)EnvToUsr((envelope*)env);
+void interceptor::deliver_handler_(void* raw) {
+  auto* imsg = (interceptor_msg_*)raw;
+  auto* env = (envelope*)raw;
+  auto* msg = (CkMessage*)EnvToUsr(env);
+
+  auto aid = imsg->aid;
+  auto idx = imsg->idx;
+  auto epIdx = imsg->epIdx;
+  auto refNum = imsg->refNum;
+  auto msgIdx = imsg->msgIdx;
+  auto totalSize = imsg->totalSize;
+
   if (imsg->packed) {
     auto* prev = msg;
-    msg = (CkMessage*)_msgTable[imsg->msgIdx]->unpack(prev);
+    msg = (CkMessage*)_msgTable[msgIdx]->unpack(prev);
     CkAssert(msg == prev);
-    imsg->packed = false;
   }
+
+  std::fill((char*)raw, (char*)raw + sizeof(envelope), '\0');
+
+  env->setRef(refNum);
+  env->setEpIdx(epIdx);
+  env->setMsgIdx(msgIdx);
+  env->setPacked(false);
+  env->setTotalsize(totalSize);
+
   auto* loc = local_branch();
   if (loc == nullptr) {
     CmiPushPE(CkMyPe(), env);
   } else {
-    loc->deliver(imsg->aid, imsg->idx, msg);
+    loc->deliver(aid, idx, msg);
   }
 }
 
@@ -137,18 +154,23 @@ void interceptor::send_to_branch(const int& pe, const CkArrayID& aid,
   auto* env = UsrToEnv(msg);
   auto* imsg = (interceptor_msg_*)env;
 
+  auto refNum = env->getRef();
+  auto epIdx = env->getEpIdx();
   auto msgIdx = env->getMsgIdx();
   auto wasPacked = env->isPacked();
   auto totalSize = env->getTotalsize();
 
-  std::fill((char*)imsg, (char*)imsg + sizeof(interceptor_msg_), '\0');
+  std::fill((char*)env, (char*)env + sizeof(envelope), '\0');
 
   imsg->aid = aid;
   imsg->idx = idx;
+  imsg->epIdx = epIdx;
   imsg->msgIdx = msgIdx;
+  imsg->refNum = refNum;
+  imsg->totalSize = totalSize;
+
   auto& packer = _msgTable[msgIdx]->pack;
   imsg->packed = packer && ((CkNodeOf(pe) != CkMyNode()) || wasPacked);
-
   if (imsg->packed && !wasPacked) {
     auto prev = msg;
     msg = (CkMessage*)packer(msg);

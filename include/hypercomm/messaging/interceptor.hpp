@@ -10,9 +10,12 @@ CkpvExtern(CProxy_interceptor, interceptor_);
 
 struct interceptor_msg_ {
   char core[CmiMsgHeaderSizeBytes];
+  std::size_t totalSize;
+  CMK_REFNUM_TYPE refNum;
+  UShort epIdx;
+  UChar msgIdx;
   CkArrayID aid;
   CkArrayIndex idx;
-  UChar msgIdx;
   bool packed;
 };
 
