@@ -24,7 +24,8 @@ jobs:
 
     # Prep Charm++
     - name: prep-charm++
-      run: sudo apt-get install -y mpi
+      run: |
+        sudo apt-get install -y mpi
 
     # Build Charm++
     - name: build-charm++
