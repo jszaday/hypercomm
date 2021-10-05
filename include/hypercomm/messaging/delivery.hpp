@@ -46,9 +46,7 @@ struct payload {
   payload(void) = delete;
   payload(const payload&) = delete;
   payload(payload&& other) = delete;
-
   payload(CkMessage* _1) : options_(_1), type_(kMessage) {}
-  payload(CkMarshalledMessage&& _1) : payload(_1.getMessage()) {}
 
   template <typename T>
   payload(const T& _1, value_ptr&& _2)

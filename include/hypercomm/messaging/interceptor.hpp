@@ -8,6 +8,17 @@ namespace hypercomm {
 
 CkpvExtern(CProxy_interceptor, interceptor_);
 
+struct interceptor_msg_ {
+  char core[CmiMsgHeaderSizeBytes];
+  CkArrayID aid;
+  CkArrayIndex idx;
+  UChar msgIdx;
+  bool packed;
+};
+
+static_assert(sizeof(interceptor_msg_) <= sizeof(envelope),
+              "interceptor header cannot fit within message!?");
+
 class interceptor : public CBase_interceptor {
   using queue_type =
       std::unordered_map<CkArrayIndex, std::vector<CkMessage*>, IndexHasher>;
@@ -16,6 +27,8 @@ class interceptor : public CBase_interceptor {
 
   std::unordered_map<CkArrayID, req_map_type, ArrayIDHasher> fwdReqs_;
   std::unordered_map<CkArrayID, queue_type, ArrayIDHasher> queued_;
+
+  static void deliver_handler_(void*);
 
  public:
   interceptor(void) { CkpvAccess(interceptor_) = this->thisProxy; }
@@ -34,7 +47,6 @@ class interceptor : public CBase_interceptor {
   const CkArrayIndex& dealias(const CkArrayID& aid,
                               const CkArrayIndex& idx) const;
 
- public:
   // create a forwarding record for "from" to "to" at the home pe of "from"
   void forward(const CkArrayID& aid, const CkArrayIndex& from,
                const CkArrayIndex& to);
@@ -42,15 +54,19 @@ class interceptor : public CBase_interceptor {
   // delete any forwarding records for the given idx, at its home pe
   void stop_forwarding(const CkArrayID& aid, const CkArrayIndex& idx);
 
-  // entry-method accessible version of deliver
+  static const int& deliver_handler(void);
+
   inline void deliver(const CkArrayID& aid, const CkArrayIndex& raw,
-                      CkMarshalledMessage&& msg) {
+                      CkMessage* msg) {
     // deliver with immediately payload processing, "inlining" the EP
-    this->deliver(aid, raw, detail::make_payload(std::move(msg)), true);
+    this->deliver(aid, raw, detail::make_payload(msg), true);
   }
 
   void deliver(const CkArrayID& aid, const CkArrayIndex& raw,
                detail::payload_ptr&&, const bool& immediate);
+
+  static void send_to_branch(const int& pe, const CkArrayID& aid,
+                             const CkArrayIndex& idx, CkMessage* msg);
 
   template <typename T>
   inline static is_valid_endpoint_t<T> send_async(const CkArrayID& aid,

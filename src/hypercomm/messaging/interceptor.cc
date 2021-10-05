@@ -97,6 +97,7 @@ void initialize(void) {
     _registermessaging();
   }
   // register the handler for delivery
+  interceptor::deliver_handler();
   delivery::handler();
   // zero the per-pe interceptor proxy
   CkpvInitialize(CProxy_interceptor, interceptor_);
@@ -107,6 +108,55 @@ void initialize(void) {
 // registers delivery::handler_ as a converse handler
 const int& delivery::handler(void) {
   return CmiAutoRegister(delivery::handler_);
+}
+
+// registers delivery::handler_ as a converse handler
+const int& interceptor::deliver_handler(void) {
+  return CmiAutoRegister(interceptor::deliver_handler_);
+}
+
+void interceptor::deliver_handler_(void* env) {
+  auto* imsg = (interceptor_msg_*)env;
+  auto* msg = (CkMessage*)EnvToUsr((envelope*)env);
+  if (imsg->packed) {
+    auto* prev = msg;
+    msg = (CkMessage*)_msgTable[imsg->msgIdx]->unpack(prev);
+    CkAssert(msg == prev);
+    imsg->packed = false;
+  }
+  auto* loc = local_branch();
+  if (loc == nullptr) {
+    CmiPushPE(CkMyPe(), env);
+  } else {
+    loc->deliver(imsg->aid, imsg->idx, msg);
+  }
+}
+
+void interceptor::send_to_branch(const int& pe, const CkArrayID& aid,
+                                 const CkArrayIndex& idx, CkMessage* msg) {
+  auto* env = UsrToEnv(msg);
+  auto* imsg = (interceptor_msg_*)env;
+
+  auto msgIdx = env->getMsgIdx();
+  auto wasPacked = env->isPacked();
+  auto totalSize = env->getTotalsize();
+
+  std::fill((char*)imsg, (char*)imsg + sizeof(interceptor_msg_), '\0');
+
+  imsg->aid = aid;
+  imsg->idx = idx;
+  imsg->msgIdx = msgIdx;
+  auto& packer = _msgTable[msgIdx]->pack;
+  imsg->packed = packer && ((CkNodeOf(pe) != CkMyNode()) || wasPacked);
+
+  if (imsg->packed && !wasPacked) {
+    auto prev = msg;
+    msg = (CkMessage*)packer(msg);
+    CkAssert(msg == prev);
+  }
+
+  CmiSetHandler(imsg, interceptor::deliver_handler());
+  CmiSyncSendAndFree(pe, totalSize, (char*)imsg);
 }
 
 // locally delivers the payload to the interceptor with immediacy
@@ -212,7 +262,7 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
       // if we lost an elt, the home pe will know its location
       // (or at least buffer it)
       auto destPe = ourElt ? homePe : lastPe;
-      thisProxy[destPe].deliver(aid, post, CkMarshalledMessage(msg));
+      send_to_branch(destPe, aid, post, msg);
     }
   }
 }
