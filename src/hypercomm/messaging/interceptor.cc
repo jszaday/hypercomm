@@ -117,9 +117,14 @@ const int& interceptor::deliver_handler(void) {
   return CmiAutoRegister(interceptor::deliver_handler_);
 }
 
-static inline void prep_array_msg_(CkMessage* msg) {
-  UsrToEnv(msg)->setMsgtype(ForArrayEltMsg);
-  CkArrayMessage* amsg = (CkArrayMessage*)msg;
+static inline void prep_array_msg_(CkMessage* msg, const CkArrayID& aid) {
+  auto* amsg = (CkArrayMessage*)msg;
+  auto* env = UsrToEnv(msg);
+  env->setMsgtype(ForArrayEltMsg);
+  env->setArrayMgr(aid);
+  env->getsetArraySrcPe() = CkMyPe();
+  env->setRecipientID(ck::ObjID(0));
+  env->getsetArrayHops() = 0;
   amsg->array_setIfNotThere(CkArray_IfNotThere_buffer);
 }
 
@@ -145,7 +150,7 @@ bool interceptor::send_fallback(const CkArrayID& aid, const CkArrayIndex& idx,
     return false;
   } else {
     auto queuing = (opts & CK_MSG_INLINE) ? CkDeliver_inline : CkDeliver_queue;
-    prep_array_msg_(msg);
+    prep_array_msg_(msg, aid);
     ((CkArray*)arr)->deliver(msg, idx, queuing, opts & (~CK_MSG_INLINE));
     return true;
   }
@@ -180,7 +185,7 @@ void interceptor::deliver_handler_(void* raw) {
 
   if (loc == nullptr) {
     if (arr != nullptr) {
-      prep_array_msg_(msg);
+      prep_array_msg_(msg, aid);
       ((CkArray*)arr)->deliver(msg, idx, CkDeliver_queue);
     }
   } else {
