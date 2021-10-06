@@ -97,8 +97,8 @@ void initialize(void) {
     _registermessaging();
   }
   // register the handler for delivery
-  interceptor::deliver_handler();
   delivery::handler();
+  interceptor::deliver_handler();
   // zero the per-pe interceptor proxy
   CkpvInitialize(CProxy_interceptor, interceptor_);
   CkAssert(((CkGroupID)CkpvAccess(interceptor_)).isZero());
@@ -122,24 +122,17 @@ void interceptor::deliver_handler_(void* raw) {
 
   auto aid = imsg->aid;
   auto idx = imsg->idx;
-  auto epIdx = imsg->epIdx;
-  auto refNum = imsg->refNum;
-  auto msgIdx = imsg->msgIdx;
-  auto totalSize = imsg->totalSize;
+  auto hdr = imsg->hdr;
 
-  if (imsg->packed) {
+  if (imsg->packed()) {
     auto* prev = msg;
-    msg = (CkMessage*)_msgTable[msgIdx]->unpack(prev);
+    msg = (CkMessage*)_msgTable[hdr.msgIdx]->unpack(prev);
     CkAssert(msg == prev);
+    hdr.packed = false;
   }
 
-  std::fill((char*)raw, (char*)raw + sizeof(envelope), '\0');
-
-  env->setRef(refNum);
-  env->setEpIdx(epIdx);
-  env->setMsgIdx(msgIdx);
-  env->setPacked(false);
-  env->setTotalsize(totalSize);
+  std::fill((char*)env, (char*)env + sizeof(envelope), '\0');
+  hdr.export_to(env);
 
   auto* loc = local_branch();
   if (loc == nullptr) {
@@ -153,33 +146,33 @@ void interceptor::deliver_handler_(void* raw) {
 void interceptor::send_to_branch(const int& pe, const CkArrayID& aid,
                                  const CkArrayIndex& idx, CkMessage* msg) {
   auto* env = UsrToEnv(msg);
-  auto* imsg = (interceptor_msg_*)env;
+  if (pe == CkMyPe()) {
+    if (env->isPacked()) {
+      CkUnpackMessage(&env);
+    }
 
-  auto refNum = env->getRef();
-  auto epIdx = env->getEpIdx();
-  auto msgIdx = env->getMsgIdx();
-  auto wasPacked = env->isPacked();
-  auto totalSize = env->getTotalsize();
+    interceptor::send_async(aid, idx, msg);
+  } else {
+    auto* imsg = (interceptor_msg_*)env;
+    interceptor_msg_::header_ hdr(env);
 
-  std::fill((char*)env, (char*)env + sizeof(envelope), '\0');
+    std::fill((char*)env, (char*)env + sizeof(envelope), '\0');
 
-  imsg->aid = aid;
-  imsg->idx = idx;
-  imsg->epIdx = epIdx;
-  imsg->msgIdx = msgIdx;
-  imsg->refNum = refNum;
-  imsg->totalSize = totalSize;
+    imsg->hdr = hdr;
+    imsg->aid = aid;
+    imsg->idx = idx;
 
-  auto& packer = _msgTable[msgIdx]->pack;
-  imsg->packed = packer && ((CkNodeOf(pe) != CkMyNode()) || wasPacked);
-  if (imsg->packed && !wasPacked) {
-    auto prev = msg;
-    msg = (CkMessage*)packer(msg);
-    CkAssert(msg == prev);
+    auto& packer = _msgTable[hdr.msgIdx]->pack;
+    imsg->set_packed(packer && (hdr.packed || (CkNodeOf(pe) != CkMyNode())));
+    if (imsg->packed() && !hdr.packed) {
+      auto prev = msg;
+      msg = (CkMessage*)packer(msg);
+      CkAssert(msg == prev);
+    }
+
+    CmiSetHandler(imsg, interceptor::deliver_handler());
+    CmiSyncSendAndFree(pe, hdr.totalSize, (char*)imsg);
   }
-
-  CmiSetHandler(imsg, interceptor::deliver_handler());
-  CmiSyncSendAndFree(pe, totalSize, (char*)imsg);
 }
 
 // locally delivers the payload to the interceptor with immediacy

@@ -10,13 +10,38 @@ CkpvExtern(CProxy_interceptor, interceptor_);
 
 struct interceptor_msg_ {
   char core[CmiMsgHeaderSizeBytes];
-  std::size_t totalSize;
-  CMK_REFNUM_TYPE refNum;
-  UShort epIdx;
-  UChar msgIdx;
+
+  struct header_ {
+    std::size_t totalSize;
+    CMK_REFNUM_TYPE refNum;
+    UShort epIdx;
+    UChar msgIdx;
+    bool packed;
+
+    header_(const envelope* env) {
+      this->refNum = env->getRef();
+      this->epIdx = env->getEpIdx();
+      this->msgIdx = env->getMsgIdx();
+      this->packed = env->isPacked();
+      this->totalSize = env->getTotalsize();
+    }
+
+    inline void export_to(envelope* env) const {
+      env->setRef(this->refNum);
+      env->setEpIdx(this->epIdx);
+      env->setMsgIdx(this->msgIdx);
+      env->setPacked(this->packed);
+      env->setTotalsize(this->totalSize);
+    }
+  };
+
+  header_ hdr;
   CkArrayID aid;
   CkArrayIndex idx;
-  bool packed;
+
+  inline void set_packed(const bool& _) { this->hdr.packed = _; }
+
+  inline const bool& packed(void) const { return this->hdr.packed; }
 };
 
 static_assert(sizeof(interceptor_msg_) <= sizeof(envelope),
