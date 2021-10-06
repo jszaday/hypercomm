@@ -1,0 +1,52 @@
+mainmodule tester {
+
+    readonly int nElts;
+    readonly int nIters;
+    readonly int nChares;
+
+    message PingMsg {
+        char payload[];
+    };
+
+    mainchare main {
+        entry [nokeep] main(CkArgMsg*);
+        entry [nokeep] void start(CkArrayCreatedMsg*);
+        entry void done(std::string, double);
+    };
+
+    readonly CProxy_main mainProxy;
+
+    array [Max] exchanger : hypercomm::locality_base_ {
+        entry exchanger(void);
+
+        entry void run_intercept(void);
+        entry void recv_intercept(CkMessage*);
+
+        entry void run_plain(void);
+        entry void recv_plain(CkMessage*);
+
+        entry void run_sdag(void) {
+            serial {
+                if (mine == 0) {
+                    startTime = CkWallTimer();
+                    peer.recv_sdag(new (nElts) PingMsg);
+                }
+            }
+            for (it = 0; it < nIters; it += 1) {
+                when recv_sdag(CkMessage* msg) serial {
+                    peer.recv_sdag(msg);
+                }
+            }
+            serial {
+                if (mine == 0) {
+                    auto endTime = CkWallTimer();
+                    mainProxy.done("sdag", endTime - startTime);
+                }
+            }
+        }
+
+        entry void recv_sdag(CkMessage*);
+    };
+
+    initproc void enroll_polymorphs(void);
+}
