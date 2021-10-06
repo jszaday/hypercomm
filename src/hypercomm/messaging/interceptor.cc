@@ -137,7 +137,7 @@ void interceptor::deliver_handler_(void* raw) {
   auto* loc = local_branch();
   if (loc == nullptr) {
     CmiSetHandler(env, interceptor::deliver_handler());
-    CmiPushPE(CkMyPe(), env);
+    CmiPushPE(CmiMyRank(), env);
   } else {
     loc->deliver(aid, idx, msg);
   }
