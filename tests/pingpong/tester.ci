@@ -28,8 +28,9 @@ mainmodule tester {
         entry void run_sdag(void) {
             serial {
                 if (mine == 0) {
-                    startTime = CkWallTimer();
-                    peer.recv_sdag(new (nElts) PingMsg);
+                    auto* msg = new (nElts) PingMsg;
+                    this->startTime = CkWallTimer();
+                    peer.recv_sdag(msg);
                 }
             }
             for (it = 0; it < nIters; it += 1) {

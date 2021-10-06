@@ -75,8 +75,8 @@ class exchanger : public vil<CBase_exchanger, int> {
 
   void run_intercept(void) {
     this->it = 0;
-    this->startTime = CkWallTimer();
     auto* msg = new (nElts) PingMsg;
+    this->startTime = CkWallTimer();
     UsrToEnv(msg)->setEpIdx(CkIndex_exchanger::recv_intercept(nullptr));
     interceptor::send_async(peer, msg);
   }
@@ -94,8 +94,9 @@ class exchanger : public vil<CBase_exchanger, int> {
 
   void run_plain(void) {
     this->it = 0;
+    auto* msg = new (nElts) PingMsg;
     this->startTime = CkWallTimer();
-    peer.recv_plain(new (nElts) PingMsg);
+    peer.recv_plain(msg);
   }
 
   void recv_plain(CkMessage* msg) {
