@@ -83,6 +83,9 @@ jobs:
         echo "<!-- zero_copy_demo --!>"
         cd ../zero_copy_demo
         TESTOPTS="++local" make test
+        echo "<!-- pingpong --!>"
+        cd ../pingpong
+        TESTOPTS="++local" make test
         echo "<!-- avalanche --!>"
         cd ../avalanche
         TESTOPTS="++local 65" DEBUG=1 make test

@@ -135,13 +135,7 @@ class interceptor : public CBase_interceptor {
   inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
                                 detail::payload_ptr&& payload) {
     if (((CkGroupID)CkpvAccess(interceptor_)).isZero()) {
-#if CMK_VERBOSE
-      CkError("warning> unable to deliver through interceptor.\n");
-#endif
-      // TODO ( is there a better function for this? )
-      auto msg = payload->release();
-      CProxyElement_ArrayBase::ckSendWrapper(aid, idx, msg,
-                                             UsrToEnv(msg)->getEpIdx(), 0);
+      CkEnforce(send_fallback(aid, idx, payload->release()));
     } else {
       auto* loc = spin_to_win();
       CkAssertMsg(loc, "unable to retrieve interceptor");
@@ -163,6 +157,9 @@ class interceptor : public CBase_interceptor {
   }
 
  protected:
+  static bool send_fallback(const CkArrayID& aid, const CkArrayIndex& idx,
+                            CkMessage* msg, const int& opts = 0);
+
   inline static interceptor* spin_to_win(void) {
     void* local = nullptr;
     while ((local = CkLocalBranch(CkpvAccess(interceptor_))) == nullptr) {

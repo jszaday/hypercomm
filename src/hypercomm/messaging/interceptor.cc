@@ -3,6 +3,8 @@
 #include <hypercomm/sections/imprintable.hpp>
 #include <hypercomm/utilities/macros.hpp>
 
+CkpvExtern(CkCoreState*, _coreState);
+
 namespace hypercomm {
 
 CkpvDeclare(CProxy_interceptor, interceptor_);
@@ -115,6 +117,45 @@ const int& interceptor::deliver_handler(void) {
   return CmiAutoRegister(interceptor::deliver_handler_);
 }
 
+static inline void prep_array_msg_(CkMessage* msg, const CkArrayID& aid) {
+  auto* amsg = (CkArrayMessage*)msg;
+  auto* env = UsrToEnv(msg);
+  env->setMsgtype(ForArrayEltMsg);
+  env->setArrayMgr(aid);
+  env->getsetArraySrcPe() = CkMyPe();
+  env->setRecipientID(ck::ObjID(0));
+  env->getsetArrayHops() = 0;
+  amsg->array_setIfNotThere(CkArray_IfNotThere_buffer);
+}
+
+static inline CkArray* lookup_or_buffer_(const CkArrayID& aid, envelope* env) {
+  auto gid = (CkGroupID)aid;
+  auto* ck = CkpvAccess(_coreState);
+  CmiImmediateLock(CkpvAccess(_groupTableImmLock));
+  IrrGroup* obj = ck->localBranch(gid);
+  if (obj == nullptr) {
+    ck->getGroupTable()->find(gid).enqMsg(env);
+  }
+  CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
+  return dynamic_cast<CkArray*>(obj);
+}
+
+bool interceptor::send_fallback(const CkArrayID& aid, const CkArrayIndex& idx,
+                                CkMessage* msg, const int& opts) {
+#if CMK_VERBOSE
+  CkError("warning> delivery through interceptor failed... falling back!\n");
+#endif
+  auto* arr = lookup_or_buffer_(aid, UsrToEnv(msg));
+  if (arr == nullptr) {
+    return false;
+  } else {
+    auto queuing = (opts & CK_MSG_INLINE) ? CkDeliver_inline : CkDeliver_queue;
+    prep_array_msg_(msg, aid);
+    ((CkArray*)arr)->deliver(msg, idx, queuing, opts & (~CK_MSG_INLINE));
+    return true;
+  }
+}
+
 void interceptor::deliver_handler_(void* raw) {
   auto* imsg = (interceptor_msg_*)raw;
   auto* env = (envelope*)raw;
@@ -131,13 +172,22 @@ void interceptor::deliver_handler_(void* raw) {
     hdr.packed = false;
   }
 
-  std::fill((char*)env, (char*)env + sizeof(envelope), '\0');
-  hdr.export_to(env);
-
   auto* loc = local_branch();
+  auto* arr = loc ? nullptr : lookup_or_buffer_(aid, env);
+
+  if (arr || loc) {
+    std::fill((char*)env, (char*)env + sizeof(envelope), '\0');
+    hdr.export_to(env);
+  } else {
+    // ensure imsg has most up-to-date status
+    imsg->set_packed(hdr.packed);
+  }
+
   if (loc == nullptr) {
-    CmiSetHandler(env, interceptor::deliver_handler());
-    CmiPushPE(CkMyPe(), env);
+    if (arr != nullptr) {
+      prep_array_msg_(msg, aid);
+      ((CkArray*)arr)->deliver(msg, idx, CkDeliver_queue);
+    }
   } else {
     loc->deliver(aid, idx, msg);
   }
