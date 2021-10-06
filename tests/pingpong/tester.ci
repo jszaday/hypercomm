@@ -33,7 +33,7 @@ mainmodule tester {
                     peer.recv_sdag(msg);
                 }
             }
-            for (it = 0; it < nIters; it += 1) {
+            for (it = !mine; it < nIters; it += 1) {
                 when recv_sdag(CkMessage* msg) serial {
                     peer.recv_sdag(msg);
                 }

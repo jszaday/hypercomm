@@ -54,7 +54,8 @@ struct main : public CBase_main {
       this->warmup = false;
       exchangers[CkArrayIndex1D(0)].run_plain();
     } else {
-      CkExit();
+      // ensure there is no latent activity
+      CkExitAfterQuiescence();
     }
   }
 };
