@@ -6,7 +6,6 @@ module messaging {
 
         group interceptor {
             entry interceptor(void);
-            entry void deliver(const CkArrayID&, const CkArrayIndex&, CkMarshalledMessage);
             entry void forward(const CkArrayID&, const CkArrayIndex&, const CkArrayIndex&);
             entry void stop_forwarding(const CkArrayID&, const CkArrayIndex&);
         };

@@ -486,7 +486,7 @@ class tree_builder : public CBase_tree_builder, public array_listener {
       auto *msg = hypercomm::pack(curr, children, elt->__stamp__());
       UsrToEnv(msg)->setEpIdx(
           CkIndex_locality_base_::idx_replace_downstream_CkMessage());
-      interceptor.deliver(aid, parent, msg);
+      interceptor::send_async(aid, parent, msg);
       // if we had children,
       if (!children.empty()) {
 #if CMK_VERBOSE

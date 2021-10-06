@@ -98,6 +98,7 @@ void initialize(void) {
   }
   // register the handler for delivery
   delivery::handler();
+  interceptor::deliver_handler();
   // zero the per-pe interceptor proxy
   CkpvInitialize(CProxy_interceptor, interceptor_);
   CkAssert(((CkGroupID)CkpvAccess(interceptor_)).isZero());
@@ -107,6 +108,71 @@ void initialize(void) {
 // registers delivery::handler_ as a converse handler
 const int& delivery::handler(void) {
   return CmiAutoRegister(delivery::handler_);
+}
+
+// registers delivery::handler_ as a converse handler
+const int& interceptor::deliver_handler(void) {
+  return CmiAutoRegister(interceptor::deliver_handler_);
+}
+
+void interceptor::deliver_handler_(void* raw) {
+  auto* imsg = (interceptor_msg_*)raw;
+  auto* env = (envelope*)raw;
+  auto* msg = (CkMessage*)EnvToUsr(env);
+
+  auto aid = imsg->aid;
+  auto idx = imsg->idx;
+  auto hdr = imsg->hdr;
+
+  if (imsg->packed()) {
+    auto* prev = msg;
+    msg = (CkMessage*)_msgTable[hdr.msgIdx]->unpack(prev);
+    CkAssert(msg == prev);
+    hdr.packed = false;
+  }
+
+  std::fill((char*)env, (char*)env + sizeof(envelope), '\0');
+  hdr.export_to(env);
+
+  auto* loc = local_branch();
+  if (loc == nullptr) {
+    CmiSetHandler(env, interceptor::deliver_handler());
+    CmiPushPE(CkMyPe(), env);
+  } else {
+    loc->deliver(aid, idx, msg);
+  }
+}
+
+void interceptor::send_to_branch(const int& pe, const CkArrayID& aid,
+                                 const CkArrayIndex& idx, CkMessage* msg) {
+  auto* env = UsrToEnv(msg);
+  if (pe == CkMyPe()) {
+    if (env->isPacked()) {
+      CkUnpackMessage(&env);
+    }
+
+    interceptor::send_async(aid, idx, msg);
+  } else {
+    auto* imsg = (interceptor_msg_*)env;
+    interceptor_msg_::header_ hdr(env);
+
+    std::fill((char*)env, (char*)env + sizeof(envelope), '\0');
+
+    imsg->hdr = hdr;
+    imsg->aid = aid;
+    imsg->idx = idx;
+
+    auto& packer = _msgTable[hdr.msgIdx]->pack;
+    imsg->set_packed(packer && (hdr.packed || (CkNodeOf(pe) != CkMyNode())));
+    if (imsg->packed() && !hdr.packed) {
+      auto prev = msg;
+      msg = (CkMessage*)packer(msg);
+      CkAssert(msg == prev);
+    }
+
+    CmiSetHandler(imsg, interceptor::deliver_handler());
+    CmiSyncSendAndFree(pe, hdr.totalSize, (char*)imsg);
+  }
 }
 
 // locally delivers the payload to the interceptor with immediacy
@@ -212,7 +278,7 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
       // if we lost an elt, the home pe will know its location
       // (or at least buffer it)
       auto destPe = ourElt ? homePe : lastPe;
-      thisProxy[destPe].deliver(aid, post, CkMarshalledMessage(msg));
+      send_to_branch(destPe, aid, post, msg);
     }
   }
 }
