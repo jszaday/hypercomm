@@ -11,59 +11,65 @@ class mailbox : public component {
  public:
   using predicate_type = std::shared_ptr<immediate_action<bool(const T&)>>;
   using action_type = callback_ptr;
+  using reqcount_t = std::size_t;
 
-  class request : public component::status_listener,
-                  public std::enable_shared_from_this<request> {
+  class request {
    public:
-    std::shared_ptr<component> com;
+    mailbox<T>* self;
+    reqcount_t id;
     predicate_type pred;
     action_type act;
-    mailbox<T>* self;
 
-    request(mailbox<T>* _1, const predicate_type& _2, const callback_ptr& _3)
-        : self(_1), pred(_2), act(_3) {}
-
-    ~request() {}
-
-    virtual void on_completion(const component&) override {
-      // TODO this may not be necessary?
-      self->pop_request(this->shared_from_this());
-    }
-
-    virtual void on_invalidation(const component&) override {
-      self->pop_request(this->shared_from_this());
-    }
+    request(mailbox<T>* _1, const reqcount_t& _2, const predicate_type& _3,
+            const callback_ptr& _4)
+        : self(_1), id(_2), pred(_3), act(_4) {}
 
     inline bool matches(const T& t) { return !pred || pred->action(t); }
 
     inline void action(value_type&& value) { act->send(std::move(value)); }
   };
 
-  using request_type = std::shared_ptr<request>;
+  class comlink : public component::status_listener {
+   public:
+    mailbox<T>* self;
+    reqcount_t id;
+
+    comlink(mailbox<T>* _1, const reqcount_t& _2) : self(_1), id(_2) {}
+
+    virtual void on_completion(const component&) override {
+      // TODO this may not be necessary?
+      self->pop_request(this->id);
+    }
+
+    virtual void on_invalidation(const component&) override {
+      self->pop_request(this->id);
+    }
+  };
 
  protected:
-  std::deque<request_type> requests_;
   std::deque<std::unique_ptr<typed_value<T>>> buffer_;
+  std::deque<std::unique_ptr<request>> requests_;
+  reqcount_t reqcount;
 
  public:
-  mailbox(const id_t& _1) : component(_1) {}
+  mailbox(const id_t& _1) : component(_1), reqcount(0) {}
 
   virtual std::size_t n_inputs(void) const override { return 1; }
   virtual std::size_t n_outputs(void) const override { return 0; }
   virtual bool keep_alive(void) const override { return true; }
 
-  inline request_type put_request(const predicate_type& pred,
-                                  const callback_ptr& cb) {
+  inline request* put_request(const predicate_type& pred,
+                              const callback_ptr& cb) {
     auto search = this->find_in_buffer(pred);
     if (search == std::end(this->buffer_)) {
-      auto req = std::make_shared<request>(this, pred, cb);
+      auto req = new request(this, ++this->reqcount, pred, cb);
       this->requests_.emplace_back(req);
       return req;
     } else {
       QdProcess(1);
       cb->send(std::move(*search));
       this->buffer_.erase(search);
-      return {};
+      return nullptr;
     }
   }
 
@@ -73,13 +79,17 @@ class mailbox : public component {
     auto cb = access_context_()->make_connector(com, port);
     auto req = this->put_request(pred, cb);
     if (req) {
-      (access_context_()->components[com])->add_listener(req);
+      (access_context_()->components[com])
+          ->add_listener(std::make_shared<comlink>(this, req->id));
     }
   }
 
-  inline void pop_request(const request_type& req) {
+  inline void pop_request(const reqcount_t& req) {
+    using request_type = typename decltype(this->requests_)::value_type;
     auto end = std::end(this->requests_);
-    auto search = std::find(std::begin(this->requests_), end, req);
+    auto search = std::find_if(
+        std::begin(this->requests_), end,
+        [&](const request_type& other) -> bool { return req == other->id; });
     if (search != end) {
       this->requests_.erase(search);
     }
@@ -93,7 +103,7 @@ class mailbox : public component {
       QdCreate(1);
       this->buffer_.emplace_back(std::move(value));
     } else {
-      auto req = *search;
+      auto req = std::move(*search);
       this->requests_.erase(search);
       // delete req before sending cb to preclude
       // feedback loops
