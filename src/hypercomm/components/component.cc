@@ -85,7 +85,7 @@ void component::stage_action(incoming_type::iterator* search) {
     // determine whether we persist after acting
     this->alive = this->keep_alive();
     // then notify our listeners if we expired
-    if (!this->alive) this->notify_listeners<false>();
+    if (!this->alive) this->notify_listeners<kCompletion>();
   }
 }
 
@@ -150,7 +150,7 @@ void component::on_invalidation(void) {
   // dumps its values and propagates invalidations downstream:
   this->ret_inv_values();
   // notifies its listeners
-  this->notify_listeners<true>();
+  this->notify_listeners<kInvalidation>();
 }
 
 void component::receive_value(const port_type& port, value_type&& value) {

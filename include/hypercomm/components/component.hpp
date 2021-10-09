@@ -4,7 +4,6 @@
 #include "../core.hpp"
 
 #include "identifiers.hpp"
-#include "status_listener.hpp"
 
 namespace hypercomm {
 
@@ -17,9 +16,10 @@ class component : virtual public impermanent {
   using port_type = components::port_id_t;
   using value_set = std::map<port_type, value_type>;
   using incoming_type = std::deque<value_set>;
-  using status_listener = components::status_listener;
 
-  using listener_ptr = std::shared_ptr<status_listener>;
+  enum status { kCompletion, kInvalidation };
+
+  using status_listener_fn = void (*)(component&, const status&, void*);
 
   const id_t id;
   bool activated;
@@ -76,33 +76,21 @@ class component : virtual public impermanent {
   void activate(void);
 
   // subscribes a status listener
-  inline void add_listener(const listener_ptr& l) {
-    this->listeners_.emplace_back(l);
-  }
-
-  // unsubscribes a status listener
-  inline void remove_listener(const listener_ptr& l) {
-    auto end = std::end(this->listeners_);
-    auto search = std::find(std::begin(this->listeners_), end, l);
-    if (search != end) {
-      this->listeners_.erase(search);
-    }
+  template <typename... Args>
+  inline void add_listener(Args... args) {
+    this->listeners_.emplace_back(new listener_(std::forward<Args>(args)...));
   }
 
   // sends invalidation or completion notifications
-  template <bool Invalidation>
+  template <status Status>
   inline void notify_listeners(void) {
 #if CMK_VERBOSE
     CkPrintf("com%lu> notifying %lu listener(s) of status change to %s.\n",
              this->id, this->listeners_.size(),
-             Invalidation ? "invalid" : "complete");
+             (Status == kInvalidation) ? "invalid" : "complete");
 #endif
-    for (const auto& l : this->listeners_) {
-      if (Invalidation) {
-        l->on_invalidation(*this);
-      } else {
-        l->on_completion(*this);
-      }
+    for (auto& l : this->listeners_) {
+      (*l)(*this, Status);
     }
 
     this->listeners_.clear();
@@ -129,7 +117,29 @@ class component : virtual public impermanent {
   }
 
  protected:
-  std::vector<listener_ptr> listeners_;
+  struct listener_ {
+    using fn_t = status_listener_fn;
+    using deleter_t = void (*)(void*);
+
+    fn_t fn;
+    void* arg;
+    deleter_t deleter;
+
+    listener_(const fn_t& fn_, void* arg_ = nullptr,
+              const deleter_t& deleter_ = nullptr)
+        : fn(fn_), arg(arg_), deleter(deleter_) {}
+
+    ~listener_() {
+      if (this->arg) this->deleter(this->arg);
+    }
+
+    void operator()(component& self, const status& nu) {
+      fn(self, nu, this->arg);
+      this->arg = nullptr;
+    }
+  };
+
+  std::vector<std::unique_ptr<listener_>> listeners_;
 
   // staging area for incomplete value sets
   incoming_type incoming;

@@ -2,6 +2,7 @@
 #define __HYPERCOMM_COMPONENTS_MAILBOX_HPP__
 
 #include "../core/typed_value.hpp"
+#include "../utilities/weak_ref.hpp"
 #include "../core/generic_locality.hpp"
 
 namespace hypercomm {
@@ -12,47 +13,34 @@ class mailbox : public component {
   using predicate_type = std::shared_ptr<immediate_action<bool(const T&)>>;
   using action_type = callback_ptr;
   using reqcount_t = std::size_t;
+  using weak_ref_t = utilities::weak_ref<mailbox>;
 
   class request {
    public:
-    mailbox<T>* self;
     reqcount_t id;
     predicate_type pred;
     action_type act;
 
-    request(mailbox<T>* _1, const reqcount_t& _2, const predicate_type& _3,
-            const callback_ptr& _4)
-        : self(_1), id(_2), pred(_3), act(_4) {}
+    request(const reqcount_t& _1, const predicate_type& _2,
+            const callback_ptr& _3)
+        : id(_1), pred(_2), act(_3) {}
 
     inline bool matches(const T& t) { return !pred || pred->action(t); }
 
     inline void action(value_type&& value) { act->send(std::move(value)); }
   };
 
-  class comlink : public component::status_listener {
-   public:
-    mailbox<T>* self;
-    reqcount_t id;
-
-    comlink(mailbox<T>* _1, const reqcount_t& _2) : self(_1), id(_2) {}
-
-    virtual void on_completion(const component&) override {
-      // TODO this may not be necessary?
-      self->pop_request(this->id);
-    }
-
-    virtual void on_invalidation(const component&) override {
-      self->pop_request(this->id);
-    }
-  };
-
  protected:
   std::deque<std::unique_ptr<typed_value<T>>> buffer_;
   std::deque<std::unique_ptr<request>> requests_;
+  std::shared_ptr<weak_ref_t> weak_;
   reqcount_t reqcount;
 
  public:
-  mailbox(const id_t& _1) : component(_1), reqcount(0) {}
+  mailbox(const id_t& _1)
+      : component(_1), reqcount(0), weak_(new weak_ref_t(this)) {}
+
+  ~mailbox() { weak_->reset(nullptr); }
 
   virtual std::size_t n_inputs(void) const override { return 1; }
   virtual std::size_t n_outputs(void) const override { return 0; }
@@ -62,7 +50,7 @@ class mailbox : public component {
                               const callback_ptr& cb) {
     auto search = this->find_in_buffer(pred);
     if (search == std::end(this->buffer_)) {
-      auto req = new request(this, ++this->reqcount, pred, cb);
+      auto req = new request(++this->reqcount, pred, cb);
       this->requests_.emplace_back(req);
       return req;
     } else {
@@ -80,7 +68,9 @@ class mailbox : public component {
     auto req = this->put_request(pred, cb);
     if (req) {
       (access_context_()->components[com])
-          ->add_listener(std::make_shared<comlink>(this, req->id));
+          ->add_listener(&on_status_change,
+                         new listener_type(this->weak_, req->id),
+                         [](void* value) { delete (listener_type*)value; });
     }
   }
 
@@ -138,6 +128,17 @@ class mailbox : public component {
       }
     }
     return search;
+  }
+
+ private:
+  using listener_type = std::pair<std::shared_ptr<weak_ref_t>, reqcount_t>;
+
+  static void on_status_change(component&, const component::status& status,
+                               void* arg) {
+    auto* listener = (listener_type*)arg;
+    auto& self = *(listener->first);
+    if (self) self->pop_request(listener->second);
+    delete listener;
   }
 };
 }  // namespace hypercomm

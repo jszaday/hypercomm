@@ -346,14 +346,6 @@ void forwarding_callback<CkArrayIndex>::send(callback::value_type&& value) {
   interceptor::send_async(base, this->ep, std::move(value));
 }
 
-void entry_port::on_completion(const component&) {
-  access_context_()->invalidate_port(this->shared_from_this());
-}
-
-void entry_port::on_invalidation(const component&) {
-  access_context_()->invalidate_port(this->shared_from_this());
-}
-
 void entry_port::take_back(value_ptr&& value) {
   access_context_()->receive_value(this->shared_from_this(), std::move(value));
 }
