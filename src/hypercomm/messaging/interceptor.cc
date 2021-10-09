@@ -252,15 +252,19 @@ void interceptor::resync_queue(const CkArrayID& aid, const CkArrayIndex& idx) {
 // recursively unravel forwarding requests until the destination is found
 const CkArrayIndex& interceptor::dealias(const CkArrayID& aid,
                                          const CkArrayIndex& idx) const {
-  auto findAid = this->fwdReqs_.find(aid);
-  if (findAid != std::end(this->fwdReqs_)) {
-    auto& reqMap = findAid->second;
-    auto findIdx = reqMap.find(idx);
-    if (findIdx != std::end(reqMap)) {
-      return this->dealias(aid, findIdx->second);
+  if (this->fwdReqs_.empty()) {
+    return idx;
+  } else {
+    auto findAid = this->fwdReqs_.find(aid);
+    if (findAid != std::end(this->fwdReqs_)) {
+      auto& reqMap = findAid->second;
+      auto findIdx = reqMap.find(idx);
+      if (findIdx != std::end(reqMap)) {
+        return this->dealias(aid, findIdx->second);
+      }
     }
+    return idx;
   }
-  return idx;
 }
 
 // create a forwarding record for "from" to "to" at the home pe of "from"
