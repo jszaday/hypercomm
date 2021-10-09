@@ -101,7 +101,7 @@ class vil : public Base,
 
   template <typename T, typename... Args>
   comproxy<T> emplace_component(Args... args) {
-    auto next = this->component_authority++;
+    auto next = ++(this->component_authority);
     auto inst = new T(next, std::move(args)...);
     this->components.emplace(next, inst);
     return ((component*)inst)->id;
@@ -344,14 +344,6 @@ void forwarding_callback<CkArrayIndex>::send(callback::value_type&& value) {
   const auto& base =
       static_cast<const CProxyElement_locality_base_&>(this->proxy->c_proxy());
   interceptor::send_async(base, this->ep, std::move(value));
-}
-
-void entry_port::on_completion(const component&) {
-  access_context_()->invalidate_port(this->shared_from_this());
-}
-
-void entry_port::on_invalidation(const component&) {
-  access_context_()->invalidate_port(this->shared_from_this());
 }
 
 void entry_port::take_back(value_ptr&& value) {

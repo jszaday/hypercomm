@@ -2,26 +2,30 @@
 #define __HYPERCOMM_COMPONENTS_SENTINEL_HPP__
 
 #include "../core/common.hpp"
+#include "../utilities/weak_ref.hpp"
 
 namespace hypercomm {
 
 // NOTE this could be made into a component if it makes sense to
 //      do so, but it doesn't really have i/o so i'm hesitant
-class sentinel : public component::status_listener,
-                 public std::enable_shared_from_this<sentinel> {
+class sentinel {
  public:
   using group_type = std::shared_ptr<std::vector<component::id_t>>;
+  using weak_ref_t = utilities::weak_ref<sentinel>;
 
  private:
   std::map<component::id_t, group_type> groups_;
+  std::shared_ptr<weak_ref_t> weak_;
   CthThread sleeper_ = nullptr;
   std::size_t n_expected_ = 0;
   component::id_t id_;
 
  public:
-  sentinel(const component::id_t& _1) : id_(_1) {}
+  sentinel(const component::id_t& _1) : id_(_1), weak_(new weak_ref_t(this)) {}
 
-  virtual void on_completion(const component& com) override {
+  ~sentinel() { weak_->reset(nullptr); }
+
+  void on_completion(const component& com) {
     const auto& id = com.id;
     auto search = this->groups_.find(id);
     if (search != std::end(this->groups_)) {
@@ -42,7 +46,7 @@ class sentinel : public component::status_listener,
     }
   }
 
-  virtual void on_invalidation(const component& com) override {
+  void on_invalidation(const component& com) {
     const auto& id = com.id;
     auto search = this->groups_.find(id);
     if (search == std::end(this->groups_)) {
@@ -65,16 +69,23 @@ class sentinel : public component::status_listener,
 
  private:
   template <typename T>
+  void add_listener(const T& t) {
+    (access_context_()->components[t])
+        ->add_listener(
+            &on_status_change, new std::shared_ptr<weak_ref_t>(this->weak_),
+            [](void* value) { delete (std::shared_ptr<weak_ref_t>*)value; });
+  }
+
+  template <typename T>
   inline void all_helper(const T& t) {
     this->n_expected_ += 1;
-
-    (access_context_()->components[t])->add_listener(this->shared_from_this());
+    this->add_listener(t);
   }
 
   template <typename T>
   inline component::id_t any_helper(T& t) {
     component::id_t id = t;
-    (access_context_()->components[id])->add_listener(this->shared_from_this());
+    this->add_listener(id);
     return id;
   }
 
@@ -96,6 +107,30 @@ class sentinel : public component::status_listener,
     }
 
     this->n_expected_ += 1;
+  }
+
+ private:
+  using listener_type = decltype(weak_);
+
+  static void on_status_change(component& com, const component::status& status,
+                               void* arg) {
+    auto* listener = (listener_type*)arg;
+    auto& self = *listener;
+
+    if (self) {
+      switch (status) {
+        case component::kCompletion:
+          (*self)->on_completion(com);
+          break;
+        case component::kInvalidation:
+          (*self)->on_invalidation(com);
+          break;
+        default:
+          break;
+      }
+    }
+
+    delete listener;
   }
 };
 }  // namespace hypercomm

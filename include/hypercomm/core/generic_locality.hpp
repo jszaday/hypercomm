@@ -99,7 +99,9 @@ class generic_locality_ : public virtual common_functions_ {
 
   inline void connect(const entry_port_ptr& srcPort, const component_id_t& dst,
                       const components::port_id_t& dstPort) {
-    this->components[dst]->add_listener(srcPort);
+    this->components[dst]->add_listener(
+        &on_status_change, new entry_port_ptr(srcPort),
+        [](void* value) { delete (entry_port_ptr*)value; });
     this->open(srcPort, std::make_pair(dst, dstPort));
   }
 
@@ -124,6 +126,13 @@ class generic_locality_ : public virtual common_functions_ {
     } else {
       return nullptr;
     }
+  }
+
+  static void on_status_change(component&, const component::status& status,
+                               void* arg) {
+    auto* port = (entry_port_ptr*)arg;
+    access_context_()->invalidate_port(*port);
+    delete port;
   }
 };
 
