@@ -78,7 +78,7 @@ class component : virtual public impermanent {
   // subscribes a status listener
   template <typename... Args>
   inline void add_listener(Args... args) {
-    this->listeners_.emplace_back(new listener_(std::forward<Args>(args)...));
+    this->listeners_.emplace_back(std::forward<Args>(args)...);
   }
 
   // sends invalidation or completion notifications
@@ -89,11 +89,11 @@ class component : virtual public impermanent {
              this->id, this->listeners_.size(),
              (Status == kInvalidation) ? "invalid" : "complete");
 #endif
-    for (auto& l : this->listeners_) {
-      (*l)(*this, Status);
+    while (!this->listeners_.empty()) {
+      auto& l = this->listeners_.back();
+      l(*this, Status);
+      this->listeners_.pop_back();
     }
-
-    this->listeners_.clear();
   }
 
   template <typename... Args>
@@ -129,6 +129,11 @@ class component : virtual public impermanent {
               const deleter_t& deleter_ = nullptr)
         : fn(fn_), arg(arg_), deleter(deleter_) {}
 
+    listener_(listener_&& other)
+    : fn(other.fn), arg(other.arg), deleter(other.deleter) {
+      other.arg = nullptr;
+    }
+
     ~listener_() {
       if (this->arg) this->deleter(this->arg);
     }
@@ -139,7 +144,7 @@ class component : virtual public impermanent {
     }
   };
 
-  std::vector<std::unique_ptr<listener_>> listeners_;
+  std::vector<listener_> listeners_;
 
   // staging area for incomplete value sets
   incoming_type incoming;
