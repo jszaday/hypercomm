@@ -12,18 +12,18 @@ class mailbox : public component {
  public:
   using predicate_type = std::shared_ptr<immediate_action<bool(const T&)>>;
   using action_type = callback_ptr;
-  using reqcount_t = std::size_t;
   using weak_ref_t = utilities::weak_ref<mailbox>;
 
   class request {
    public:
-    reqcount_t id;
     predicate_type pred;
     action_type act;
 
-    request(const reqcount_t& _1, const predicate_type& _2,
-            const callback_ptr& _3)
-        : id(_1), pred(_2), act(_3) {}
+    component::id_t com;
+    component::listener_type listener;
+
+    request(const predicate_type& _1, const callback_ptr& _2)
+        : pred(_1), act(_2), com(0) {}
 
     inline bool matches(const T& t) { return !pred || pred->action(t); }
 
@@ -32,13 +32,13 @@ class mailbox : public component {
 
  protected:
   std::deque<std::unique_ptr<typed_value<T>>> buffer_;
-  std::deque<std::unique_ptr<request>> requests_;
+  std::list<request> requests_;
   std::shared_ptr<weak_ref_t> weak_;
-  reqcount_t reqcount;
+
+  using reqiter_t = typename decltype(requests_)::iterator;
 
  public:
-  mailbox(const id_t& _1)
-      : component(_1), reqcount(0), weak_(new weak_ref_t(this)) {}
+  mailbox(const id_t& _1) : component(_1), weak_(new weak_ref_t(this)) {}
 
   ~mailbox() { weak_->reset(nullptr); }
 
@@ -46,18 +46,17 @@ class mailbox : public component {
   virtual std::size_t n_outputs(void) const override { return 0; }
   virtual bool keep_alive(void) const override { return true; }
 
-  inline request* put_request(const predicate_type& pred,
-                              const callback_ptr& cb) {
+  inline reqiter_t put_request(const predicate_type& pred,
+                               const callback_ptr& cb) {
     auto search = this->find_in_buffer(pred);
     if (search == std::end(this->buffer_)) {
-      auto req = new request(++this->reqcount, pred, cb);
-      this->requests_.emplace_back(req);
-      return req;
+      this->requests_.emplace_front(pred, cb);
+      return std::begin(this->requests_);
     } else {
       QdProcess(1);
       cb->send(std::move(*search));
       this->buffer_.erase(search);
-      return nullptr;
+      return std::end(this->requests_);
     }
   }
 
@@ -66,22 +65,13 @@ class mailbox : public component {
                              const component::port_type& port) {
     auto cb = access_context_()->make_connector(com, port);
     auto req = this->put_request(pred, cb);
-    if (req) {
-      (access_context_()->components[com])
-          ->add_listener(&on_status_change,
-                         new listener_type(this->weak_, req->id),
-                         [](void* value) { delete (listener_type*)value; });
-    }
-  }
-
-  inline void pop_request(const reqcount_t& req) {
-    using request_type = typename decltype(this->requests_)::value_type;
-    auto end = std::end(this->requests_);
-    auto search = std::find_if(
-        std::begin(this->requests_), end,
-        [&](const request_type& other) -> bool { return req == other->id; });
-    if (search != end) {
-      this->requests_.erase(search);
+    if (req != std::end(this->requests_)) {
+      req->com = com;
+      req->listener =
+          (access_context_()->components[com])
+              ->add_listener(&on_status_change,
+                             new listener_type(this->weak_, req),
+                             [](void* value) { delete (listener_type*)value; });
     }
   }
 
@@ -94,10 +84,14 @@ class mailbox : public component {
       this->buffer_.emplace_back(std::move(value));
     } else {
       auto req = std::move(*search);
+      // cleanup the request before triggering
+      // its action (from our list, and com's!)
       this->requests_.erase(search);
-      // delete req before sending cb to preclude
-      // feedback loops
-      req->action(std::move(value));
+      if (req.com != 0) {
+        (access_context_()->components[req.com])->remove_listener(req.listener);
+      }
+      // this precludes feedback loops
+      req.action(std::move(value));
     }
 
     return {};
@@ -118,26 +112,30 @@ class mailbox : public component {
 
   using request_iterator = typename decltype(requests_)::iterator;
 
-  inline request_iterator find_matching(
-      const std::unique_ptr<typed_value<T>>& _1) {
-    const auto& value = _1->value();
-    request_iterator search = std::begin(this->requests_);
-    for (; search != std::end(this->requests_); search++) {
-      if ((*search)->matches(value)) {
-        break;
+  inline reqiter_t find_matching(const std::unique_ptr<typed_value<T>>& _1) {
+    auto& value = _1->value();
+    for (auto it = (this->requests_).rbegin(); it != (this->requests_).rend();
+         it++) {
+      if (it->matches(value)) {
+        return --(it.base());
       }
     }
-    return search;
+    return std::end(this->requests_);
   }
 
  private:
-  using listener_type = std::pair<std::shared_ptr<weak_ref_t>, reqcount_t>;
+  using listener_type = std::pair<std::shared_ptr<weak_ref_t>, reqiter_t>;
 
   static void on_status_change(component&, const component::status& status,
                                void* arg) {
     auto* listener = (listener_type*)arg;
     auto& self = *(listener->first);
-    if (self) self->pop_request(listener->second);
+    if (self) {
+      auto& req = listener->second;
+      if (req != std::end(self->requests_)) {
+        self->requests_.erase(req);
+      }
+    }
     delete listener;
   }
 };

@@ -8,6 +8,10 @@
 namespace hypercomm {
 
 class component : virtual public impermanent {
+ protected:
+  struct listener_;
+  std::list<listener_> listeners_;
+
  public:
   friend class generic_locality_;
 
@@ -19,6 +23,7 @@ class component : virtual public impermanent {
 
   enum status { kCompletion, kInvalidation };
 
+  using listener_type = typename decltype(listeners_)::iterator;
   using status_listener_fn = void (*)(component&, const status&, void*);
 
   const id_t id;
@@ -77,8 +82,15 @@ class component : virtual public impermanent {
 
   // subscribes a status listener
   template <typename... Args>
-  inline void add_listener(Args... args) {
-    this->listeners_.emplace_back(std::forward<Args>(args)...);
+  inline listener_type add_listener(Args... args) {
+    this->listeners_.emplace_front(std::forward<Args>(args)...);
+    return std::begin(this->listeners_);
+  }
+
+  inline void remove_listener(const listener_type& it) {
+    if (it != std::end(this->listeners_)) {
+      this->listeners_.erase(it);
+    }
   }
 
   // sends invalidation or completion notifications
@@ -125,14 +137,11 @@ class component : virtual public impermanent {
     void* arg;
     deleter_t deleter;
 
+    listener_(listener_&&) = delete;
+    listener_(const listener_&) = delete;
     listener_(const fn_t& fn_, void* arg_ = nullptr,
               const deleter_t& deleter_ = nullptr)
         : fn(fn_), arg(arg_), deleter(deleter_) {}
-
-    listener_(listener_&& other)
-    : fn(other.fn), arg(other.arg), deleter(other.deleter) {
-      other.arg = nullptr;
-    }
 
     ~listener_() {
       if (this->arg) this->deleter(this->arg);
@@ -143,8 +152,6 @@ class component : virtual public impermanent {
       this->arg = nullptr;
     }
   };
-
-  std::vector<listener_> listeners_;
 
   // staging area for incomplete value sets
   incoming_type incoming;

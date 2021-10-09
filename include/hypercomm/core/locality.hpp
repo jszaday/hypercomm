@@ -101,7 +101,7 @@ class vil : public Base,
 
   template <typename T, typename... Args>
   comproxy<T> emplace_component(Args... args) {
-    auto next = this->component_authority++;
+    auto next = ++(this->component_authority);
     auto inst = new T(next, std::move(args)...);
     this->components.emplace(next, inst);
     return ((component*)inst)->id;
