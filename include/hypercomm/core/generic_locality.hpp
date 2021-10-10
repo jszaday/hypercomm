@@ -121,13 +121,13 @@ class generic_locality_ : public manageable_base_ {
   A* get_component(const component_id_t& id) {
     auto search = this->components.find(id);
     if (search != std::end(this->components)) {
-      return dynamic_cast<A*>(search->second.get());
+      return static_cast<A*>(search->second.get());
     } else {
       return nullptr;
     }
   }
 
-  static void on_status_change(component&, const component::status& status,
+  static void on_status_change(const component*, component::status status,
                                void* arg) {
     auto* port = (entry_port_ptr*)arg;
     access_context_()->invalidate_port(*port);
