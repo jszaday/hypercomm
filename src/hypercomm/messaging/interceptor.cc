@@ -346,8 +346,8 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
   auto* arr = CProxy_ArrayBase(aid).ckLocalBranch();
   auto* locMgr = arr->getLocMgr();
   auto& post = this->dealias(aid, pre);
-  CkEnforce(locMgr->lookupID(post, id));
-  auto* elt = (ArrayElement*)arr->getEltFromArrMgr(id);
+  auto validId = locMgr->lookupID(post, id);
+  auto* elt = validId ? (ArrayElement*)arr->getEltFromArrMgr(id) : nullptr;
   // if the elt is locally available
   if (elt != nullptr) {
     // process it with appropriate immediacy
@@ -355,7 +355,8 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
   } else {
     auto mine = CkMyPe();
     auto msg = payload->release();
-    auto lastHome = lookup_or_update_(arr, locMgr, post, id);
+    auto lastHome = validId ? lookup_or_update_(arr, locMgr, post, id)
+                            : std::make_pair(mine, mine);
     // if we are the elt's home (and its last known loc)
     if ((mine == lastHome.first) && (lastHome.first == lastHome.second)) {
       // buffer it and create (1) to delay QD
