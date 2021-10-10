@@ -317,7 +317,7 @@ template class access_bypass<CkLocCache * CkLocMgr::*, &CkLocMgr::cache,
                              backstage_pass>;
 }  // namespace detail
 
-inline std::pair<int, int> lookup_or_update_(CkArray* arr, CkLocMgr* locMgr,
+inline std::pair<int, int> lookup_or_update_(CkLocMgr* locMgr,
                                              const CkArrayIndex& idx,
                                              const CmiUInt8& id) {
   auto cache = locMgr->*detail::get(detail::backstage_pass());
@@ -339,6 +339,12 @@ inline std::pair<int, int> lookup_or_update_(CkArray* arr, CkLocMgr* locMgr,
   return std::make_pair(lastPe, homePe);
 }
 
+inline std::pair<int, int> lookup_fallback_(CkLocMgr* locMgr,
+                                            const CkArrayIndex& idx) {
+  auto homePe = locMgr->homePe(idx);
+  return std::make_pair(homePe, homePe);
+}
+
 void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
                           detail::payload_ptr&& payload,
                           const bool& immediate) {
@@ -355,8 +361,8 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
   } else {
     auto mine = CkMyPe();
     auto msg = payload->release();
-    auto lastHome = validId ? lookup_or_update_(arr, locMgr, post, id)
-                            : std::make_pair(mine, mine);
+    auto lastHome = validId ? lookup_or_update_(locMgr, post, id)
+                            : lookup_fallback_(locMgr, post);
     // if we are the elt's home (and its last known loc)
     if ((mine == lastHome.first) && (lastHome.first == lastHome.second)) {
       // buffer it and create (1) to delay QD
