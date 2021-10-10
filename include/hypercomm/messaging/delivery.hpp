@@ -102,6 +102,7 @@ struct delivery {
            detail::payload_ptr&& _3)
       : aid(_1), idx(_2), payload(std::move(_3)) {
     CkAssert(this->payload->valid());
+    std::fill(this->core, this->core + CmiReservedHeaderSize, '\0');
     CmiSetHandler(this, handler());
   }
 

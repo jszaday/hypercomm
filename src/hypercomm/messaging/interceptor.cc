@@ -1,3 +1,4 @@
+#include <hypercomm/utilities/backstage_pass.hpp>
 #include <hypercomm/core/generic_locality.hpp>
 #include <hypercomm/messaging/interceptor.hpp>
 #include <hypercomm/sections/imprintable.hpp>
@@ -308,31 +309,62 @@ void interceptor::stop_forwarding(const CkArrayID& aid,
   }
 }
 
+namespace detail {
+CkLocCache* CkLocMgr::*get(backstage_pass);
+
+// Explicitly instantiating the class generates the fn declared above.
+template class access_bypass<CkLocCache * CkLocMgr::*, &CkLocMgr::cache,
+                             backstage_pass>;
+}  // namespace detail
+
+inline std::pair<int, int> lookup_or_update_(CkArray* arr, CkLocMgr* locMgr,
+                                             const CkArrayIndex& idx,
+                                             const CmiUInt8& id) {
+  auto cache = locMgr->*detail::get(detail::backstage_pass());
+  auto& entry = cache->getLocationEntry(id);
+
+  auto homePe = -1;
+  auto lastPe = entry.pe;
+  auto badLookup = lastPe == homePe;
+  if ((lastPe == CkMyPe()) || badLookup) {
+    homePe = locMgr->homePe(idx);
+    if (badLookup) lastPe = homePe;
+    CkLocEntry e;
+    e.id = id;
+    e.pe = homePe;
+    e.epoch = entry.epoch + 1;
+    cache->updateLocation(e);
+  }
+
+  return std::make_pair(lastPe, homePe);
+}
+
 void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
                           detail::payload_ptr&& payload,
                           const bool& immediate) {
+  CmiUInt8 id;
   auto* arr = CProxy_ArrayBase(aid).ckLocalBranch();
+  auto* locMgr = arr->getLocMgr();
   auto& post = this->dealias(aid, pre);
-  auto* elt = arr->lookup(post);
+  CkEnforce(locMgr->lookupID(post, id));
+  auto* elt = (ArrayElement*)arr->getEltFromArrMgr(id);
   // if the elt is locally available
   if (elt != nullptr) {
     // process it with appropriate immediacy
     detail::payload::process(elt, std::move(payload), immediate);
   } else {
+    auto mine = CkMyPe();
     auto msg = payload->release();
-    auto homePe = arr->homePe(post);
-    auto lastPe = arr->lastKnown(post);
-    auto ourElt = homePe == lastPe;
+    auto lastHome = lookup_or_update_(arr, locMgr, post, id);
     // if we are the elt's home (and its last known loc)
-    if (ourElt && (homePe == CkMyPe())) {
+    if ((mine == lastHome.first) && (lastHome.first == lastHome.second)) {
       // buffer it and create (1) to delay QD
       this->queued_[aid][post].push_back(msg);
       QdCreate(1);
     } else {
       // if we lost an elt, the home pe will know its location
       // (or at least buffer it)
-      auto destPe = ourElt ? homePe : lastPe;
-      send_to_branch(destPe, aid, post, msg);
+      send_to_branch(lastHome.first, aid, post, msg);
     }
   }
 }
