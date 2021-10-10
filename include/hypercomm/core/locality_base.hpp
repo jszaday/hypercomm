@@ -10,7 +10,11 @@ class locality_base_ : public ArrayElement {
 
   virtual void execute(CkMessage* msg) = 0;
   virtual void replace_downstream(CkMessage* msg) { NOT_IMPLEMENTED; }
-  virtual stamp_type __stamp__(const CkArrayIndex* = nullptr) const = 0;
+  virtual stamp_type __stamp__(const CkArrayIndex* = nullptr) const {
+    NOT_IMPLEMENTED;
+
+    return {};
+  }
 
   inline const CkArrayIndex& __base_index__(void) const {
     return this->ckGetArrayIndex();

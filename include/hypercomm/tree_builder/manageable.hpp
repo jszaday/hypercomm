@@ -8,7 +8,7 @@
 namespace hypercomm {
 template <typename T>
 class manageable : public T {
-  using stamp_type = common_functions_::stamp_type;
+  using stamp_type = locality_base_::stamp_type;
   using index_type_ = typename T::index_type;
   using port_type_ = reduction_port<index_type_>;
   using identity_type_ = identity<index_type_>;

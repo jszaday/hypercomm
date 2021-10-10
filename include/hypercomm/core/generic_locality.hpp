@@ -109,8 +109,6 @@ class generic_locality_ : public manageable_base_ {
   callback_ptr make_connector(const component_id_t& com,
                               const component::port_type& port);
 
-  virtual stamp_type __stamp__(const CkArrayIndex*) const { NOT_IMPLEMENTED; }
-
  protected:
   bool invalidated(const component::id_t& id);
 
