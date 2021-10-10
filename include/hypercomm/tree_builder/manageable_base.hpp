@@ -2,8 +2,7 @@
 #define __HYPERCOMM_TREE_BUILDER_MANAGEABLE_BASE_HPP__
 
 #include "common.hpp"
-
-#include "../reductions/reducer.hpp"
+#include "../core/locality_base.hpp"
 
 namespace hypercomm {
 
@@ -11,13 +10,7 @@ namespace hypercomm {
 //      of sections to assocations :3
 using association_ptr_ = std::unique_ptr<association_>;
 
-class common_functions_ {
- public:
-  using stamp_type = typename reducer::stamp_type;
-  virtual stamp_type __stamp__(const CkArrayIndex* = nullptr) const = 0;
-};
-
-class manageable_base_ : public ArrayElement, public virtual common_functions_ {
+class manageable_base_ : public locality_base_ {
   friend class tree_builder;
 
   template <typename T>

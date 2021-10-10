@@ -86,9 +86,7 @@ struct future_manager_ {
 };
 
 template <typename Base, typename Index>
-class vil : public Base,
-            public indexed_locality_<Index>,
-            public future_manager_ {
+class vil : public detail::base_<Base, Index>, public future_manager_ {
   using idx_locality_ = indexed_locality_<Index>;
 
  public:

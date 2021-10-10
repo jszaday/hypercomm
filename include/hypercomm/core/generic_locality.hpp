@@ -2,6 +2,7 @@
 #define __HYPERCOMM_CORE_GENLOC_HPP__
 
 #include "../messaging/interceptor.hpp"
+#include "../tree_builder/manageable_base.hpp"
 
 /* TODO consider introducing a simplified connection API that
  *     utilizes "port authorities", aka port id counters, to
@@ -9,7 +10,7 @@
  */
 
 namespace hypercomm {
-class generic_locality_ : public virtual common_functions_ {
+class generic_locality_ : public manageable_base_ {
  public:
   template <typename A, typename Enable>
   friend class comproxy;
@@ -108,8 +109,6 @@ class generic_locality_ : public virtual common_functions_ {
   callback_ptr make_connector(const component_id_t& com,
                               const component::port_type& port);
 
-  virtual stamp_type __stamp__(const CkArrayIndex*) const { NOT_IMPLEMENTED; }
-
  protected:
   bool invalidated(const component::id_t& id);
 
@@ -122,13 +121,13 @@ class generic_locality_ : public virtual common_functions_ {
   A* get_component(const component_id_t& id) {
     auto search = this->components.find(id);
     if (search != std::end(this->components)) {
-      return dynamic_cast<A*>(search->second.get());
+      return utilities::fast_cast<A>(search->second.get());
     } else {
       return nullptr;
     }
   }
 
-  static void on_status_change(component&, const component::status& status,
+  static void on_status_change(const component*, component::status status,
                                void* arg) {
     auto* port = (entry_port_ptr*)arg;
     access_context_()->invalidate_port(*port);
@@ -165,8 +164,7 @@ void generic_locality_::open(const entry_port_ptr& ours,
 template <void fn(generic_locality_*, const entry_port_ptr&,
                   component::value_type&&)>
 void CkIndex_locality_base_::value_handler(CkMessage* msg, CkMigratable* self) {
-  auto* obj = (locality_base_*)self;
-  dynamic_cast<generic_locality_*>(obj)->receive_value(msg, fn);
+  ((generic_locality_*)self)->receive_value(msg, fn);
 }
 
 }  // namespace hypercomm

@@ -63,6 +63,8 @@ class mailbox : public component {
   inline void put_request_to(const predicate_type& pred,
                              const component_id_t& com,
                              const component::port_type& port) {
+    // TODO ( this allocation of a connector is slow if the req
+    //        gets instantly fulfilled! it should be cleaned up. )
     auto cb = access_context_()->make_connector(com, port);
     auto req = this->put_request(pred, cb);
     if (req != std::end(this->requests_)) {
@@ -126,7 +128,7 @@ class mailbox : public component {
  private:
   using listener_type = std::pair<std::shared_ptr<weak_ref_t>, reqiter_t>;
 
-  static void on_status_change(component&, const component::status& status,
+  static void on_status_change(const component*, component::status status,
                                void* arg) {
     auto* listener = (listener_type*)arg;
     auto& self = *(listener->first);

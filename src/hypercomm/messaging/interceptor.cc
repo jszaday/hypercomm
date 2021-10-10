@@ -328,12 +328,13 @@ inline std::pair<int, int> lookup_or_update_(CkLocMgr* locMgr,
   auto badLookup = lastPe == homePe;
   if ((lastPe == CkMyPe()) || badLookup) {
     homePe = locMgr->homePe(idx);
-    if (badLookup) lastPe = homePe;
-    CkLocEntry e;
-    e.id = id;
-    e.pe = homePe;
-    e.epoch = entry.epoch + 1;
-    cache->updateLocation(e);
+    if (badLookup) {
+      CkLocEntry e;
+      e.id = id;
+      e.pe = lastPe = homePe;
+      e.epoch = entry.epoch + 1;
+      cache->updateLocation(e);
+    }
   }
 
   return std::make_pair(lastPe, homePe);
@@ -366,6 +367,7 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
     // if we are the elt's home (and its last known loc)
     if ((mine == lastHome.first) && (lastHome.first == lastHome.second)) {
       // buffer it and create (1) to delay QD
+      // TODO ( buffer the payload here, don't release to message )
       this->queued_[aid][post].push_back(msg);
       QdCreate(1);
     } else {
@@ -381,7 +383,7 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
                       const bool& immediate) {
   CkAssert(payload->valid());
 
-  auto* cast = dynamic_cast<generic_locality_*>(elt);
+  auto* cast = (generic_locality_*)elt;
   auto& opts = payload->options_;
 
   if (immediate) {

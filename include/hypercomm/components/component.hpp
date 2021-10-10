@@ -24,7 +24,7 @@ class component : virtual public impermanent {
   enum status { kCompletion, kInvalidation };
 
   using listener_type = typename decltype(listeners_)::iterator;
-  using status_listener_fn = void (*)(component&, const status&, void*);
+  using status_listener_fn = void (*)(const component*, status, void*);
 
   const id_t id;
   bool activated;
@@ -103,7 +103,7 @@ class component : virtual public impermanent {
 #endif
     while (!this->listeners_.empty()) {
       auto& l = this->listeners_.back();
-      l(*this, Status);
+      l(this, Status);
       this->listeners_.pop_back();
     }
   }
@@ -147,7 +147,7 @@ class component : virtual public impermanent {
       if (this->arg) this->deleter(this->arg);
     }
 
-    void operator()(component& self, const status& nu) {
+    inline void operator()(const component* self, status nu) {
       fn(self, nu, this->arg);
       this->arg = nullptr;
     }

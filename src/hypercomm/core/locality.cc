@@ -61,14 +61,18 @@ void generic_locality_::invalidate_component(const component::id_t& id) {
 }
 
 bool generic_locality_::invalidated(const component::id_t& id) {
-  auto search = std::find(std::begin(this->invalidations),
-                          std::end(this->invalidations), id);
-  if (search == std::end(this->invalidations)) {
+  if (this->invalidations.empty()) {
     return false;
   } else {
-    this->invalidations.erase(search);
+    auto search = std::find(std::begin(this->invalidations),
+                            std::end(this->invalidations), id);
+    if (search == std::end(this->invalidations)) {
+      return false;
+    } else {
+      this->invalidations.erase(search);
 
-    return true;
+      return true;
+    }
   }
 }
 
