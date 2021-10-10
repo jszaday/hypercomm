@@ -128,7 +128,8 @@ class mailbox : public component {
  private:
   using listener_type = std::pair<std::shared_ptr<weak_ref_t>, reqiter_t>;
 
-  static void on_status_change(const component*, component::status status, void* arg) {
+  static void on_status_change(const component*, component::status status,
+                               void* arg) {
     auto* listener = (listener_type*)arg;
     auto& self = *(listener->first);
     if (self) {

@@ -57,13 +57,33 @@ char* get_message_buffer(const CkMessage* msg);
 inline char* get_message_buffer(const std::shared_ptr<CkMessage>& msg) {
   return get_message_buffer(msg.get());
 }
+
+template <typename T, typename U, typename = void>
+struct is_safely_castable : std::false_type {};
+
+template <typename T, typename U>
+struct is_safely_castable<
+    T, U, std::void_t<decltype(static_cast<U>(std::declval<T>()))>>
+    : std::true_type {};
+
+template <typename U, typename T>
+inline typename std::enable_if<is_safely_castable<T, U>::value, U*>::type
+fast_cast(T* t) {
+  return static_cast<U*>(t);
+}
+
+template <typename U, typename T>
+inline typename std::enable_if<!is_safely_castable<T, U>::value, U*>::type
+fast_cast(T* t) {
+  return dynamic_cast<U*>(t);
+}
 }  // namespace utilities
 
 template <template <typename...> class Template, typename T>
 struct is_specialization_of : std::false_type {};
 
 template <template <typename...> class Template, typename... Args>
-struct is_specialization_of<Template, Template<Args...> > : std::true_type {};
+struct is_specialization_of<Template, Template<Args...>> : std::true_type {};
 
 using dimension_type = decltype(CkArrayIndexBase::dimension);
 

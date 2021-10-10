@@ -121,7 +121,7 @@ class generic_locality_ : public manageable_base_ {
   A* get_component(const component_id_t& id) {
     auto search = this->components.find(id);
     if (search != std::end(this->components)) {
-      return static_cast<A*>(search->second.get());
+      return utilities::fast_cast<A>(search->second.get());
     } else {
       return nullptr;
     }
