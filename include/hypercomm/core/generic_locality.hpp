@@ -2,6 +2,7 @@
 #define __HYPERCOMM_CORE_GENLOC_HPP__
 
 #include "../messaging/interceptor.hpp"
+#include "../tree_builder/manageable_base.hpp"
 
 /* TODO consider introducing a simplified connection API that
  *     utilizes "port authorities", aka port id counters, to
@@ -9,7 +10,7 @@
  */
 
 namespace hypercomm {
-class generic_locality_ : public virtual common_functions_ {
+class generic_locality_ : public manageable_base_ {
  public:
   template <typename A, typename Enable>
   friend class comproxy;
@@ -165,8 +166,7 @@ void generic_locality_::open(const entry_port_ptr& ours,
 template <void fn(generic_locality_*, const entry_port_ptr&,
                   component::value_type&&)>
 void CkIndex_locality_base_::value_handler(CkMessage* msg, CkMigratable* self) {
-  auto* obj = (locality_base_*)self;
-  dynamic_cast<generic_locality_*>(obj)->receive_value(msg, fn);
+  ((generic_locality_*)self)->receive_value(msg, fn);
 }
 
 }  // namespace hypercomm

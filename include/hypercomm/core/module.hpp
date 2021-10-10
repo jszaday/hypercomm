@@ -49,29 +49,6 @@ using CProxySection_locality_base_ = CProxySection_ArrayElement;
 namespace core {
 void initialize(void);
 }  // namespace core
-
-class locality_base_ : public manageable_base_ {
- public:
-  using base_index_type = CkArrayIndex;
-
-  virtual void execute(CkMessage* msg) = 0;
-  virtual void replace_downstream(CkMessage* msg) { NOT_IMPLEMENTED; }
-
-  inline const CkArrayIndex& __base_index__(void) const {
-    return this->ckGetArrayIndex();
-  }
-
-  inline collective_ptr<CkArrayIndex> __proxy__(void) const {
-    return std::make_shared<array_proxy>(
-        CProxy_ArrayBase(this->ckGetArrayID()));
-  }
-
-  inline element_ptr<CkArrayIndex> __element__(void) const {
-    return std::make_shared<array_element_proxy>(CProxyElement_ArrayElement(
-        this->ckGetArrayID(), this->ckGetArrayIndex()));
-  }
-};
-
 }  // namespace hypercomm
 
 #endif
