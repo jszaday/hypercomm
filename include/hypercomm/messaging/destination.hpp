@@ -79,6 +79,8 @@ class destination {
     u_options(void) {}
     u_options(const callback_ptr& x) : cb(x) {}
     u_options(const component_port_t& x) : port(x) {}
+    u_options(const component::id_t& com_, const component::port_type& port_)
+        : port(com_, port_) {}
   } options;
 
  public:
@@ -100,6 +102,10 @@ class destination {
   }
 
   destination(const callback_ptr& cb) : type(kCallback), options(cb) {}
+
+  destination(const component_id_t& com, const component::port_type& port)
+      : type(kComponentPort), options(com, port) {}
+
   destination(const component_port_t& port)
       : type(kComponentPort), options(port) {}
 

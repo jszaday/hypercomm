@@ -6,13 +6,14 @@ namespace hypercomm {
 // TODO this is a temporary solution
 struct connector_ : public callback {
   generic_locality_* self;
-  const component_port_t dst;
+  destination dst;
 
-  connector_(generic_locality_* _1, const component_port_t& _2)
-      : self(_1), dst(_2) {}
+  connector_(generic_locality_* _1, const component_id_t& com,
+             const component::port_type& port)
+      : self(_1), dst(com, port) {}
 
   virtual return_type send(argument_type&& value) override {
-    self->try_send(destination(dst), std::move(value));
+    self->try_send(dst, std::move(value));
   }
 
   virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }
@@ -20,7 +21,8 @@ struct connector_ : public callback {
 
 callback_ptr generic_locality_::make_connector(
     const component_id_t& com, const component::port_type& port) {
-  return std::make_shared<connector_>(this, std::make_pair(com, port));
+  return callback_ptr(new connector_(this, com, port),
+                      [](callback* cb) { delete (connector_*)cb; });
 }
 
 namespace {

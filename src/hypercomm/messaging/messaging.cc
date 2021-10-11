@@ -12,14 +12,22 @@ namespace hypercomm {
 namespace messaging {
 
 constexpr auto hdr_size = sizeof(__msg__);
+constexpr auto kIgnored = ptr_record::IGNORED;
 
 void *__msg__::pack(__msg__ *msg) {
   msg->payload = (char *)((char *)msg->payload - (char *)msg);
+  const auto has_port = (bool)msg->dst;
   const auto avail_size = std::size_t(msg->payload) - hdr_size;
-  const auto real_size = hypercomm::size(msg->dst);
+  const auto real_size =
+      has_port ? hypercomm::size(msg->dst) : sizeof(kIgnored);
   if (real_size <= avail_size) {
-    packer s((char *)msg + hdr_size);
-    hypercomm::pup(s, msg->dst);
+    auto *buf = (char *)msg + hdr_size;
+    if (has_port) {
+      packer s(buf);
+      hypercomm::pup(s, msg->dst);
+    } else {
+      *(reinterpret_cast<ptr_record::kind_t *>(buf)) = kIgnored;
+    }
     return (void *)msg;
   } else {
     // TODO introduce HYPERCOMM_NO_COPYING and abort only when undefined
@@ -27,8 +35,8 @@ void *__msg__::pack(__msg__ *msg) {
   }
 }
 
-__msg__ *__msg__::unpack(void *buf) {
-  __msg__ *msg = (__msg__ *)buf;
+__msg__ *__msg__::unpack(void *raw) {
+  __msg__ *msg = (__msg__ *)raw;
   const auto expected_size = std::size_t(msg->payload) - hdr_size;
   msg->payload = (char *)((size_t)msg->payload + (char *)msg);
 #if CMK_VERBOSE
@@ -37,9 +45,16 @@ __msg__ *__msg__::unpack(void *buf) {
   CkPrintf("info@%d> unpacking a %lu byte port from: %s\n", CkMyPe(),
            expected_size, str.c_str());
 #endif
-  unpacker s(std::shared_ptr<void>{}, (char *)msg + hdr_size);
-  hypercomm::pup(s, msg->dst);
-  CkAssertMsg(expected_size >= s.size(), "entry port size changed");
+  auto *buf = (char *)msg + hdr_size;
+  auto has_port =
+      *(reinterpret_cast<hypercomm::ptr_record::kind_t *>(buf)) != kIgnored;
+  if (has_port) {
+    unpacker s(std::shared_ptr<void>{}, buf);
+    hypercomm::pup(s, msg->dst);
+    CkAssertMsg(expected_size >= s.size(), "entry port size changed");
+  } else {
+    new (&msg->dst) entry_port_ptr();
+  }
   return msg;
 }
 

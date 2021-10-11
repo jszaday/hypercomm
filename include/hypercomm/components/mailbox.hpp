@@ -22,6 +22,9 @@ class mailbox : public component {
     component::id_t com;
     component::listener_type listener;
 
+    request(const predicate_type& _1, callback_ptr&& _2)
+        : pred(_1), act(_2), com(0) {}
+
     request(const predicate_type& _1, const callback_ptr& _2)
         : pred(_1), act(_2), com(0) {}
 
@@ -63,17 +66,21 @@ class mailbox : public component {
   inline void put_request_to(const predicate_type& pred,
                              const component_id_t& com,
                              const component::port_type& port) {
-    // TODO ( this allocation of a connector is slow if the req
-    //        gets instantly fulfilled! it should be cleaned up. )
-    auto cb = access_context_()->make_connector(com, port);
-    auto req = this->put_request(pred, cb);
-    if (req != std::end(this->requests_)) {
+    auto* ctx = access_context_();
+    auto search = this->find_in_buffer(pred);
+    if (search == std::end(this->buffer_)) {
+      this->requests_.emplace_front(pred, ctx->make_connector(com, port));
+      auto req = this->requests_.begin();
       req->com = com;
       req->listener =
-          (access_context_()->components[com])
+          (ctx->components[com])
               ->add_listener(&on_status_change,
                              new listener_type(this->weak_, req),
                              [](void* value) { delete (listener_type*)value; });
+    } else {
+      QdProcess(1);
+      ctx->components[com]->receive_value(port, std::move(*search));
+      this->buffer_.erase(search);
     }
   }
 
