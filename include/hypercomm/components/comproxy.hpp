@@ -8,24 +8,31 @@ namespace hypercomm {
 template <typename A>
 class comproxy<
     A, typename std::enable_if<std::is_base_of<component, A>::value>::type> {
-  component_id_t id;
+  static constexpr auto nil_id_ = std::numeric_limits<component_id_t>::max();
+  component_id_t id_;
 
  public:
   using type = A;
 
-  comproxy(void) : id(std::numeric_limits<component_id_t>::max()) {}
-  comproxy(const component_id_t& id) : id(id) {}
-  comproxy(const comproxy<A>& proxy) : id(proxy->id) {}
+  comproxy(void) : id_(nil_id_) {}
+  comproxy(const component_id_t& id) : id_(id) {}
+  comproxy(const comproxy<A>& proxy) : id_(proxy.id_) {}
+  comproxy(comproxy<A>&& proxy) : id_(proxy.id_) { proxy.id_ = nil_id_; }
+
+  comproxy<A>& operator=(const comproxy<A>& other) {
+    if (this != &other) {
+      this->id_ = other.id_;
+    }
+    return *this;
+  }
 
   A* operator->(void) const noexcept {
-    return access_context_()->get_component<A>(this->id);
+    return access_context_()->get_component<A>(this->id_);
   }
 
-  operator component_id_t(void) const noexcept { return this->id; }
+  operator component_id_t(void) const noexcept { return this->id_; }
 
-  operator bool(void) const noexcept {
-    return (this->id != std::numeric_limits<component_id_t>::max());
-  }
+  operator bool(void) const noexcept { return (this->id_ != nil_id_); }
 };
 }  // namespace hypercomm
 
