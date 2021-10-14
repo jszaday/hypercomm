@@ -40,6 +40,12 @@ class generic_locality_ : public manageable_base_ {
 
   void update_context(void);
 
+  template <typename... Args>
+  inline void receive(Args... args) {
+    deliverable dev(std::forward<Args>(args)...);
+    this->receive(dev);
+  }
+
   void receive(deliverable& dev);
   void loopback(const entry_port_ptr& port, component::value_type&& value);
   bool has_value(const entry_port_ptr& port) const;
