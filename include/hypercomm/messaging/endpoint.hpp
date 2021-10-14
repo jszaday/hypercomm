@@ -1,4 +1,5 @@
 #ifndef __HYPERCOMM_MESSAGING_ENDPOINT_HPP__
+#define __HYPERCOMM_MESSAGING_ENDPOINT_HPP__
 
 #include "../core/common.hpp"
 #include "../core/module.hpp"
@@ -16,8 +17,9 @@ class endpoint {
   endpoint(PUP::reconstruct) : endpoint(0x0) {}
   endpoint(const int& _) : idx_(_), port_(nullptr) {}
   endpoint(const entry_port_ptr& _) : idx_(demux()), port_(_) {}
+  endpoint(int idx, const entry_port_ptr& port) : idx_(idx), port_(port) {}
   endpoint(std::tuple<int, const entry_port_ptr&>&& pair)
-      : idx_(std::get<0>(pair)), port_(std::get<1>(pair)) {}
+      : endpoint(std::get<0>(pair), std::get<1>(pair)) {}
 
   inline bool valid(void) const {
     return this->port_ || (this->idx_ != demux());
@@ -68,6 +70,6 @@ using is_valid_endpoint_t =
 
 template <typename T>
 using endpoint_map = std::unordered_map<endpoint, T, endpoint_hasher>;
-}
+}  // namespace hypercomm
 
 #endif

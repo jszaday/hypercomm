@@ -1,11 +1,10 @@
 #ifndef __HYPERCOMM_CORE_ZC_VALUE_HPP__
 #define __HYPERCOMM_CORE_ZC_VALUE_HPP__
 
-#include "value.hpp"
-#include "../messaging/destination.hpp"
+#include "../messaging/endpoint.hpp"
 
 namespace hypercomm {
-struct zero_copy_value : public hyper_value {
+struct zero_copy_value {
   std::vector<CkNcpyBuffer> buffers;
   std::vector<std::shared_ptr<void>> values;
   std::size_t nReceived;
@@ -17,10 +16,6 @@ struct zero_copy_value : public hyper_value {
       : msg(_),
         nReceived(0),
         ep(std::forward_as_tuple(UsrToEnv(_)->getEpIdx(), _->dst)) {}
-
-  virtual message_type release(void) override { NOT_IMPLEMENTED; }
-
-  virtual bool recastable(void) const override { return this->ready(); }
 
   inline bool ready(void) const {
     return this->nReceived && (this->nReceived == this->buffers.size());

@@ -105,8 +105,47 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
   }
 }
 
+void generic_locality_::receive(deliverable& dev) {
+  auto& demux = CkIndex_locality_base_::idx_demux_CkMessage();
+  switch (dev.kind) {
+    case deliverable::kValue:
+      this->receive_value(std::move(dev.entry_port()),
+                          value_ptr(dev.release<hyper_value>()));
+      break;
+    case deliverable::kMessage: {
+      // this move of the port can lead to unexpected behaviors
+      // like, don't peek at the dev's port, but look at its src
+      // instead. but, again, this is only a temporary problem...
+      // (pending widespread refactoring of components to take devs)
+      auto port = std::move(dev.entry_port());
+      auto* msg = dev.release<CkMessage>();
+      if (demux == UsrToEnv(msg)->getEpIdx()) {
+        this->receive_value(port, make_value<deliverable_value>(msg));
+      } else {
+        this->receive_message(msg);
+      }
+      break;
+    }
+    case deliverable::kDeferred: {
+      auto* zc = dev.peek<zero_copy_value>();
+      auto& ep = zc->ep;
+      if (demux == ep.idx_) {
+        this->receive_value(std::move(ep.port_),
+                            make_value<deliverable_value>(std::move(dev)));
+      } else {
+        (ep.get_handler())(this, dev);
+      }
+      break;
+    }
+    default:
+      CkAbort("unknown deliverable kind");
+      break;
+  }
+}
+
 void generic_locality_::receive_value(const entry_port_ptr& port,
                                       component::value_type&& value) {
+  CkAssertMsg((bool)port, "ports should be non-null!");
   // save this port as the source of the value
   if (value) value->source = port;
   // seek this port in our list of active ports
@@ -166,12 +205,11 @@ void generic_locality_::receive_message(CkMessage* msg) {
 struct zero_copy_payload_ {
  private:
   generic_locality_* parent_;
-  std::shared_ptr<zero_copy_value> val_;
+  zero_copy_value* val_;
   CkNcpyBuffer* src_;
 
  public:
-  zero_copy_payload_(generic_locality_* _1,
-                     const std::shared_ptr<zero_copy_value>& _3,
+  zero_copy_payload_(generic_locality_* _1, zero_copy_value* _3,
                      CkNcpyBuffer* _4)
       : parent_(_1), val_(_3), src_(_4) {}
 
@@ -186,12 +224,10 @@ struct zero_copy_payload_ {
     delete ptr;
 
     if (self->val_->ready()) {
-      std::unique_ptr<hyper_value> val((hyper_value*)self->val_.get());
+      deliverable dev(self->val_);
       self->parent_->update_context();
-      auto& ep = self->val_->ep;
-      auto fn = ep.get_handler();
-      val->source = std::make_shared<endpoint_source>(ep);
-      fn(self->parent_, ep.port_, std::move(val));
+      auto fn = self->val_->ep.get_handler();
+      fn(self->parent_, dev);
     }
 
     delete self;
@@ -246,9 +282,9 @@ void generic_locality_::post_buffer(const endpoint& ep,
 }
 
 using outstanding_iterator = generic_locality_::outstanding_iterator;
-outstanding_iterator generic_locality_::poll_buffer(
-    CkNcpyBuffer* buffer, const std::shared_ptr<zero_copy_value>& val,
-    const std::size_t& goal) {
+outstanding_iterator generic_locality_::poll_buffer(CkNcpyBuffer* buffer,
+                                                    zero_copy_value* val,
+                                                    const std::size_t& goal) {
   using value_type = typename decltype(this->buffers)::mapped_type::value_type;
   // seek the queue of buffers from the map
   auto& ep = val->ep;
@@ -288,8 +324,7 @@ void generic_locality_::receive_value(CkMessage* raw,
   message* msg = (epIdx == message::index()) ? (message*)raw : nullptr;
   if (msg && msg->is_zero_copy()) {
     // will be deleted by zero_copy_payload_
-    std::shared_ptr<zero_copy_value> val(new zero_copy_value(msg),
-                                         [](void*) {});
+    auto* val = new zero_copy_value(msg);
     PUP::fromMem p(msg->payload);
     p | val->buffers;
     val->offset = p.get_current_pointer();
@@ -308,13 +343,8 @@ void generic_locality_::receive_value(CkMessage* raw,
     }
   } else {
     this->update_context();
-    // this ensures the port is deleted (since message's
-    // destructor isn't called via CkFreeMsg)
-    auto port = msg ? std::move(msg->dst) : nullptr;
-    auto value = msg ? msg2value(msg) : msg2value(raw);
-    value->source =
-        std::make_shared<endpoint_source>(std::forward_as_tuple(epIdx, port));
-    fn(this, port, std::move(value));
+    deliverable dev(msg);
+    fn(this, dev);
   }
 }
 
@@ -335,15 +365,15 @@ void generic_locality_::activate_component(const component_id_t& id) {
 
 void generic_locality_::try_send(const destination& dest,
                                  component::value_type&& value) {
-  switch (dest.type) {
-    case destination::type_::kCallback: {
+  switch (dest.kind) {
+    case destination::kCallback: {
       const auto& cb = dest.cb();
       CkAssertMsg(cb, "callback must be valid!");
       cb->send(std::move(value));
       break;
     }
-    case destination::type_::kComponentPort:
-      this->try_send(dest.port(), std::move(value));
+    case destination::kComponent:
+      this->try_send(dest.com_port(), std::move(value));
       break;
     default:
       CkAbort("unknown destination type");
@@ -408,6 +438,30 @@ reducer::value_set reducer::action(value_set&& accepted) {
   auto contrib = make_typed_value<typename contribution_type::type>(
       std::move(result), ourCmbnr, ourCb);
   return component::make_set(0, std::move(contrib));
+}
+
+void generic_locality_::open(const entry_port_ptr& ours, destination&& theirs) {
+  ours->alive = true;
+  auto pair = this->entry_ports.emplace(ours, std::move(theirs));
+#if CMK_ERROR_CHECKING
+  if (!pair.second) {
+    std::stringstream ss;
+    ss << "[";
+    for (const auto& epp : this->entry_ports) {
+      const auto& other_port = epp.first;
+      if (comparable_comparator<entry_port_ptr>()(ours, other_port)) {
+        ss << "{" << other_port->to_string() << "}, ";
+      } else {
+        ss << other_port->to_string() << ", ";
+      }
+    }
+    ss << "]";
+
+    CkAbort("fatal> adding non-unique port %s to:\n\t%s\n",
+            ours->to_string().c_str(), ss.str().c_str());
+  }
+#endif
+  this->resync_port_queue(pair.first);
 }
 
 }  // namespace hypercomm

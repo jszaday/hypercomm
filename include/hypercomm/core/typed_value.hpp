@@ -3,6 +3,7 @@
 
 #include "../reductions/contribution.hpp"
 #include "../messaging/packing.hpp"
+#include "deliverable_value.hpp"
 #include "zero_copy_value.hpp"
 #include "config.hpp"
 
@@ -140,20 +141,53 @@ inline std::unique_ptr<typed_value<T>> value2typed(zero_copy_value* value) {
 }  // namespace
 
 template <typename T>
+std::unique_ptr<typed_value<T>> dev2typed(
+    deliverable& dev, std::shared_ptr<value_source>&& src = {});
+
+template <typename T>
 std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
   auto* value = ptr.get();
   if (typed_value<T>* p1 = dynamic_cast<typed_value<T>*>(value)) {
     return std::unique_ptr<typed_value<T>>((typed_value<T>*)ptr.release());
-  } else if (zero_copy_value* p2 = dynamic_cast<zero_copy_value*>(value)) {
-    return value2typed<T>(p2);
-  } else if (buffer_value* p3 = dynamic_cast<buffer_value*>(value)) {
-    auto* payload = p3->payload<T>();
-    auto typed = typed_value<T>::from_buffer(std::move(p3->buffer), payload);
-    return std::move(typed);
+  } else if (deliverable_value* p2 = dynamic_cast<deliverable_value*>(value)) {
+    return dev2typed<T>(p2->dev, std::move(p2->source));
   } else {
-    auto typed = typed_value<T>::from_message(value->release());
-    typed->source = value->source;
-    return std::move(typed);
+    NOT_IMPLEMENTED;
+    return {};
+  }
+}
+
+template <typename T>
+std::unique_ptr<typed_value<T>> dev2typed(deliverable& dev,
+                                          std::shared_ptr<value_source>&& src) {
+  switch (dev.kind) {
+    case deliverable::kDeferred: {
+      auto* zc = dev.release<zero_copy_value>();
+      CkAssert(zc->ready());
+      return value2typed<T>(zc);
+    }
+    case deliverable::kMessage: {
+      auto port = std::move(dev.entry_port());
+      auto* msg = dev.release<CkMessage>();
+      auto typed = typed_value<T>::from_message(msg);
+      if (typed) {
+        typed->source = src ? std::move(src)
+                            : std::make_shared<endpoint_source>(
+                                  UsrToEnv(msg)->getEpIdx(), port);
+      }
+      return std::move(typed);
+    }
+    case deliverable::kValue: {
+      auto port = std::move(dev.entry_port());
+      auto* val = dev.release<hyper_value>();
+      val->source =
+          src ? std::move(src) : std::make_shared<endpoint_source>(port);
+      return value2typed<T>(value_ptr(val));
+    }
+    default: {
+      NOT_IMPLEMENTED;
+      return {};
+    }
   }
 }
 }  // namespace hypercomm

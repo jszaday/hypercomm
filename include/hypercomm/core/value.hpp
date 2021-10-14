@@ -44,47 +44,6 @@ inline void try_return(value_ptr&& value) {
 #endif
 }
 
-class plain_value : public hyper_value {
- public:
-  message_type msg;
-
-  plain_value(void) : msg(nullptr) {}
-
-  plain_value(message_type _1) : msg(_1) {}
-
-  ~plain_value() {
-    if (msg != nullptr) {
-      CkFreeMsg(msg);
-    }
-  }
-
-  virtual bool recastable(void) const override { return msg != nullptr; }
-
-  virtual message_type release(void) override {
-    auto value = this->msg;
-    this->msg = nullptr;
-    return value;
-  }
-};
-
-class buffer_value : public hyper_value {
- public:
-  std::shared_ptr<void> buffer;
-  std::size_t size;
-
-  buffer_value(const std::shared_ptr<void>& _1, const std::size_t& _2)
-      : buffer(_1), size(_2) {}
-
-  template <typename T>
-  inline T* payload(void) const {
-    return static_cast<T*>(this->buffer.get());
-  }
-
-  virtual bool recastable(void) const override { return (bool)this->buffer; }
-
-  virtual message_type release(void) override { return nullptr; }
-};
-
 template <typename T, typename... Args>
 inline std::unique_ptr<T> make_value(Args... args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
