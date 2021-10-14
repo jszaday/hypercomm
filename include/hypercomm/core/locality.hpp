@@ -159,15 +159,15 @@ class vil : public detail::base_<Base, Index>, public future_manager_ {
     this->broadcast(section, msg);
   }
 
-  template <typename T>
-  void local_contribution(const T& which, component::value_type&& value,
+  template <typename Identity, typename T>
+  void local_contribution(const T& which, typed_value_ptr<T>&& value,
                           const combiner_ptr& fn, const callback_ptr& cb) {
     local_contribution(this->identity_for(which), std::move(value), fn, cb);
   }
 
  protected:
   void local_contribution(const identity_ptr& ident,
-                          component::value_type&& value, const combiner_ptr& fn,
+                          value_ptr&& value, const combiner_ptr& fn,
                           const callback_ptr& cb) {
     auto next = ident->next_reduction();
     auto ustream = ident->upstream();
@@ -251,7 +251,7 @@ void deliver(const element_proxy<Index>& proxy, message* msg) {
 }
 
 void generic_locality_::loopback(const entry_port_ptr& port,
-                                 component::value_type&& value) {
+                                 value_ptr&& value) {
   auto elt = dynamic_cast<ArrayElement*>(this);
   CkAssert(elt != nullptr);
   interceptor::send_async(elt->ckGetArrayID(), elt->ckGetArrayIndex(), port,
@@ -262,7 +262,7 @@ template <typename Proxy,
           typename = typename std::enable_if<std::is_base_of<
               CProxyElement_locality_base_, Proxy>::value>::type>
 inline void send2port(const Proxy& proxy, const entry_port_ptr& port,
-                      component::value_type&& value) {
+                      value_ptr&& value) {
   interceptor::send_async(proxy, port, std::move(value));
 }
 
@@ -270,13 +270,13 @@ inline void send2port(const Proxy& proxy, const entry_port_ptr& port,
 template <typename Index>
 inline void send2port(const element_ptr<Index>& proxy,
                       const entry_port_ptr& port,
-                      component::value_type&& value) {
+                      value_ptr&& value) {
   const auto& base =
       static_cast<const CProxyElement_locality_base_&>(proxy->c_proxy());
   send2port(base, port, std::move(value));
 }
 
-inline void send2future(const future& f, component::value_type&& value) {
+inline void send2future(const future& f, value_ptr&& value) {
   // TODO ( do not assume array-issuedness )
   auto src = std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(f.source);
   CkAssertMsg(src, "future must be from a locality!");

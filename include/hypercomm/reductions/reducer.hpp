@@ -1,32 +1,25 @@
 #ifndef __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 #define __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 
-#include "contribution.hpp"
+#include "../components/component.hpp"
+#include "../reductions/contribution.hpp"
 
 namespace hypercomm {
-struct reducer : public hypercomm::component {
+
+struct reducer_base_ {
   using imprintable_ptr = std::shared_ptr<imprintable_base_>;
   using stamp_type = comparable_map<imprintable_ptr, reduction_id_t>;
   using pair_type = typename stamp_type::value_type;
 
- private:
+ protected:
   imprintable_ptr imprintable_;
   reduction_id_t count_;
 
+  reducer_base_(const imprintable_ptr& imprintable,
+                std::size_t count)
+  : imprintable_(imprintable), count_(count) {}
+
  public:
-  hypercomm::combiner_ptr combiner;
-  std::size_t n_ustream, n_dstream;
-
-  reducer(const component::id_t &_1, const pair_type &_2,
-          const hypercomm::combiner_ptr &_3, const std::size_t &_4,
-          const std::size_t &_5)
-      : component(_1),
-        imprintable_(_2.first),
-        count_(_2.second),
-        combiner(_3),
-        n_ustream(_4),
-        n_dstream(_5) {}
-
   inline pair_type stamp(void) const {
     return std::make_pair(this->imprintable_, this->count_);
   }
@@ -36,14 +29,27 @@ struct reducer : public hypercomm::component {
     auto search = stamp.find(this->imprintable_);
     return (search != std::end(stamp)) && (this->count_ >= search->second);
   }
+};
 
-  virtual bool permissive(void) const override { return true; }
+template<typename T>
+class reducer : public hypercomm::component<contribution<T>, contribution<T>>, public reducer_base_ {
+  using parent_type_ = hypercomm::component<contribution<T>, contribution<T>>;
 
-  virtual std::size_t n_inputs(void) const override { return this->n_ustream; }
+ public:
+  combiner_ptr<T> combiner;
+  std::size_t n_ustream, n_dstream;
 
-  virtual std::size_t n_outputs(void) const override { return this->n_dstream; }
-
-  virtual value_set action(value_set &&accepted) override;
+  reducer(const component_id_t &_1, const pair_type &_2,
+          const combiner_ptr<T> &_3, const std::size_t &_4,
+          const std::size_t &_5)
+      : parent_type_(_1),
+        reducer_base_(_2.first, _2.second),
+        combiner(_3),
+        n_ustream(_4),
+        n_dstream(_5) {
+          this->persistent = true;
+        }
+  // virtual value_set action(value_set &&accepted) override;
 };
 }  // namespace hypercomm
 

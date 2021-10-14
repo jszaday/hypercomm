@@ -4,32 +4,37 @@
 #include "../sections/imprintable.hpp"
 
 namespace hypercomm {
+template<typename T>
 class reducer;
 
+template<typename T>
 class contribution {
  private:
-  CkMessage *msg_;
-  combiner_ptr combiner_;
-  callback_ptr callback_;
+  typed_value_ptr<T> value_;
+  combiner_ptr<T> combiner_;
+  callback_ptr<T> callback_;
 
  public:
+  template<typename A>
   friend class reducer;
-  friend class puper<contribution>;
+
+  template<typename A>
+  friend class puper;
 
   contribution(const tags::reconstruct &) {}
 
-  contribution(value_ptr &&_1, const combiner_ptr &_2, const callback_ptr &_3)
-      : msg_(_1->release()), combiner_(_2), callback_(_3) {}
+  contribution(typed_value_ptr<T> &&_1, const combiner_ptr<T> &_2, const callback_ptr<T> &_3)
+      : value_(std::move(_1)), combiner_(_2), callback_(_3) {}
 };
 
-template <>
-struct puper<contribution> {
-  inline static void impl(serdes &s, contribution &t) {
-    s | t.msg_;
-    s | t.combiner_;
-    s | t.callback_;
-  }
-};
+// template <typename T>
+// struct puper<contribution<T>> {
+//   inline static void impl(serdes &s, contribution<T> &t) {
+//     // s | t.msg_;
+//     s | t.combiner_;
+//     s | t.callback_;
+//   }
+// };
 }  // namespace hypercomm
 
 #endif

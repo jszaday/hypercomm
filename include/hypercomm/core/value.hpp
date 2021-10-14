@@ -1,6 +1,7 @@
 #ifndef __HYPERCOMM_CORE_VALUE_HPP__
 #define __HYPERCOMM_CORE_VALUE_HPP__
 
+#include <typeindex>
 #include "../utilities.hpp"
 
 namespace hypercomm {
@@ -29,6 +30,7 @@ class hyper_value {
   }
   virtual message_type release(void) = 0;
   virtual bool recastable(void) const = 0;
+  virtual const std::type_index* get_type(void) const { return nullptr; }
 };
 
 inline void try_return(value_ptr&& value) {

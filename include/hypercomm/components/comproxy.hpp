@@ -8,7 +8,7 @@ namespace hypercomm {
 template <typename A>
 class comproxy<
     A, typename std::enable_if<std::is_base_of<component, A>::value>::type> {
-  using id_t = component::id_t;
+  using id_t = component_id_t;
   id_t id;
 
  public:

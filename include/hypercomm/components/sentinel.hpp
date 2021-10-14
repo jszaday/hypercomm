@@ -10,18 +10,18 @@ namespace hypercomm {
 //      do so, but it doesn't really have i/o so i'm hesitant
 class sentinel {
  public:
-  using group_type = std::shared_ptr<std::vector<component::id_t>>;
+  using group_type = std::shared_ptr<std::vector<component_id_t>>;
   using weak_ref_t = utilities::weak_ref<sentinel>;
 
  private:
-  std::map<component::id_t, group_type> groups_;
+  std::map<component_id_t, group_type> groups_;
   std::shared_ptr<weak_ref_t> weak_;
   CthThread sleeper_ = nullptr;
   std::size_t n_expected_ = 0;
-  component::id_t id_;
+  component_id_t id_;
 
  public:
-  sentinel(const component::id_t& _1) : id_(_1), weak_(new weak_ref_t(this)) {}
+  sentinel(const component_id_t& _1) : id_(_1), weak_(new weak_ref_t(this)) {}
 
   ~sentinel() { weak_->reset(nullptr); }
 
@@ -83,8 +83,8 @@ class sentinel {
   }
 
   template <typename T>
-  inline component::id_t any_helper(T& t) {
-    component::id_t id = t;
+  inline component_id_t any_helper(T& t) {
+    component_id_t id = t;
     this->add_listener(id);
     return id;
   }
@@ -98,9 +98,9 @@ class sentinel {
 
   template <typename... Ts>
   void expect_any(const Ts&... ts) {
-    std::vector<component::id_t> base{{any_helper(ts)...}};
+    std::vector<component_id_t> base{{any_helper(ts)...}};
     auto group =
-        std::make_shared<std::vector<component::id_t>>(std::move(base));
+        std::make_shared<std::vector<component_id_t>>(std::move(base));
 
     for (const auto& id : *group) {
       this->groups_[id] = group;
@@ -112,7 +112,7 @@ class sentinel {
  private:
   using listener_type = decltype(weak_);
 
-  static void on_status_change(const component* com, component::status status,
+  static void on_status_change(const component* com, components::status_ status,
                                void* arg) {
     auto* listener = (listener_type*)arg;
     auto& self = *listener;

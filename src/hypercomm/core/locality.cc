@@ -3,28 +3,6 @@
 #include <hypercomm/reductions/reducer.hpp>
 
 namespace hypercomm {
-// TODO this is a temporary solution
-struct connector_ : public callback {
-  generic_locality_* self;
-  destination dst;
-
-  connector_(generic_locality_* _1, const component_id_t& com,
-             const component::port_type& port)
-      : self(_1), dst(com, port) {}
-
-  virtual return_type send(argument_type&& value) override {
-    self->try_send(dst, std::move(value));
-  }
-
-  virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }
-};
-
-callback_ptr generic_locality_::make_connector(
-    const component_id_t& com, const component::port_type& port) {
-  return callback_ptr(new connector_(this, com, port),
-                      [](callback* cb) { delete (connector_*)cb; });
-}
-
 namespace {
 CpvDeclare(generic_locality_*, locality_);
 }
@@ -47,14 +25,13 @@ generic_locality_* access_context_(void) {
   return locality;
 }
 
-void generic_locality_::invalidate_component(const component::id_t& id) {
+void generic_locality_::invalidate_component(const component_id_t& id) {
   auto search = this->components.find(id);
   if (search != std::end(this->components)) {
     auto& com = search->second;
-    auto was_alive = com->alive;
-    com->alive = false;
-    com->on_invalidation();
-    if (was_alive) {
+    auto was_active = com->is_active();
+    com->deactivate(components::kInvalidation);
+    if (was_active) {
       this->components.erase(search);
     } else {
       this->invalidations.emplace_back(id);
@@ -62,7 +39,7 @@ void generic_locality_::invalidate_component(const component::id_t& id) {
   }
 }
 
-bool generic_locality_::invalidated(const component::id_t& id) {
+bool generic_locality_::invalidated(const component_id_t& id) {
   if (this->invalidations.empty()) {
     return false;
   } else {
@@ -95,7 +72,7 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
     auto& buffer = search->second;
     while (port->alive && !buffer.empty()) {
       auto& msg = buffer.front();
-      this->try_send(it->second, std::move(msg));
+      this->pass_thru(it->second, msg);
       buffer.pop_front();
       QdProcess(1);
     }
@@ -105,8 +82,8 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
   }
 }
 
-void generic_locality_::receive_value(const entry_port_ptr& port,
-                                      component::value_type&& value) {
+void generic_locality_::receive(
+  const entry_port_ptr& port, value_ptr&& value) {
   // save this port as the source of the value
   if (value) value->source = port;
   // seek this port in our list of active ports
@@ -119,7 +96,18 @@ void generic_locality_::receive_value(const entry_port_ptr& port,
     // otherwise, try to deliver it
     CkAssertMsg(search->first && search->first->alive,
                 "entry port must be alive");
-    this->try_send(search->second, std::move(value));
+    this->pass_thru(search->second, std::move(value));
+  }
+}
+
+void generic_locality_::receive(
+  const UShort& epIdx, CkMessage*&& msg
+) {
+  auto fn = CkIndex_locality_base_::get_value_handler(epIdx);
+  if (fn == nullptr) {
+    _entryTable[epIdx]->call(msg, dynamic_cast<CkMigratable*>(this));
+  } else {
+    this->receive_value(msg, fn);
   }
 }
 
@@ -144,21 +132,10 @@ generic_locality_::~generic_locality_() {
   for (auto& pair : this->port_queue) {
     auto& port = pair.first;
     for (auto& value : pair.second) {
-      this->loopback(port, std::move(value));
+      this->loopback(port, value);
 
       QdProcess(1);
     }
-  }
-}
-
-void generic_locality_::receive_message(CkMessage* msg) {
-  auto* env = UsrToEnv(msg);
-  auto epIdx = env->getEpIdx();
-  auto fn = CkIndex_locality_base_::get_value_handler(epIdx);
-  if (fn == nullptr) {
-    _entryTable[epIdx]->call(msg, dynamic_cast<CkMigratable*>(this));
-  } else {
-    this->receive_value(msg, fn);
   }
 }
 
@@ -333,81 +310,47 @@ void generic_locality_::activate_component(const component_id_t& id) {
   }
 }
 
-void generic_locality_::try_send(const destination& dest,
-                                 component::value_type&& value) {
-  switch (dest.type) {
-    case destination::type_::kCallback: {
-      const auto& cb = dest.cb();
-      CkAssertMsg(cb, "callback must be valid!");
-      cb->send(std::move(value));
-      break;
-    }
-    case destination::type_::kComponentPort:
-      this->try_send(dest.port(), std::move(value));
-      break;
-    default:
-      CkAbort("unknown destination type");
-  }
-}
+// reducer::value_set reducer::action(value_set&& accepted) {
+//   CkAssertMsg(this->n_dstream == 1, "reducers may only have one output");
 
-void generic_locality_::try_send(const component_port_t& port,
-                                 component::value_type&& value) {
-  auto search = components.find(port.first);
-#if CMK_ERROR_CHECKING
-  if (search == std::end(components)) {
-    std::stringstream ss;
-    ss << "fatal> recvd msg for invalid destination com" << port.first << ":"
-       << port.second << "!";
-    CkAbort("%s", ss.str().c_str());
-  }
-#endif
+//   auto cmp = comparable_comparator<callback_ptr>();
+//   callback_ptr ourCb;
 
-  search->second->receive_value(port.second, std::move(value));
+//   auto& ourCmbnr = this->combiner;
 
-  this->try_collect(search->second);
-}
+//   using contribution_type = typed_value<contribution>;
+//   typename combiner::argument_type args;
+//   for (auto& pair : accepted) {
+//     auto& raw = pair.second;
+//     auto contrib =
+//         raw ? value2typed<typename contribution_type::type>(std::move(raw))
+//             : std::shared_ptr<contribution_type>();
+//     if (contrib) {
+//       if ((*contrib)->msg_ != nullptr) {
+//         args.emplace_back(msg2value((*contrib)->msg_));
+//       }
 
-reducer::value_set reducer::action(value_set&& accepted) {
-  CkAssertMsg(this->n_dstream == 1, "reducers may only have one output");
+//       auto& theirCb = (*contrib)->callback_;
+//       if (theirCb) {
+//         if (ourCb) {
+//           // CkAssertMsg(cmp(cb, (*contrib)->callback_), "callbacks must
+//           // match");
+//         } else {
+//           ourCb = theirCb;
+//         }
+//       }
 
-  auto cmp = comparable_comparator<callback_ptr>();
-  callback_ptr ourCb;
+//       auto& theirCmbnr = (*contrib)->combiner_;
+//       if (!ourCmbnr && theirCmbnr) {
+//         ourCmbnr = theirCmbnr;
+//       }
+//     }
+//   }
 
-  auto& ourCmbnr = this->combiner;
-
-  using contribution_type = typed_value<contribution>;
-  typename combiner::argument_type args;
-  for (auto& pair : accepted) {
-    auto& raw = pair.second;
-    auto contrib =
-        raw ? value2typed<typename contribution_type::type>(std::move(raw))
-            : std::shared_ptr<contribution_type>();
-    if (contrib) {
-      if ((*contrib)->msg_ != nullptr) {
-        args.emplace_back(msg2value((*contrib)->msg_));
-      }
-
-      auto& theirCb = (*contrib)->callback_;
-      if (theirCb) {
-        if (ourCb) {
-          // CkAssertMsg(cmp(cb, (*contrib)->callback_), "callbacks must
-          // match");
-        } else {
-          ourCb = theirCb;
-        }
-      }
-
-      auto& theirCmbnr = (*contrib)->combiner_;
-      if (!ourCmbnr && theirCmbnr) {
-        ourCmbnr = theirCmbnr;
-      }
-    }
-  }
-
-  auto result = ourCmbnr->send(std::move(args));
-  auto contrib = make_typed_value<typename contribution_type::type>(
-      std::move(result), ourCmbnr, ourCb);
-  return component::make_set(0, std::move(contrib));
-}
+//   auto result = ourCmbnr->send(std::move(args));
+//   auto contrib = make_typed_value<typename contribution_type::type>(
+//       std::move(result), ourCmbnr, ourCb);
+//   return component::make_set(0, std::move(contrib));
+// }
 
 }  // namespace hypercomm

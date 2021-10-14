@@ -1,6 +1,7 @@
 #ifndef __HYPERCOMM_MESSAGING_DELIVERY_HPP__
 #define __HYPERCOMM_MESSAGING_DELIVERY_HPP__
 
+#include "../core/module.hpp"
 #include "../core/entry_port.hpp"
 #include "../core/zero_copy_value.hpp"
 #include "destination.hpp"
@@ -10,7 +11,7 @@ namespace hypercomm {
 namespace detail {
 // TODO ( it would be good to rename this at some point )
 message* repack_to_port(const entry_port_ptr& port,
-                        component::value_type&& value);
+                        value_ptr&& value);
 
 struct payload;
 

@@ -2,8 +2,10 @@
 #define __HYPERCOMM_CORE_COMMON_HPP__
 
 #include "../messaging/common.hpp"
-#include "../components/component.hpp"
+#include "../components/base.hpp"
+
 #include "callback.hpp"
+#include "proxy.hpp"
 
 namespace hypercomm {
 
@@ -33,9 +35,9 @@ class indexed_locality_;
 
 using entry_port_ptr = std::shared_ptr<entry_port>;
 using entry_port_map = comparable_map<entry_port_ptr, destination>;
-using component_port_t = std::pair<component::id_t, component::port_type>;
+using component_port_pair = std::pair<component_id_t, component_port_t>;
 using component_map =
-    std::unordered_map<component::id_t, std::unique_ptr<component>>;
+    std::unordered_map<component_id_t, std::unique_ptr<components::base_>>;
 
 template <typename T>
 using mapped_queue = comparable_map<entry_port_ptr, std::deque<T>>;

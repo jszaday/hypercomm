@@ -20,7 +20,7 @@ void delete_value_(const void*, CkDataMsg* msg) {
 }
 
 message* pack_deferrable_(const entry_port_ptr& port,
-                          component::value_type&& uniq) {
+                          value_ptr&& uniq) {
   std::shared_ptr<hyper_value> value(uniq.release());
   std::vector<serdes::deferred_type> deferred;
   std::vector<CkNcpyBuffer> buffers;
@@ -73,7 +73,7 @@ message* pack_deferrable_(const entry_port_ptr& port,
 }
 
 message* repack_to_port(const entry_port_ptr& port,
-                        component::value_type&& value) {
+                        value_ptr&& value) {
   if (value->pupable) {
     return pack_deferrable_(port, std::move(value));
   } else {
@@ -393,7 +393,7 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
       CkPrintf("pe%d> delivering msg %p to idx %s!\n", CkMyPe(), msg,
                utilities::idx2str(elt->ckGetArrayIndex()).c_str());
 #endif
-      cast->receive_message(msg);
+      cast->receive(msg);
       msg = nullptr;
     } else {
       auto& ep = opts.value_.ep_;

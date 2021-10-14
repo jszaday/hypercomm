@@ -19,7 +19,7 @@ class mailbox : public component {
     predicate_type pred;
     action_type act;
 
-    component::id_t com;
+    component_id_t com;
     component::listener_type listener;
 
     request(const predicate_type& _1, callback_ptr&& _2)
@@ -65,7 +65,7 @@ class mailbox : public component {
 
   inline void put_request_to(const predicate_type& pred,
                              const component_id_t& com,
-                             const component::port_type& port) {
+                             const component_port_t& port) {
     auto* ctx = access_context_();
     auto search = this->find_in_buffer(pred);
     if (search == std::end(this->buffer_)) {
@@ -135,7 +135,7 @@ class mailbox : public component {
  private:
   using listener_type = std::pair<std::shared_ptr<weak_ref_t>, reqiter_t>;
 
-  static void on_status_change(const component*, component::status status,
+  static void on_status_change(const component*, components::status_ status,
                                void* arg) {
     auto* listener = (listener_type*)arg;
     auto& self = *(listener->first);

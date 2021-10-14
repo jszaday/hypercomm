@@ -9,29 +9,17 @@ struct immediate_action;
 
 template <typename Ret, typename... Args>
 struct immediate_action<Ret(Args...)>
-    : virtual public core::action<false, true> {
-  static_assert(sizeof...(Args) == 1,
-                "multi-args unsupported outside of C++17");
-
+    : virtual public core::action<false, std::tuple<Args...>, Ret> {
   using tuple_type = std::tuple<Args...>;
 
-  template <std::size_t N>
-  using argument_type = typename std::tuple_element<N, tuple_type>::type;
+  using parent_type = core::action<false, tuple_type, Ret>;
+
+  using return_type = typename parent_type::return_type;
 
   virtual Ret action(Args...) = 0;
 
-  virtual value_type send(value_type&& msg) override {
-    throw std::runtime_error("not yet implemented!");
-    // TODO fix this!
-    // auto buffer = utilities::get_message_buffer(msg);
-    // auto unpack = serdes::make_unpacker(msg, buffer);
-    // temporary<argument_type<0>> tmp;
-    // pup(unpack, tmp);
-    // auto rval = this->action(tmp.value());
-    // auto size = hypercomm::size(rval);
-    // auto rmsg = message::make_message(size, {});
-    // auto packr = serdes::make_packer(rmsg->payload);
-    // return value_type(rmsg);
+  virtual return_type send(typed_value_ptr<tuple_type>&& args) override {
+    NOT_IMPLEMENTED;
   }
 };
 }  // namespace hypercomm

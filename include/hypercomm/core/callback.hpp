@@ -1,40 +1,67 @@
 #ifndef __HYPERCOMM_CORE_CALLBACK_HPP__
 #define __HYPERCOMM_CORE_CALLBACK_HPP__
 
-#include "value.hpp"
+#include "typed_value.hpp"
+#include "../messaging/deliverable.hpp"
 
 namespace hypercomm {
 namespace core {
 
-template <bool MultiMsg, bool Returns>
-struct action : virtual public polymorph {
-  using value_type = value_ptr;
+template<bool Pack>
+struct action_base_;
 
-  using return_type =
-      typename std::conditional<Returns, value_type, void>::type;
+template<bool Pack>
+struct action_base_: virtual public polymorph {
   using argument_type =
-      typename std::conditional<MultiMsg, std::vector<value_type>,
-                                value_type>::type;
+    typename std::conditional<Pack, std::vector<deliverable>, deliverable>::type;
 
-  virtual return_type send(argument_type&&) = 0;
-
-  template <bool multi_msg_t = MultiMsg,
-            typename std::enable_if<multi_msg_t>::type>
-  return_type send(value_type&& value) {
-    argument_type list = {value};
-    return send(std::move(list));
-  }
+  virtual void send(deliverable&&) = 0;
 };
 
-using callback = action<false, false>;
-using combiner = action<true, true>;
+template <bool Pack, typename Arg, typename Ret>
+struct action;
+
+template <bool Pack, typename Arg, typename Ret>
+struct action: virtual public polymorph {
+  using value_type = typed_value_ptr<Arg>;
+  using return_type = typed_value_ptr<Ret>;
+  using argument_type =
+      typename std::conditional<Pack, std::vector<value_type>, value_type>::type;
+
+  virtual return_type send(argument_type&&) = 0;
+};
+
+template <bool Pack, typename Arg>
+struct action<Pack, Arg, void>: public action_base_<Pack> {
+  using value_type = typed_value_ptr<Arg>;
+  using return_type = void;
+  using argument_type =
+      typename std::conditional<Pack, std::vector<value_type>, value_type>::type;
+
+  virtual void send(typename action_base_<Pack>::argument_type&&) override {
+    NOT_IMPLEMENTED;
+  }
+
+  virtual return_type send(argument_type&&) = 0;
+};
+
 }  // namespace core
 
-using callback = core::callback;
-using callback_ptr = std::shared_ptr<callback>;
+template<typename T>
+using callback = core::action<false, T, void>;
 
-using combiner = core::combiner;
-using combiner_ptr = std::shared_ptr<combiner>;
+template<typename T>
+using combiner = core::action<true, T, T>;
+
+template<typename T>
+using callback_ptr = std::shared_ptr<callback<T>>;
+
+template<typename T>
+using combiner_ptr = std::shared_ptr<combiner<T>>;
+
+using generic_callback = core::action_base_<false>;
+using generic_callback_ptr = std::shared_ptr<generic_callback>;
+
 }  // namespace hypercomm
 
 #endif

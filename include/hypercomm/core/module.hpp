@@ -11,7 +11,7 @@ class locality_base_;
 class generic_locality_;
 
 using value_handler_fn_ = void (*)(generic_locality_*, const entry_port_ptr&,
-                                   component::value_type&&);
+                                   value_ptr&&);
 
 class CkIndex_locality_base_ {
  public:
@@ -28,7 +28,7 @@ class CkIndex_locality_base_ {
   }
 
   template <void fn(generic_locality_*, const entry_port_ptr&,
-                    component::value_type&&)>
+                    value_ptr&&)>
   static int register_value_handler(const char* name, const int& flags = 0) {
     auto epIdx = CkRegisterEp(name, (CkCallFnPtr)&value_handler<fn>,
                               CMessage_CkMessage::__idx, __idx, flags);
@@ -37,7 +37,7 @@ class CkIndex_locality_base_ {
   }
 
   template <void fn(generic_locality_*, const entry_port_ptr&,
-                    component::value_type&&)>
+                    value_ptr&&)>
   static void value_handler(CkMessage* msg, CkMigratable* base);
 };
 

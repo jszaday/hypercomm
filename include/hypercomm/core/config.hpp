@@ -5,6 +5,10 @@
 #define HYPERCOMM_PORT_SIZE 48
 #endif
 
+#ifndef HYPERCOMM_ERROR_CHECKING
+#define HYPERCOMM_ERROR_CHECKING CMK_ERROR_CHECKING
+#endif
+
 #include <cstdint>
 
 namespace hypercomm {
