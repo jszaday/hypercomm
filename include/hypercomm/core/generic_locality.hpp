@@ -14,7 +14,7 @@ class generic_locality_ : public manageable_base_ {
  public:
   template <typename A, typename Enable>
   friend class comproxy;
-  friend class detail::payload;
+  friend class deliverable;
   friend class CkIndex_locality_base_;
 
   entry_port_map entry_ports;

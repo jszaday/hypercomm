@@ -87,11 +87,11 @@ class interceptor : public CBase_interceptor {
   inline void deliver(const CkArrayID& aid, const CkArrayIndex& raw,
                       CkMessage* msg) {
     // deliver with immediately payload processing, "inlining" the EP
-    this->deliver(aid, raw, detail::make_payload(msg), true);
+    this->deliver(aid, raw, deliverable(msg), true);
   }
 
-  void deliver(const CkArrayID& aid, const CkArrayIndex& raw,
-               detail::payload_ptr&&, const bool& immediate);
+  void deliver(const CkArrayID& aid, const CkArrayIndex& raw, deliverable&&,
+               const bool& immediate);
 
   static void send_to_branch(const int& pe, const CkArrayID& aid,
                              const CkArrayIndex& idx, CkMessage* msg);
@@ -101,8 +101,7 @@ class interceptor : public CBase_interceptor {
                                                   const CkArrayIndex& idx,
                                                   const T& ep,
                                                   value_ptr&& value) {
-    interceptor::send_async(aid, idx,
-                            detail::make_payload(ep, std::move(value)));
+    interceptor::send_async(aid, idx, deliverable(std::move(value), ep));
   }
 
   template <typename T>
@@ -128,14 +127,14 @@ class interceptor : public CBase_interceptor {
 
   inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
                                 CkMessage* msg) {
-    interceptor::send_async(aid, idx, detail::make_payload(msg));
+    interceptor::send_async(aid, idx, deliverable(msg));
   }
 
   // asynchronously send a message to the specified index of aid
   inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
-                                detail::payload_ptr&& payload) {
+                                deliverable&& payload) {
     if (((CkGroupID)CkpvAccess(interceptor_)).isZero()) {
-      CkEnforce(send_fallback(aid, idx, payload->release()));
+      CkEnforce(send_fallback(aid, idx, deliverable::to_message(payload)));
     } else {
       auto* loc = spin_to_win();
       CkAssertMsg(loc, "unable to retrieve interceptor");

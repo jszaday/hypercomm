@@ -3,6 +3,7 @@
 
 #include "../core/common.hpp"
 #include "../core/module.hpp"
+#include "../core/entry_port.hpp"
 
 namespace hypercomm {
 class endpoint {
@@ -22,6 +23,19 @@ class endpoint {
   endpoint(std::tuple<int, const entry_port_ptr&>&& pair)
       : endpoint(std::get<0>(pair), std::get<1>(pair)) {}
 
+  endpoint(endpoint&& other)
+      : idx_(other.idx_), port_(std::move(other.port_)) {}
+
+  endpoint(const endpoint& other) : idx_(other.idx_), port_(other.port_) {}
+
+  inline endpoint& operator=(const endpoint& other) {
+    if (this != &other) {
+      this->~endpoint();
+      new (this) endpoint(other);
+    }
+    return *this;
+  }
+
   inline bool valid(void) const {
     return this->port_ || (this->idx_ != demux());
   }
@@ -38,11 +52,6 @@ class endpoint {
   inline hash_code hash(void) const {
     return hash_combine(utilities::hash<int>()(this->idx_),
                         utilities::hash<entry_port_ptr>()(this->port_));
-  }
-
-  inline void pup(serdes& s) {
-    s | const_cast<int&>(this->idx_);
-    s | const_cast<entry_port_ptr&>(this->port_);
   }
 
   template <typename T>

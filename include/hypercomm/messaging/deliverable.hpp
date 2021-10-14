@@ -1,13 +1,18 @@
 #ifndef __HYPERCOMM_MESSAGING_DELIVERABLE_HPP__
 #define __HYPERCOMM_MESSAGING_DELIVERABLE_HPP__
 
-#include "../core/value.hpp"
-#include "../core/zero_copy_value.hpp"
 #include "../serialization/construction.hpp"
+#include "../core/zero_copy_value.hpp"
+#include "../core/value.hpp"
+#include "endpoint.hpp"
 
 namespace hypercomm {
 
+struct delivery;
+
 struct deliverable {
+  friend class delivery;
+
   enum kind_ { kMessage, kValue, kDeferred };
 
   kind_ kind;
@@ -34,7 +39,7 @@ struct deliverable {
 
   template <typename T, typename... Args>
   deliverable(std::unique_ptr<T>&& ptr, Args... args)
-  : deliverable(ptr.release(), std::forward<Args>(args)...) {}
+      : deliverable(ptr.release(), std::forward<Args>(args)...) {}
 
   ~deliverable() {
     switch (kind) {
@@ -52,18 +57,9 @@ struct deliverable {
 
   deliverable(const deliverable&) = delete;
 
-  deliverable(deliverable&& other) : kind(other.kind) {
-    switch (kind) {
-      case kMessage:
-        this->storage_ = other.release<CkMessage>();
-        break;
-      case kValue:
-        this->storage_ = other.release<hyper_value>();
-        break;
-      case kDeferred:
-        this->storage_ = other.release<zero_copy_value>();
-        break;
-    }
+  deliverable(deliverable&& other)
+      : kind(other.kind), storage_(other.storage_), ep_(std::move(other.ep_)) {
+    other.storage_ = nullptr;
   }
 
   template <typename T>
@@ -95,9 +91,11 @@ struct deliverable {
 
   inline operator bool(void) const { return (this->storage_ != nullptr); }
 
+  static CkMessage* to_message(deliverable& dev);
+
  private:
-  inline entry_port_ptr &get_port_(void) {
-    return const_cast<entry_port_ptr &>((this->ep_).port_);
+  inline entry_port_ptr& get_port_(void) {
+    return const_cast<entry_port_ptr&>((this->ep_).port_);
   }
 };
 
