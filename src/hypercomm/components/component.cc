@@ -56,7 +56,7 @@ void component::activate(void) {
 // find a value set that has a "gap", or missing value,
 // at the specified port
 inline incoming_type::iterator find_gap(incoming_type& incoming,
-                                        const component::port_type& which) {
+                                        const component_port_t& which) {
   if (!incoming.empty()) {
     auto search = incoming.rbegin();
     for (; search != incoming.rend(); search++) {
@@ -110,7 +110,7 @@ void component::unspool_values(value_set& pairs) {
   }
 }
 
-void component::update_destination(const port_type& port,
+void component::update_destination(const component_port_t& port,
                                    const callback_ptr& cb) {
   auto search = this->outgoing.find(port);
   // if no values are available at this port
@@ -153,7 +153,7 @@ void component::on_invalidation(void) {
   this->notify_listeners<kInvalidation>();
 }
 
-void component::receive_value(const port_type& port, value_type&& value) {
+void component::receive_value(const component_port_t& port, value_type&& value) {
   CkAssertMsg(port < this->n_inputs(), "port must be within range");
   // if a component receives an unpermitted invalidation
   if (!value && !this->permissive()) {
