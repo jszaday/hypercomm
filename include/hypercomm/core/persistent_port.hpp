@@ -5,7 +5,7 @@
 
 namespace hypercomm {
 struct persistent_port : public entry_port {
-  components::port_id_t id = 0;
+  component_port_t id = 0;
 
   persistent_port(PUP::reconstruct) {}
   persistent_port(const decltype(id)& _1) : id(_1) {}

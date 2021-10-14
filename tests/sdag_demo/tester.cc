@@ -128,7 +128,7 @@ struct locality : public vil<CBase_locality, int> {
      */
 
     this->repNo += 1;
-    auto senti = std::make_shared<sentinel>((component::id_t)this->repNo);
+    auto senti = std::make_shared<sentinel>((component_id_t)this->repNo);
 
     for (auto i = 0; i < numIters; i += 1) {
       // the constructor argument represents the nbr of inputs

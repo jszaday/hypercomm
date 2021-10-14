@@ -15,10 +15,8 @@ class component : virtual public impermanent {
  public:
   friend class generic_locality_;
 
-  using id_t = component_id_t;
   using value_type = value_ptr;
-  using port_type = components::port_id_t;
-  using value_set = std::map<port_type, value_type>;
+  using value_set = std::map<component_port_t, value_type>;
   using incoming_type = std::deque<value_set>;
 
   enum status { kCompletion, kInvalidation };
@@ -26,10 +24,10 @@ class component : virtual public impermanent {
   using listener_type = typename decltype(listeners_)::iterator;
   using status_listener_fn = void (*)(const component*, status, void*);
 
-  const id_t id;
+  const component_id_t id;
   bool activated;
 
-  component(const id_t& _1) : id(_1), activated(false) {}
+  component(const component_id_t& _1) : id(_1), activated(false) {}
 
   virtual ~component() {
     // dumps all held values and propagates invalidations downstream
@@ -72,10 +70,10 @@ class component : virtual public impermanent {
 
   // used to send a value to a component
   // null values are treated as invalidations
-  void receive_value(const port_type& port, value_type&& value);
+  void receive_value(const component_port_t& port, value_type&& value);
 
   // updates the cb that a port's value is sent to
-  void update_destination(const port_type& port, const callback_ptr& cb);
+  void update_destination(const component_port_t& port, const callback_ptr& cb);
 
   // called when a component is first "activated" in the RTS
   void activate(void);
@@ -122,7 +120,7 @@ class component : virtual public impermanent {
   }
 
   // create a value set and initialize it with the port/value pair
-  inline static value_set make_set(const port_type& port, value_type&& value) {
+  inline static value_set make_set(const component_port_t& port, value_type&& value) {
     value_set set;
     set.emplace(port, std::move(value));
     return std::move(set);
@@ -156,9 +154,9 @@ class component : virtual public impermanent {
   // staging area for incomplete value sets
   incoming_type incoming;
   // buffer of yet-unsent values
-  std::map<port_type, std::deque<value_type>> outgoing;
+  std::map<component_port_t, std::deque<value_type>> outgoing;
   // buffer of unfulfilled callbacks
-  std::map<port_type, std::deque<callback_ptr>> routes;
+  std::map<component_port_t, std::deque<callback_ptr>> routes;
 
  private:
   void stage_action(incoming_type::iterator*);

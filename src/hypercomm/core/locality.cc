@@ -9,7 +9,7 @@ struct connector_ : public callback {
   destination dst;
 
   connector_(generic_locality_* _1, const component_id_t& com,
-             const component::port_type& port)
+             const component_port_t& port)
       : self(_1), dst(com, port) {}
 
   virtual return_type send(argument_type&& value) override {
@@ -19,8 +19,8 @@ struct connector_ : public callback {
   virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }
 };
 
-callback_ptr generic_locality_::make_connector(
-    const component_id_t& com, const component::port_type& port) {
+callback_ptr generic_locality_::make_connector(const component_id_t& com,
+                                               const component_port_t& port) {
   return callback_ptr(new connector_(this, com, port),
                       [](callback* cb) { delete (connector_*)cb; });
 }
@@ -47,7 +47,7 @@ generic_locality_* access_context_(void) {
   return locality;
 }
 
-void generic_locality_::invalidate_component(const component::id_t& id) {
+void generic_locality_::invalidate_component(const component_id_t& id) {
   auto search = this->components.find(id);
   if (search != std::end(this->components)) {
     auto& com = search->second;
@@ -62,7 +62,7 @@ void generic_locality_::invalidate_component(const component::id_t& id) {
   }
 }
 
-bool generic_locality_::invalidated(const component::id_t& id) {
+bool generic_locality_::invalidated(const component_id_t& id) {
   if (this->invalidations.empty()) {
     return false;
   } else {
@@ -350,7 +350,7 @@ void generic_locality_::try_send(const destination& dest,
   }
 }
 
-void generic_locality_::try_send(const component_port_t& port,
+void generic_locality_::try_send(const com_port_pair_t& port,
                                  component::value_type&& value) {
   auto search = components.find(port.first);
 #if CMK_ERROR_CHECKING

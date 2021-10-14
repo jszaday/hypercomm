@@ -17,7 +17,7 @@ struct reducer : public hypercomm::component {
   hypercomm::combiner_ptr combiner;
   std::size_t n_ustream, n_dstream;
 
-  reducer(const component::id_t &_1, const pair_type &_2,
+  reducer(const component_id_t &_1, const pair_type &_2,
           const hypercomm::combiner_ptr &_3, const std::size_t &_4,
           const std::size_t &_5)
       : component(_1),

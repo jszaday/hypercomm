@@ -51,13 +51,13 @@ class generic_locality_ : public manageable_base_ {
   template <typename Destination>
   void open(const entry_port_ptr& ours, const Destination& theirs);
   void try_send(const destination& dest, component::value_type&& value);
-  void try_send(const component_port_t& port, component::value_type&& value);
+  void try_send(const com_port_pair_t& port, component::value_type&& value);
 
   void resync_port_queue(entry_port_iterator& it);
   void invalidate_port(const entry_port_ptr& port);
 
   void activate_component(const component_id_t& id);
-  void invalidate_component(const component::id_t& id);
+  void invalidate_component(const component_id_t& id);
 
   template <typename T>
   inline is_valid_endpoint_t<T> manual_mode(const T& ep) {
@@ -85,21 +85,21 @@ class generic_locality_ : public manageable_base_ {
   }
 
   inline void connect(const component_id_t& src,
-                      const components::port_id_t& srcPort,
+                      const component_port_t& srcPort,
                       const component_id_t& dst,
-                      const components::port_id_t& dstPort) {
+                      const component_port_t& dstPort) {
     this->components[src]->update_destination(
         srcPort, this->make_connector(dst, dstPort));
   }
 
   inline void connect(const component_id_t& src,
-                      const components::port_id_t& srcPort,
+                      const component_port_t& srcPort,
                       const callback_ptr& cb) {
     this->components[src]->update_destination(srcPort, cb);
   }
 
   inline void connect(const entry_port_ptr& srcPort, const component_id_t& dst,
-                      const components::port_id_t& dstPort) {
+                      const component_port_t& dstPort) {
     this->components[dst]->add_listener(
         &on_status_change, new entry_port_ptr(srcPort),
         [](void* value) { delete (entry_port_ptr*)value; });
@@ -107,10 +107,10 @@ class generic_locality_ : public manageable_base_ {
   }
 
   callback_ptr make_connector(const component_id_t& com,
-                              const component::port_type& port);
+                              const component_port_t& port);
 
  protected:
-  bool invalidated(const component::id_t& id);
+  bool invalidated(const component_id_t& id);
 
  private:
   outstanding_iterator poll_buffer(CkNcpyBuffer* buffer,
