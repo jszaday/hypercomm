@@ -435,4 +435,28 @@ reducer::value_set reducer::action(value_set&& accepted) {
   return component::make_set(0, std::move(contrib));
 }
 
+void generic_locality_::open(const entry_port_ptr& ours, destination&& theirs) {
+  ours->alive = true;
+  auto pair = this->entry_ports.emplace(ours, std::move(theirs));
+#if CMK_ERROR_CHECKING
+  if (!pair.second) {
+    std::stringstream ss;
+    ss << "[";
+    for (const auto& epp : this->entry_ports) {
+      const auto& other_port = epp.first;
+      if (comparable_comparator<entry_port_ptr>()(ours, other_port)) {
+        ss << "{" << other_port->to_string() << "}, ";
+      } else {
+        ss << other_port->to_string() << ", ";
+      }
+    }
+    ss << "]";
+
+    CkAbort("fatal> adding non-unique port %s to:\n\t%s\n",
+            ours->to_string().c_str(), ss.str().c_str());
+  }
+#endif
+  this->resync_port_queue(pair.first);
+}
+
 }  // namespace hypercomm

@@ -50,8 +50,12 @@ class generic_locality_ : public manageable_base_ {
   void loopback(const entry_port_ptr& port, component::value_type&& value);
   bool has_value(const entry_port_ptr& port) const;
 
-  template <typename Destination>
-  void open(const entry_port_ptr& ours, const Destination& theirs);
+  void open(const entry_port_ptr& ours, destination&& theirs);
+  template <typename... Args>
+  void open(const entry_port_ptr& ours, Args... args) {
+    this->open(ours, std::move(destination(std::forward<Args>(args)...)));
+  }
+
   void try_send(const destination& dest, component::value_type&& value);
   void try_send(const com_port_pair_t& port, component::value_type&& value);
 
@@ -138,32 +142,6 @@ class generic_locality_ : public manageable_base_ {
     delete port;
   }
 };
-
-template <typename Destination>
-void generic_locality_::open(const entry_port_ptr& ours,
-                             const Destination& theirs) {
-  ours->alive = true;
-  auto pair = this->entry_ports.emplace(ours, theirs);
-#if CMK_ERROR_CHECKING
-  if (!pair.second) {
-    std::stringstream ss;
-    ss << "[";
-    for (const auto& epp : this->entry_ports) {
-      const auto& other_port = epp.first;
-      if (comparable_comparator<entry_port_ptr>()(ours, other_port)) {
-        ss << "{" << other_port->to_string() << "}, ";
-      } else {
-        ss << other_port->to_string() << ", ";
-      }
-    }
-    ss << "]";
-
-    CkAbort("fatal> adding non-unique port %s to:\n\t%s\n",
-            ours->to_string().c_str(), ss.str().c_str());
-  }
-#endif
-  this->resync_port_queue(pair.first);
-}
 
 template <void fn(generic_locality_*, deliverable&)>
 void CkIndex_locality_base_::value_handler(CkMessage* msg, CkMigratable* self) {

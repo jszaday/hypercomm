@@ -95,14 +95,14 @@ class manageable : public T {
                                  // find the port within our map
                                  auto iter = this->entry_ports.find(port);
                                  // copy the old dest to keep it alive
-                                 auto value = iter->second;
+                                 auto dst = std::move(iter->second);
                                  // erase it from the port map
                                  // ( could use C++17 extract for this)
                                  this->entry_ports.erase(iter);
                                  // update the index of the port
                                  port->index = next;
                                  // reopen the port with its updated index/hash
-                                 this->open(port, std::move(value));
+                                 this->open(port, std::move(dst));
                                });
             break;
           }

@@ -32,6 +32,18 @@ class destination {
   destination(const entry_port_ptr& port);
   destination(UShort epIdx, const entry_port_ptr& port = nullptr);
 
+  destination(destination&& other);
+  destination(const destination& other);
+
+  destination& operator=(const destination& other) {
+    if (this != &other) {
+      this->~destination();
+      new (this) destination(other);
+    }
+
+    return *this;
+  }
+
   static_assert(std::is_trivially_destructible<com_port_pair_t>::value,
                 "expected pair to be trivially destructible!");
 
@@ -105,6 +117,38 @@ inline destination::destination(UShort epIdx, const entry_port_ptr& port) {
 
 inline destination::destination(const entry_port_ptr& port) {
   initializer_<kEndpoint>::initialize(this, port);
+}
+
+inline destination::destination(destination&& other) {
+  switch (other.kind) {
+    case kCallback:
+      initializer_<kCallback>::initialize(this, std::move(other.storage_.cb));
+      break;
+    case kEndpoint:
+      initializer_<kEndpoint>::initialize(this, std::move(other.storage_.ep));
+      break;
+    case kComponent:
+      initializer_<kComponent>::initialize(this, other.storage_.com);
+      break;
+    default:
+      break;
+  }
+}
+
+inline destination::destination(const destination& other) {
+  switch (other.kind) {
+    case kCallback:
+      initializer_<kCallback>::initialize(this, other.storage_.cb);
+      break;
+    case kEndpoint:
+      initializer_<kEndpoint>::initialize(this, other.storage_.ep);
+      break;
+    case kComponent:
+      initializer_<kComponent>::initialize(this, other.storage_.com);
+      break;
+    default:
+      break;
+  }
 }
 }  // namespace hypercomm
 
