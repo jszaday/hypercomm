@@ -345,7 +345,8 @@ void forwarding_callback<CkArrayIndex>::send(callback::value_type&& value) {
 }
 
 void entry_port::take_back(value_ptr&& value) {
-  access_context_()->receive_value(this->shared_from_this(), std::move(value));
+  deliverable dev(this->shared_from_this(), std::move(value));
+  access_context_()->receive(dev);
 }
 
 void endpoint_source::take_back(value_ptr&& value) {
@@ -354,7 +355,8 @@ void endpoint_source::take_back(value_ptr&& value) {
   if (self != value->source) {
     value->source = std::move(self);
   }
-  fn(access_context_(), this->ep_.port_, std::move(value));
+  deliverable dev(this->ep_.port_, std::move(value));
+  fn(access_context_(), dev);
 }
 }  // namespace hypercomm
 

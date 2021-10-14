@@ -153,7 +153,8 @@ void component::on_invalidation(void) {
   this->notify_listeners<kInvalidation>();
 }
 
-void component::receive_value(const component_port_t& port, value_type&& value) {
+void component::receive_value(const component_port_t& port,
+                              value_type&& value) {
   CkAssertMsg(port < this->n_inputs(), "port must be within range");
   // if a component receives an unpermitted invalidation
   if (!value && !this->permissive()) {

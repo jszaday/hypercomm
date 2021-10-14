@@ -15,14 +15,14 @@ class generic_locality_ : public manageable_base_ {
   template <typename A, typename Enable>
   friend class comproxy;
   friend class detail::payload;
+  friend class CkIndex_locality_base_;
 
   entry_port_map entry_ports;
   component_map components;
 
   template <typename T>
   using endpoint_queue = endpoint_map<std::deque<T>>;
-  endpoint_queue<std::pair<std::shared_ptr<zero_copy_value>, CkNcpyBuffer*>>
-      outstanding;
+  endpoint_queue<std::pair<zero_copy_value*, CkNcpyBuffer*>> outstanding;
   endpoint_queue<
       std::tuple<std::shared_ptr<void>, std::size_t, CkNcpyBufferPost>>
       buffers;
@@ -40,11 +40,7 @@ class generic_locality_ : public manageable_base_ {
 
   void update_context(void);
 
-  void receive_message(CkMessage* msg);
-
-  void receive_value(CkMessage* msg, const value_handler_fn_& fn);
-  void receive_value(const entry_port_ptr&, component::value_type&&);
-
+  void receive(deliverable& dev);
   void loopback(const entry_port_ptr& port, component::value_type&& value);
   bool has_value(const entry_port_ptr& port) const;
 
@@ -93,8 +89,7 @@ class generic_locality_ : public manageable_base_ {
   }
 
   inline void connect(const component_id_t& src,
-                      const component_port_t& srcPort,
-                      const callback_ptr& cb) {
+                      const component_port_t& srcPort, const callback_ptr& cb) {
     this->components[src]->update_destination(srcPort, cb);
   }
 
@@ -110,12 +105,15 @@ class generic_locality_ : public manageable_base_ {
                               const component_port_t& port);
 
  protected:
+  void receive_message(CkMessage* msg);
+  void receive_value(CkMessage* msg, const value_handler_fn_& fn);
+  void receive_value(const entry_port_ptr&, component::value_type&&);
+
   bool invalidated(const component_id_t& id);
 
  private:
-  outstanding_iterator poll_buffer(CkNcpyBuffer* buffer,
-                                   const std::shared_ptr<zero_copy_value>&,
-                                   const std::size_t& goal);
+  outstanding_iterator poll_buffer(CkNcpyBuffer*, zero_copy_value*,
+                                   const std::size_t&);
 
   template <typename A>
   A* get_component(const component_id_t& id) {
@@ -161,8 +159,7 @@ void generic_locality_::open(const entry_port_ptr& ours,
   this->resync_port_queue(pair.first);
 }
 
-template <void fn(generic_locality_*, const entry_port_ptr&,
-                  component::value_type&&)>
+template <void fn(generic_locality_*, deliverable&)>
 void CkIndex_locality_base_::value_handler(CkMessage* msg, CkMigratable* self) {
   ((generic_locality_*)self)->receive_value(msg, fn);
 }
