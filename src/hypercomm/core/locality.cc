@@ -113,6 +113,10 @@ void generic_locality_::receive(deliverable& dev) {
                           value_ptr(dev.release<hyper_value>()));
       break;
     case deliverable::kMessage: {
+      // this move of the port can lead to unexpected behaviors
+      // like, don't peek at the dev's port, but look at its src
+      // instead. but, again, this is only a temporary problem...
+      // (pending widespread refactoring of components to take devs)
       auto port = std::move(dev.entry_port());
       auto* msg = dev.release<CkMessage>();
       if (demux == UsrToEnv(msg)->getEpIdx()) {
@@ -141,6 +145,7 @@ void generic_locality_::receive(deliverable& dev) {
 
 void generic_locality_::receive_value(const entry_port_ptr& port,
                                       component::value_type&& value) {
+  CkAssertMsg((bool)port, "ports should be non-null!");
   // save this port as the source of the value
   if (value) value->source = port;
   // seek this port in our list of active ports

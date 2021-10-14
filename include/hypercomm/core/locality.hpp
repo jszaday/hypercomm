@@ -350,12 +350,8 @@ void entry_port::take_back(value_ptr&& value) {
 }
 
 void endpoint_source::take_back(value_ptr&& value) {
-  auto fn = this->ep_.get_handler();
-  auto self = this->shared_from_this();
-  if (self != value->source) {
-    value->source = std::move(self);
-  }
   deliverable dev(this->ep_.port_, std::move(value));
+  auto fn = this->ep_.get_handler();
   fn(access_context_(), dev);
 }
 }  // namespace hypercomm

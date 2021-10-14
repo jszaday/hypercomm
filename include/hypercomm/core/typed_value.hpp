@@ -141,7 +141,8 @@ inline std::unique_ptr<typed_value<T>> value2typed(zero_copy_value* value) {
 }  // namespace
 
 template <typename T>
-std::unique_ptr<typed_value<T>> dev2typed(deliverable& dev);
+std::unique_ptr<typed_value<T>> dev2typed(
+    deliverable& dev, std::shared_ptr<value_source>&& src = {});
 
 template <typename T>
 std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
@@ -149,7 +150,7 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
   if (typed_value<T>* p1 = dynamic_cast<typed_value<T>*>(value)) {
     return std::unique_ptr<typed_value<T>>((typed_value<T>*)ptr.release());
   } else if (deliverable_value* p2 = dynamic_cast<deliverable_value*>(value)) {
-    return dev2typed<T>(p2->dev);
+    return dev2typed<T>(p2->dev, std::move(p2->source));
   } else {
     NOT_IMPLEMENTED;
     return {};
@@ -157,7 +158,8 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
 }
 
 template <typename T>
-std::unique_ptr<typed_value<T>> dev2typed(deliverable& dev) {
+std::unique_ptr<typed_value<T>> dev2typed(deliverable& dev,
+                                          std::shared_ptr<value_source>&& src) {
   switch (dev.kind) {
     case deliverable::kDeferred: {
       auto* zc = dev.release<zero_copy_value>();
@@ -169,15 +171,17 @@ std::unique_ptr<typed_value<T>> dev2typed(deliverable& dev) {
       auto* msg = dev.release<CkMessage>();
       auto typed = typed_value<T>::from_message(msg);
       if (typed) {
-        typed->source =
-            std::make_shared<endpoint_source>(UsrToEnv(msg)->getEpIdx(), port);
+        typed->source = src ? std::move(src)
+                            : std::make_shared<endpoint_source>(
+                                  UsrToEnv(msg)->getEpIdx(), port);
       }
       return std::move(typed);
     }
     case deliverable::kValue: {
-      auto* val = dev.release<hyper_value>();
       auto port = std::move(dev.entry_port());
-      val->source = std::make_shared<endpoint_source>(port);
+      auto* val = dev.release<hyper_value>();
+      val->source =
+          src ? std::move(src) : std::make_shared<endpoint_source>(port);
       return value2typed<T>(value_ptr(val));
     }
     default: {
