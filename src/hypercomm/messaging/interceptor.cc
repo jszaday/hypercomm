@@ -409,7 +409,7 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
       value->source = std::make_shared<endpoint_source>(ep);
       cast->update_context();
       // dump both the port and value since we don't need them after this
-      deliverable dev(std::move(port), std::move(value));
+      deliverable dev(std::move(value), std::move(port));
       fn(cast, dev);
     }
   } else {
