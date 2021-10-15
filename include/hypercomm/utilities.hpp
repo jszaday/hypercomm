@@ -8,6 +8,7 @@
 #include <type_traits>
 
 #include "utilities/hash.hpp"
+#include "utilities/errors.hpp"
 
 #define NOT_IMPLEMENTED CkAbort("not yet implemented!")
 

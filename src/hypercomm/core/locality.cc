@@ -3,6 +3,17 @@
 #include <hypercomm/reductions/reducer.hpp>
 
 namespace hypercomm {
+// TODO this is a temporary solution!
+static value_ptr dev2val(deliverable& dev) {
+  if (dev.kind == deliverable::kValue) {
+    value_ptr val(dev.release<hyper_value>());
+    val->source = std::make_shared<endpoint_source>(std::move(dev.endpoint()));
+    return std::move(val);
+  } else {
+    return make_value<deliverable_value>(std::move(dev));
+  }
+}
+
 // TODO this is a temporary solution
 struct connector_ : public callback {
   generic_locality_* self;
@@ -13,7 +24,8 @@ struct connector_ : public callback {
       : self(_1), dst(com, port) {}
 
   virtual return_type send(argument_type&& value) override {
-    self->try_send(dst, std::move(value));
+    deliverable dev(std::move(value));
+    self->passthru(dst, dev);
   }
 
   virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }
@@ -94,8 +106,7 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
   if (search != port_queue.end()) {
     auto& buffer = search->second;
     while (port->alive && !buffer.empty()) {
-      auto& msg = buffer.front();
-      this->try_send(it->second, std::move(msg));
+      this->passthru(it->second, buffer.front());
       buffer.pop_front();
       QdProcess(1);
     }
@@ -105,61 +116,44 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
   }
 }
 
-void generic_locality_::receive(deliverable& dev) {
-  auto& ep = dev.endpoint();
-  auto demux = (ep.idx_ == CkIndex_locality_base_::idx_demux_CkMessage());
-  switch (dev.kind) {
-    case deliverable::kValue:
-      this->receive_value(std::move(ep.port_),
-                          value_ptr(dev.release<hyper_value>()));
+void generic_locality_::passthru(const destination& dst, deliverable& dev) {
+  switch (dst.kind) {
+    case destination::kEndpoint:
+      this->passthru(dst.ep(), dev);
       break;
-    case deliverable::kMessage: {
-      auto* msg = dev.release<CkMessage>();
-      if (demux) {
-        this->receive_value(std::move(ep.port_),
-                            make_value<deliverable_value>(msg));
-      } else {
-        // put the port back since the handler might want to do something
-        // with it...?
-        if (ep.port_ && (UsrToEnv(msg)->getMsgIdx() == message::index())) {
-          ((message*)msg)->dst = std::move(ep.port_);
-        }
-        this->receive_message(msg);
-      }
+    case destination::kComponent:
+      this->passthru(dst.com_port(), dev);
       break;
-    }
-    case deliverable::kDeferred: {
-      auto* zc = dev.peek<zero_copy_value>();
-      if (demux) {
-        this->receive_value(std::move(ep.port_),
-                            make_value<deliverable_value>(std::move(dev)));
-      } else {
-        (ep.get_handler())(this, dev);
-      }
+    case destination::kCallback:
+      // TODO set source of value?
+      dst.cb()->send(dev2val(dev));
       break;
-    }
     default:
-      CkAbort("unknown deliverable kind");
-      break;
+      unreachable("invalid destination");
   }
 }
 
-void generic_locality_::receive_value(const entry_port_ptr& port,
-                                      component::value_type&& value) {
-  CkAssertMsg((bool)port, "ports should be non-null!");
-  // save this port as the source of the value
-  if (value) value->source = port;
-  // seek this port in our list of active ports
-  auto search = this->entry_ports.find(port);
-  if (search == std::end(this->entry_ports)) {
-    // if it is not present, buffer it
-    this->port_queue[port].push_back(std::move(value));
-    QdCreate(1);
+void generic_locality_::passthru(const endpoint& ep, deliverable& dev) {
+  // update how the deliverable got to us
+  dev.endpoint() = ep;
+  // then check how we should handle it
+  if (ep.idx_ == CkIndex_locality_base_::idx_demux_CkMessage()) {
+    auto& port = ep.port_;
+    auto search = this->entry_ports.find(port);
+    if (search == std::end(this->entry_ports)) {
+      this->port_queue[port].push_back(std::move(dev));
+      QdCreate(1);
+    } else {
+      this->passthru(search->second, dev);
+    }
   } else {
-    // otherwise, try to deliver it
-    CkAssertMsg(search->first && search->first->alive,
-                "entry port must be alive");
-    this->try_send(search->second, std::move(value));
+    if (dev.kind == deliverable::kMessage) {
+      auto* msg = dev.release<CkMessage>();
+      dev.endpoint().export_to(msg);
+      this->receive_message(msg);
+    } else {
+      (ep.get_handler())(this, dev);
+    }
   }
 }
 
@@ -184,7 +178,7 @@ generic_locality_::~generic_locality_() {
   for (auto& pair : this->port_queue) {
     auto& port = pair.first;
     for (auto& value : pair.second) {
-      this->loopback(port, std::move(value));
+      this->loopback(port, dev2val(value));
 
       QdProcess(1);
     }
@@ -363,25 +357,8 @@ void generic_locality_::activate_component(const component_id_t& id) {
   }
 }
 
-void generic_locality_::try_send(const destination& dest,
-                                 component::value_type&& value) {
-  switch (dest.kind) {
-    case destination::kCallback: {
-      const auto& cb = dest.cb();
-      CkAssertMsg(cb, "callback must be valid!");
-      cb->send(std::move(value));
-      break;
-    }
-    case destination::kComponent:
-      this->try_send(dest.com_port(), std::move(value));
-      break;
-    default:
-      CkAbort("unknown destination type");
-  }
-}
-
-void generic_locality_::try_send(const com_port_pair_t& port,
-                                 component::value_type&& value) {
+void generic_locality_::passthru(const com_port_pair_t& port,
+                                 deliverable& dev) {
   auto search = components.find(port.first);
 #if CMK_ERROR_CHECKING
   if (search == std::end(components)) {
@@ -392,7 +369,7 @@ void generic_locality_::try_send(const com_port_pair_t& port,
   }
 #endif
 
-  search->second->receive_value(port.second, std::move(value));
+  search->second->receive_value(port.second, dev2val(dev));
 
   this->try_collect(search->second);
 }
