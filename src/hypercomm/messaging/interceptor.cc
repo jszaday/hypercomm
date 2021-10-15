@@ -391,13 +391,13 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
   }
 }
 
-void delivery::process(ArrayElement* elt, deliverable&& payload,
-                       bool immediate) {
-  CkAssert((bool)payload);
+void delivery::process(ArrayElement* elt, deliverable&& dev, bool immediate) {
+  CkAssert((bool)dev);
 
   auto* cast = static_cast<generic_locality_*>(elt);
   if (immediate) {
-    cast->receive(payload);
+    cast->update_context();
+    cast->receive(dev);
   } else {
     auto& aid = elt->ckGetArrayID();
     auto& idx = elt->ckGetArrayIndex();
@@ -405,7 +405,7 @@ void delivery::process(ArrayElement* elt, deliverable&& payload,
     CkPrintf("pe%d> pushing a message/value onto the queue for %s.\n", CkMyPe(),
              utilities::idx2str(elt->ckGetArrayIndex()).c_str());
 #endif
-    CmiPushPE(CkMyRank(), new delivery(aid, idx, std::move(payload)));
+    CmiPushPE(CkMyRank(), new delivery(aid, idx, std::move(dev)));
   }
 }
 

@@ -144,8 +144,10 @@ class generic_locality_ : public manageable_base_ {
 };
 
 template <void fn(generic_locality_*, deliverable&)>
-void CkIndex_locality_base_::value_handler(CkMessage* msg, CkMigratable* self) {
-  ((generic_locality_*)self)->receive_value(msg, fn);
+void CkIndex_locality_base_::value_handler(CkMessage* msg, CkMigratable* mig) {
+  auto* self = static_cast<generic_locality_*>(mig);
+  self->update_context();
+  self->receive_value(msg, fn);
 }
 
 }  // namespace hypercomm
