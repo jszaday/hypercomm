@@ -21,8 +21,8 @@ class deliverable_value : public hyper_value {
         return this->dev.release<CkMessage>();
       case deliverable::kValue: {
         auto *val = this->dev.release<hyper_value>();
-        auto *msg = (message *)val->release();
-        msg->dst = std::move(this->dev.entry_port());
+        auto *msg = val->release();
+        this->dev.endpoint().export_to(msg);
         delete val;
         return msg;
       }

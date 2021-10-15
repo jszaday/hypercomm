@@ -106,30 +106,31 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
 }
 
 void generic_locality_::receive(deliverable& dev) {
-  auto& demux = CkIndex_locality_base_::idx_demux_CkMessage();
+  auto& ep = dev.endpoint();
+  auto demux = (ep.idx_ == CkIndex_locality_base_::idx_demux_CkMessage());
   switch (dev.kind) {
     case deliverable::kValue:
-      this->receive_value(std::move(dev.entry_port()),
+      this->receive_value(std::move(ep.port_),
                           value_ptr(dev.release<hyper_value>()));
       break;
     case deliverable::kMessage: {
-      // this move of the port can lead to unexpected behaviors
-      // like, don't peek at the dev's port, but look at its src
-      // instead. but, again, this is only a temporary problem...
-      // (pending widespread refactoring of components to take devs)
-      auto port = std::move(dev.entry_port());
       auto* msg = dev.release<CkMessage>();
-      if (demux == UsrToEnv(msg)->getEpIdx()) {
-        this->receive_value(port, make_value<deliverable_value>(msg));
+      if (demux) {
+        this->receive_value(std::move(ep.port_),
+                            make_value<deliverable_value>(msg));
       } else {
+        // put the port back since the handler might want to do something
+        // with it...?
+        if (ep.port_ && (UsrToEnv(msg)->getMsgIdx() == message::index())) {
+          ((message*)msg)->dst = std::move(ep.port_);
+        }
         this->receive_message(msg);
       }
       break;
     }
     case deliverable::kDeferred: {
       auto* zc = dev.peek<zero_copy_value>();
-      auto& ep = zc->ep;
-      if (demux == ep.idx_) {
+      if (demux) {
         this->receive_value(std::move(ep.port_),
                             make_value<deliverable_value>(std::move(dev)));
       } else {
@@ -224,9 +225,9 @@ struct zero_copy_payload_ {
     delete ptr;
 
     if (self->val_->ready()) {
+      auto fn = self->val_->ep.get_handler();
       deliverable dev(self->val_);
       self->parent_->update_context();
-      auto fn = self->val_->ep.get_handler();
       fn(self->parent_, dev);
     }
 

@@ -12,10 +12,7 @@ struct zero_copy_value {
   message* msg;
   char* offset;
 
-  zero_copy_value(message* _)
-      : msg(_),
-        nReceived(0),
-        ep(std::forward_as_tuple(UsrToEnv(_)->getEpIdx(), _->dst)) {}
+  zero_copy_value(message* _) : msg(_), nReceived(0), ep(_) {}
 
   inline bool ready(void) const {
     return this->nReceived && (this->nReceived == this->buffers.size());

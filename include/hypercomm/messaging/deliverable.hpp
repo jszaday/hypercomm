@@ -23,12 +23,13 @@ struct deliverable {
 
   void* storage_;
 
-  endpoint ep_;
+  hypercomm::endpoint ep_;
 
  public:
-  deliverable(CkMessage* msg) : kind(kMessage), storage_(msg) {}
+  deliverable(CkMessage* msg) : kind(kMessage), storage_(msg), ep_(msg) {}
 
-  deliverable(zero_copy_value* zc) : kind(kDeferred), storage_(zc) {}
+  deliverable(zero_copy_value* zc)
+      : kind(kDeferred), storage_(zc), ep_(std::move(zc->ep)) {}
 
   template <typename... Args>
   deliverable(hyper_value* val, Args... args)
@@ -68,35 +69,11 @@ struct deliverable {
   template <typename T>
   inline T* peek(void);
 
-  inline entry_port_ptr& entry_port(void) {
-    switch (kind) {
-      case kMessage: {
-        auto* msg = (CkMessage*)this->storage_;
-        if (msg && (UsrToEnv(msg)->getMsgIdx() == message::index())) {
-          return ((message*)msg)->dst;
-        } else {
-          return this->get_port_();
-        }
-      }
-      case kDeferred:
-        return const_cast<entry_port_ptr&>(
-            ((zero_copy_value*)this->storage_)->ep.port_);
-      case kValue:
-        return this->get_port_();
-      default:
-        CkAbort("unreachable~!");
-        return this->get_port_();
-    }
-  }
+  inline hypercomm::endpoint& endpoint(void) { return this->ep_; }
 
   inline operator bool(void) const { return (this->storage_ != nullptr); }
 
   static CkMessage* to_message(deliverable& dev);
-
- private:
-  inline entry_port_ptr& get_port_(void) {
-    return const_cast<entry_port_ptr&>((this->ep_).port_);
-  }
 };
 
 template <>

@@ -167,21 +167,20 @@ std::unique_ptr<typed_value<T>> dev2typed(deliverable& dev,
       return value2typed<T>(zc);
     }
     case deliverable::kMessage: {
-      auto port = std::move(dev.entry_port());
+      auto& ep = dev.endpoint();
       auto* msg = dev.release<CkMessage>();
       auto typed = typed_value<T>::from_message(msg);
       if (typed) {
         typed->source = src ? std::move(src)
-                            : std::make_shared<endpoint_source>(
-                                  UsrToEnv(msg)->getEpIdx(), port);
+                            : std::make_shared<endpoint_source>(std::move(ep));
       }
       return std::move(typed);
     }
     case deliverable::kValue: {
-      auto port = std::move(dev.entry_port());
+      auto& ep = dev.endpoint();
       auto* val = dev.release<hyper_value>();
-      val->source =
-          src ? std::move(src) : std::make_shared<endpoint_source>(port);
+      val->source = src ? std::move(src)
+                        : std::make_shared<endpoint_source>(std::move(ep));
       return value2typed<T>(value_ptr(val));
     }
     default: {

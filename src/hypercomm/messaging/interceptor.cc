@@ -99,10 +99,10 @@ CkMessage* deliverable::to_message(deliverable& dev) {
     return dev.release<CkMessage>();
   } else {
     // pack the value with its destination port to form a message
-    endpoint ep(std::move(dev.ep_));
     value_ptr value(dev.release<hyper_value>());
-    auto* msg = detail::repack_to_port(std::move(ep.port_), std::move(value));
-    UsrToEnv(msg)->setEpIdx(ep.idx_);
+    auto* msg =
+        detail::repack_to_port(std::move(dev.ep_.port_), std::move(value));
+    UsrToEnv(msg)->setEpIdx(dev.ep_.idx_);
     return msg;
   }
 }
