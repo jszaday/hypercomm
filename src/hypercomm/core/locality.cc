@@ -7,7 +7,10 @@ namespace hypercomm {
 static value_ptr dev2val(deliverable& dev) {
   if (dev.kind == deliverable::kValue) {
     value_ptr val(dev.release<hyper_value>());
-    val->source = std::make_shared<endpoint_source>(std::move(dev.endpoint()));
+    if (val) {
+      val->source =
+          std::make_shared<endpoint_source>(std::move(dev.endpoint()));
+    }
     return std::move(val);
   } else {
     return make_value<deliverable_value>(std::move(dev));

@@ -95,7 +95,7 @@ template <typename T>
 inline T* deliverable::release(void) {
   auto expected = kind_for_<T>::value;
   auto* old = (T*)this->storage_;
-  CkAssert(old && (this->kind == expected));
+  CkAssert((this->kind == expected) && (old || (this->kind == kValue)));
   this->storage_ = nullptr;
   return old;
 }

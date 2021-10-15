@@ -71,15 +71,17 @@ class manageable : public T {
         switch (it->type) {
           case kDelete: {
             ds.erase(search);
-            this->affect_ports(
-                idx, it->stamp, [&](const std::shared_ptr<port_type_>& port) {
+            this->affect_ports(idx, it->stamp,
+                               [&](const std::shared_ptr<port_type_>& port) {
 #if CMK_VERBOSE
-                  CkPrintf("info> sending invalidation to %s.\n",
-                           std::to_string(idx).c_str());
+                                 CkPrintf("info> sending invalidation to %s.\n",
+                                          std::to_string(idx).c_str());
 #endif
-                  // deletions send an invalidation/null value to the reducer
-                  this->receive_value(port, std::move(value_ptr{}));
-                });
+                                 // deletions send an invalidation/null value to
+                                 // the reducer
+                                 deliverable dev(std::move(value_ptr{}), port);
+                                 this->receive(dev);
+                               });
             break;
           }
           case kReplace: {
