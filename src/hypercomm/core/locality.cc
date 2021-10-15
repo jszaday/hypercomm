@@ -342,7 +342,6 @@ void generic_locality_::receive_value(CkMessage* raw,
       }
     }
   } else {
-    this->update_context();
     deliverable dev(msg);
     fn(this, dev);
   }

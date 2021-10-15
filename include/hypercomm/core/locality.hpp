@@ -345,12 +345,12 @@ void forwarding_callback<CkArrayIndex>::send(callback::value_type&& value) {
 }
 
 void entry_port::take_back(value_ptr&& value) {
-  deliverable dev(this->shared_from_this(), std::move(value));
+  deliverable dev(std::move(value), this->shared_from_this());
   access_context_()->receive(dev);
 }
 
 void endpoint_source::take_back(value_ptr&& value) {
-  deliverable dev(this->ep_.port_, std::move(value));
+  deliverable dev(std::move(value), this->ep_.port_);
   auto fn = this->ep_.get_handler();
   fn(access_context_(), dev);
 }

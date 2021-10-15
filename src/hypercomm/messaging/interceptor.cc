@@ -93,6 +93,20 @@ message* repack_to_port(const entry_port_ptr& port,
 }
 }  // namespace detail
 
+CkMessage* deliverable::to_message(deliverable& dev) {
+  CkAssert((bool)dev && dev.kind != kDeferred);
+  if (dev.kind == deliverable::kMessage) {
+    return dev.release<CkMessage>();
+  } else {
+    // pack the value with its destination port to form a message
+    endpoint ep(std::move(dev.ep_));
+    value_ptr value(dev.release<hyper_value>());
+    auto* msg = detail::repack_to_port(std::move(ep.port_), std::move(value));
+    UsrToEnv(msg)->setEpIdx(ep.idx_);
+    return msg;
+  }
+}
+
 namespace messaging {
 void initialize(void) {
   // register the messaging module (on rank 0)
@@ -347,8 +361,7 @@ inline std::pair<int, int> lookup_fallback_(CkLocMgr* locMgr,
 }
 
 void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
-                          detail::payload_ptr&& payload,
-                          const bool& immediate) {
+                          deliverable&& payload, const bool& immediate) {
   CmiUInt8 id;
   auto* arr = CProxy_ArrayBase(aid).ckLocalBranch();
   auto* locMgr = arr->getLocMgr();
@@ -358,10 +371,10 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
   // if the elt is locally available
   if (elt != nullptr) {
     // process it with appropriate immediacy
-    detail::payload::process(elt, std::move(payload), immediate);
+    delivery::process(elt, std::move(payload), immediate);
   } else {
     auto mine = CkMyPe();
-    auto msg = payload->release();
+    auto msg = deliverable::to_message(payload);
     auto lastHome = validId ? lookup_or_update_(locMgr, post, id)
                             : lookup_fallback_(locMgr, post);
     // if we are the elt's home (and its last known loc)
@@ -378,40 +391,13 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
   }
 }
 
-namespace detail {
-void payload::process(ArrayElement* elt, payload_ptr&& payload,
-                      const bool& immediate) {
-  CkAssert(payload->valid());
+void delivery::process(ArrayElement* elt, deliverable&& dev, bool immediate) {
+  CkAssert((bool)dev);
 
-  auto* cast = (generic_locality_*)elt;
-  auto& opts = payload->options_;
-
+  auto* cast = static_cast<generic_locality_*>(elt);
   if (immediate) {
-    if (payload->type_ == kMessage) {
-      auto& msg = opts.msg_;
-#if CMK_VERBOSE
-      CkPrintf("pe%d> delivering msg %p to idx %s!\n", CkMyPe(), msg,
-               utilities::idx2str(elt->ckGetArrayIndex()).c_str());
-#endif
-      cast->receive_message(msg);
-      msg = nullptr;
-    } else {
-      auto& ep = opts.value_.ep_;
-      auto& port = ep.port_;
-      auto& value = opts.value_.value_;
-      auto fn = ep.get_handler();
-#if CMK_VERBOSE
-      CkPrintf("pe%d> delivering a value to port %s of idx %s.\n", CkMyPe(),
-               (port->to_string()).c_str(),
-               utilities::idx2str(elt->ckGetArrayIndex()).c_str());
-#endif
-      // update context and source so everything's kosher
-      value->source = std::make_shared<endpoint_source>(ep);
-      cast->update_context();
-      // dump both the port and value since we don't need them after this
-      deliverable dev(std::move(port), std::move(value));
-      fn(cast, dev);
-    }
+    cast->update_context();
+    cast->receive(dev);
   } else {
     auto& aid = elt->ckGetArrayID();
     auto& idx = elt->ckGetArrayIndex();
@@ -419,10 +405,9 @@ void payload::process(ArrayElement* elt, payload_ptr&& payload,
     CkPrintf("pe%d> pushing a message/value onto the queue for %s.\n", CkMyPe(),
              utilities::idx2str(elt->ckGetArrayIndex()).c_str());
 #endif
-    CmiPushPE(CkMyRank(), new delivery(aid, idx, std::move(payload)));
+    CmiPushPE(CkMyRank(), new delivery(aid, idx, std::move(dev)));
   }
 }
-}  // namespace detail
 
 void interceptor::send_to_root(
     const CkArrayID& aid, const std::shared_ptr<imprintable_base_>& section,
