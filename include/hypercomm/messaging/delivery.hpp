@@ -6,12 +6,6 @@
 
 namespace hypercomm {
 
-namespace detail {
-// TODO ( it would be good to rename this at some point )
-message* repack_to_port(const entry_port_ptr& port,
-                        component::value_type&& value);
-}  // namespace detail
-
 struct delivery {
   char core[CmiReservedHeaderSize];
 

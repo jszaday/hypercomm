@@ -72,10 +72,14 @@ message* pack_deferrable_(const entry_port_ptr& port,
   return msg;
 }
 
-message* repack_to_port(const entry_port_ptr& port,
-                        component::value_type&& value) {
+// TODO ( it would be good to rename this at some point )
+static message* repack_to_port(const entry_port_ptr& port,
+                               component::value_type&& value) {
   if (value->pupable) {
-    return pack_deferrable_(port, std::move(value));
+    auto flags = value->flags();
+    auto* msg = pack_deferrable_(port, std::move(value));
+    UsrToEnv(msg)->setRef(flags);
+    return msg;
   } else {
     auto msg = value ? static_cast<message*>(value->release())
                      : message::make_null_message(port);

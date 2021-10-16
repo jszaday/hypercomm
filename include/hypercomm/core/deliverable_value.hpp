@@ -15,6 +15,14 @@ class deliverable_value : public hyper_value {
 
   virtual bool recastable(void) const override { return (bool)this->dev; }
 
+  virtual CMK_REFNUM_TYPE flags(void) override {
+    if (this->dev.kind == deliverable::kValue) {
+      return this->dev.peek<hyper_value>()->flags();
+    } else {
+      return 0b0;
+    }
+  }
+
   virtual message_type release(void) override {
     switch (this->dev.kind) {
       case deliverable::kMessage:

@@ -26,22 +26,22 @@ inline const std::shared_ptr<imprintable<int>>& span_all(void) {
 }
 
 template <typename T>
-class adder : public core::combiner {
+class adder : public combiner {
  public: 
   adder(void) = default;
   adder(const tags::reconstruct&) {}
 
-  virtual combiner::return_type send(combiner::argument_type&& args) override {
+  virtual combiner::return_type operator()(combiner::argument_type&& args) override {
     if (args.empty()) {
-      return {};
+      return deliverable(value_ptr());
     } else {
-      auto accum = value2typed<T>(std::move(args.back()));
+      auto accum = dev2typed<T>(std::move(args.back()));
       args.pop_back();
       for (auto& arg : args) {
-        auto typed = value2typed<T>(std::move(arg));
+        auto typed = dev2typed<T>(std::move(arg));
         accum->value() += typed->value();
       }
-      return accum;
+      return deliverable(std::move(accum));
     }
   }
 

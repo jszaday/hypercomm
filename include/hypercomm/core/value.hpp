@@ -36,6 +36,8 @@ class hyper_value {
   }
   virtual message_type release(void) = 0;
   virtual bool recastable(void) const = 0;
+
+  virtual CMK_REFNUM_TYPE flags(void) = 0;
 };
 
 inline void try_return(value_ptr&& value) {

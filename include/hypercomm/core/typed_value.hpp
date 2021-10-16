@@ -79,11 +79,13 @@ class typed_value_impl_ : public typed_value<T> {
     }
   }
 
+  virtual CMK_REFNUM_TYPE flags(void) override {
+    return (is_contribution << messaging::__attribs__::kRedn);
+  }
+
   virtual hyper_value::message_type release(void) override {
     auto msg = pack_to_port({}, this->value());
-    if (is_contribution) {
-      msg->set_redn(true);
-    }
+    CkSetRefNum(msg, this->flags());
     return msg;
   }
 };
@@ -143,6 +145,11 @@ std::unique_ptr<typed_value<T>> zero_copy_value::to_typed(
 template <typename T>
 std::unique_ptr<typed_value<T>> dev2typed(
     deliverable& dev, std::shared_ptr<value_source>&& src = {});
+
+template <typename T>
+std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev) {
+  return dev2typed<T>(dev);
+}
 
 template <typename T>
 std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
