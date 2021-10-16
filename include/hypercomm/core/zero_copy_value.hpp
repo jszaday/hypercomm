@@ -4,6 +4,10 @@
 #include "../messaging/endpoint.hpp"
 
 namespace hypercomm {
+
+template <typename T>
+struct typed_value;
+
 struct zero_copy_value {
   std::vector<CkNcpyBuffer> buffers;
   std::vector<std::shared_ptr<void>> values;
@@ -34,6 +38,9 @@ struct zero_copy_value {
       return true;
     }
   }
+
+  template <typename T>
+  static std::unique_ptr<typed_value<T>> to_typed(zero_copy_value*);
 };
 }  // namespace hypercomm
 

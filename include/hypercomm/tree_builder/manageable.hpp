@@ -79,7 +79,7 @@ class manageable : public T {
 #endif
                                  // deletions send an invalidation/null value to
                                  // the reducer
-                                 deliverable dev(std::move(value_ptr{}), port);
+                                 deliverable dev(value_ptr(), port);
                                  this->receive(dev);
                                });
             break;
