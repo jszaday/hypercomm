@@ -6,14 +6,15 @@
 namespace hypercomm {
 // wraps a value so it's (deceptively) pup'able
 struct value_wrapper {
-  value_ptr value;
+  deliverable value;
 
   value_wrapper(const value_wrapper&) = delete;
   value_wrapper(value_ptr&& _) : value(std::forward<value_ptr>(_)) {}
   value_wrapper(value_wrapper&& _) : value_wrapper(std::move(_.value)) {}
+  value_wrapper(deliverable&& _) : value(std::move(_)) {}
 
-  value_ptr& operator*() { return this->value; }
-  const value_ptr& operator*() const { return this->value; }
+  deliverable& operator*() { return this->value; }
+  const deliverable& operator*() const { return this->value; }
 };
 
 template <>

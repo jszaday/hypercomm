@@ -18,6 +18,7 @@ class endpoint {
   endpoint(PUP::reconstruct) : endpoint(0x0) {}
   endpoint(void) : endpoint(PUP::reconstruct()) {}
   endpoint(const int& _) : idx_(_), port_(nullptr) {}
+  endpoint(entry_port_ptr&& _) : idx_(demux()), port_(_) {}
   endpoint(const entry_port_ptr& _) : idx_(demux()), port_(_) {}
   endpoint(int idx, const entry_port_ptr& port) : idx_(idx), port_(port) {}
   endpoint(std::tuple<int, const entry_port_ptr&>&& pair)

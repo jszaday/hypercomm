@@ -6,8 +6,15 @@
 namespace hypercomm {
 
 class hyper_value;
-
 using value_ptr = std::unique_ptr<hyper_value>;
+
+template <typename T>
+class typed_value;
+
+template <typename T>
+using typed_value_ptr = std::unique_ptr<typed_value<T>>;
+
+class deliverable;
 
 class value_source {
  public:

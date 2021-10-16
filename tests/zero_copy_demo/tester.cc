@@ -144,7 +144,7 @@ struct locality : public vil<CBase_locality, int> {
         if (sender) {
           auto mem = typed_value<big_data<data_type>>::from_buffer(buffer);
           interceptor::send_async(thisProxy[receiverIdx], kMailboxAddress,
-                                  std::move(mem));
+                                  deliverable(std::move(mem)));
           this->mb->put_request({}, senti);
         } else {
           this->mb->put_request({}, rts);

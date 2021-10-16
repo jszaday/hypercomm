@@ -2,38 +2,50 @@
 #define __HYPERCOMM_CORE_IMMEDIATE_HPP__
 
 #include "callback.hpp"
+#include "typed_value.hpp"
+#include "../utilities/apply.hpp"
 
 namespace hypercomm {
 template <typename Ret, typename... Args>
 struct immediate_action;
 
+template <typename... Args>
+struct immediate_action<void(Args...)>
+    : virtual public core::typed_callback<Args...> {
+  using parent_type = core::typed_callback<Args...>;
+  using tuple_type = typename parent_type::tuple_type;
+
+  virtual void action(Args...) = 0;
+
+  virtual void send(typed_value_ptr<tuple_type>&& val) override {
+    apply(
+        [&](Args... args) -> void {
+          this->action(std::forward<Args>(args)...);
+        },
+        std::move(val->value()));
+  }
+};
+
 template <typename Ret, typename... Args>
-struct immediate_action<Ret(Args...)>
-    : virtual public core::action<false, true> {
-  static_assert(sizeof...(Args) == 1,
-                "multi-args unsupported outside of C++17");
-
+struct immediate_action<Ret(Args...)> : virtual public core::immediate<false> {
   using tuple_type = std::tuple<Args...>;
-
-  template <std::size_t N>
-  using argument_type = typename std::tuple_element<N, tuple_type>::type;
 
   virtual Ret action(Args...) = 0;
 
-  virtual value_type send(value_type&& msg) override {
-    throw std::runtime_error("not yet implemented!");
-    // TODO fix this!
-    // auto buffer = utilities::get_message_buffer(msg);
-    // auto unpack = serdes::make_unpacker(msg, buffer);
-    // temporary<argument_type<0>> tmp;
-    // pup(unpack, tmp);
-    // auto rval = this->action(tmp.value());
-    // auto size = hypercomm::size(rval);
-    // auto rmsg = message::make_message(size, {});
-    // auto packr = serdes::make_packer(rmsg->payload);
-    // return value_type(rmsg);
+  virtual deliverable operator()(deliverable&& dev) override {
+    auto val = core::pup_guard<tuple_type>::unpack(std::move(dev));
+    auto ret = make_typed_value<Ret>(tags::no_init());
+
+    apply(
+        [&](Args... args) -> void {
+          new (ret->get()) Ret(this->action(std::forward<Args>(args)...));
+        },
+        std::move(val->value()));
+
+    return deliverable(std::move(ret));
   }
 };
+
 }  // namespace hypercomm
 
 #endif

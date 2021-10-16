@@ -2,14 +2,19 @@
 #define __HYPERCOMM_CORE_NULLCOMB_HPP__
 
 #include "callback.hpp"
+#include "../messaging/deliverable.hpp"
 
 namespace hypercomm {
-struct null_combiner : public core::combiner {
+struct null_combiner : public combiner {
   null_combiner(void) = default;
   null_combiner(const tags::reconstruct&) {}
 
-  virtual combiner::return_type send(combiner::argument_type&& args) override {
-    return args.empty() ? combiner::return_type{} : std::move(args[0]);
+  virtual deliverable operator()(std::vector<deliverable>&& args) override {
+    if (args.empty()) {
+      return deliverable(value_ptr());
+    } else {
+      return std::move(args[0]);
+    }
   }
 
   virtual void __pup__(hypercomm::serdes&) override {}

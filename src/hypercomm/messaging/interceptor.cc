@@ -93,7 +93,7 @@ message* repack_to_port(const entry_port_ptr& port,
 }
 }  // namespace detail
 
-CkMessage* deliverable::to_message(deliverable& dev) {
+CkMessage* deliverable::to_message(deliverable&& dev) {
   CkAssert((bool)dev && dev.kind != kDeferred);
   if (dev.kind == deliverable::kMessage) {
     return dev.release<CkMessage>();
@@ -374,7 +374,7 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
     delivery::process(elt, std::move(payload), immediate);
   } else {
     auto mine = CkMyPe();
-    auto msg = deliverable::to_message(payload);
+    auto msg = deliverable::to_message(std::move(payload));
     auto lastHome = validId ? lookup_or_update_(locMgr, post, id)
                             : lookup_fallback_(locMgr, post);
     // if we are the elt's home (and its last known loc)

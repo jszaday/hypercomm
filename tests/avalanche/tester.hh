@@ -27,7 +27,7 @@ struct matcher : public mailbox<T>::predicate_type::element_type {
 struct nil_callback : public callback {
   nil_callback(void) = default;
 
-  virtual void send(value_type&& value) override {}
+  virtual void send(deliverable&& dev) override {}
 
   virtual void __pup__(serdes& s) override {}
 

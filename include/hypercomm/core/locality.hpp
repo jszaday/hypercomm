@@ -198,7 +198,8 @@ class vil : public detail::base_<Base, Index>, public future_manager_ {
     }
 
     this->activate_component(rdcr);
-    auto contrib = make_typed_value<contribution>(std::move(value), fn, cb);
+    auto contrib =
+        make_typed_value<contribution>(deliverable(std::move(value)), fn, cb);
     this->components[rdcr]->receive_value(0, std::move(contrib));
   }
 };
@@ -276,12 +277,15 @@ inline void send2port(const element_ptr<Index>& proxy,
   send2port(base, port, std::move(value));
 }
 
-inline void send2future(const future& f, component::value_type&& value) {
+inline void send2future(const future& f, deliverable&& dev) {
   // TODO ( do not assume array-issuedness )
   auto src = std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(f.source);
   CkAssertMsg(src, "future must be from a locality!");
+  const auto& base =
+      static_cast<const CProxyElement_ArrayElement&>(src->c_proxy());
   // TODO ( send immediately looking forward! )
-  send2port(src, std::make_shared<future_port>(f), std::move(value));
+  interceptor::send_async(base, std::make_shared<future_port>(f),
+                          std::move(dev));
 }
 
 template <typename Index>

@@ -60,7 +60,7 @@ inline std::pair<value_ptr, InputIter> wait_any(const InputIter& first,
   auto search = std::find_if(first, last,
                              [&](const future& f) { return f.equals(which); });
   // return the iter/value pair
-  return std::make_pair(std::move(value), search);
+  return std::make_pair(deliverable::to_value(value), search);
 }
 }  // namespace hypercomm
 

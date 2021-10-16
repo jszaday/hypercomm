@@ -1,10 +1,11 @@
 #ifndef __HYPERCOMM_CORE_TYPED_VALUE_HPP__
 #define __HYPERCOMM_CORE_TYPED_VALUE_HPP__
 
-#include "../reductions/contribution.hpp"
 #include "../messaging/packing.hpp"
+#include "../reductions/contribution.hpp"
+#include "../serialization/is_pupable.hpp"
+
 #include "deliverable_value.hpp"
-#include "zero_copy_value.hpp"
 #include "config.hpp"
 
 namespace hypercomm {
@@ -190,6 +191,39 @@ std::unique_ptr<typed_value<T>> dev2typed(deliverable& dev,
     }
   }
 }
+
+namespace core {
+
+template <typename Tuple, typename Enable = void>
+struct pup_guard;
+
+template <typename... Args>
+struct pup_guard<
+    std::tuple<Args...>,
+    typename std::enable_if<is_pupable<std::tuple<Args...>>::value>::type> {
+  using tuple_type = std::tuple<Args...>;
+
+  static typed_value_ptr<tuple_type> unpack(deliverable&& dev) {
+    return dev2typed<tuple_type>(dev);
+  }
+};
+
+template <typename... Args>
+struct pup_guard<
+    std::tuple<Args...>,
+    typename std::enable_if<!is_pupable<std::tuple<Args...>>::value>::type> {
+  using tuple_type = std::tuple<Args...>;
+
+  static typed_value_ptr<tuple_type> unpack(deliverable&& dev) {
+    NOT_IMPLEMENTED;
+  }
+};
+
+template <typename... Args>
+void typed_callback<Args...>::send(deliverable&& dev) {
+  this->send(pup_guard<tuple_type>::unpack(std::move(dev)));
+}
+}  // namespace core
 }  // namespace hypercomm
 
 #endif

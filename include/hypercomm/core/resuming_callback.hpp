@@ -17,7 +17,7 @@ struct resuming_callback : public core::callback {
   resuming_callback(void) : th(nullptr) {}
 
   virtual void send(value_type&& value) override {
-    this->result = value2typed<type>(std::move(value));
+    this->result = dev2typed<type>(value);
     if (this->th) {
       CthAwaken(this->th);
       this->th = nullptr;

@@ -3,8 +3,6 @@
 
 #include "../serialization/construction.hpp"
 #include "../core/zero_copy_value.hpp"
-#include "../core/value.hpp"
-#include "endpoint.hpp"
 
 namespace hypercomm {
 
@@ -73,7 +71,8 @@ struct deliverable {
 
   inline operator bool(void) const { return (this->storage_ != nullptr); }
 
-  static CkMessage* to_message(deliverable& dev);
+  static value_ptr to_value(deliverable&& dev);
+  static CkMessage* to_message(deliverable&& dev);
 };
 
 template <>

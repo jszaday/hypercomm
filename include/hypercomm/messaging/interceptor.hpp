@@ -111,6 +111,15 @@ class interceptor : public CBase_interceptor {
                             std::move(value));
   }
 
+  template <typename T>
+  inline static is_valid_endpoint_t<T> send_async(
+      const CProxyElement_ArrayElement& proxy, const T& ep,
+      deliverable&& value) {
+    value.endpoint() = endpoint(ep);
+    interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(),
+                            std::move(value));
+  }
+
   // asynchronously send a message to the specified element
   inline static void send_async(
       const std::shared_ptr<generic_element_proxy>& proxy, CkMessage* msg) {
@@ -134,7 +143,8 @@ class interceptor : public CBase_interceptor {
   inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
                                 deliverable&& payload) {
     if (((CkGroupID)CkpvAccess(interceptor_)).isZero()) {
-      CkEnforce(send_fallback(aid, idx, deliverable::to_message(payload)));
+      CkEnforce(
+          send_fallback(aid, idx, deliverable::to_message(std::move(payload))));
     } else {
       auto* loc = spin_to_win();
       CkAssertMsg(loc, "unable to retrieve interceptor");

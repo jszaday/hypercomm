@@ -59,12 +59,16 @@ inline char* get_message_buffer(const std::shared_ptr<CkMessage>& msg) {
   return get_message_buffer(msg.get());
 }
 
+// TODO ( unecessary with C++17 )
+template <class... Args>
+using void_t = void;
+
 template <typename T, typename U, typename = void>
 struct is_safely_castable : std::false_type {};
 
 template <typename T, typename U>
-struct is_safely_castable<
-    T, U, std::void_t<decltype(static_cast<U>(std::declval<T>()))>>
+struct is_safely_castable<T, U,
+                          void_t<decltype(static_cast<U>(std::declval<T>()))>>
     : std::true_type {};
 
 template <typename U, typename T>
@@ -79,6 +83,14 @@ fast_cast(T* t) {
   return dynamic_cast<U*>(t);
 }
 }  // namespace utilities
+
+template <class T, std::size_t = sizeof(T)>
+std::true_type is_complete_impl(T*);
+
+std::false_type is_complete_impl(...);
+
+template <class T>
+using is_complete = decltype(is_complete_impl(std::declval<T*>()));
 
 template <template <typename...> class Template, typename T>
 struct is_specialization_of : std::false_type {};

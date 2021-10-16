@@ -4,7 +4,7 @@
 
 namespace hypercomm {
 // TODO this is a temporary solution!
-static value_ptr dev2val(deliverable& dev) {
+value_ptr deliverable::to_value(deliverable&& dev) {
   if (dev.kind == deliverable::kValue) {
     value_ptr val(dev.release<hyper_value>());
     if (val) {
@@ -26,10 +26,7 @@ struct connector_ : public callback {
              const component_port_t& port)
       : self(_1), dst(com, port) {}
 
-  virtual return_type send(argument_type&& value) override {
-    deliverable dev(std::move(value));
-    self->passthru(dst, dev);
-  }
+  virtual void send(deliverable&& dev) override { self->passthru(dst, dev); }
 
   virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }
 };
@@ -129,7 +126,7 @@ void generic_locality_::passthru(const destination& dst, deliverable& dev) {
       break;
     case destination::kCallback:
       // TODO set source of value?
-      dst.cb()->send(dev2val(dev));
+      dst.cb()->send(std::move(dev));
       break;
     default:
       unreachable("invalid destination");
@@ -181,7 +178,7 @@ generic_locality_::~generic_locality_() {
   for (auto& pair : this->port_queue) {
     auto& port = pair.first;
     for (auto& value : pair.second) {
-      this->loopback(port, dev2val(value));
+      this->loopback(port, deliverable::to_value(std::move(value)));
 
       QdProcess(1);
     }
@@ -372,7 +369,8 @@ void generic_locality_::passthru(const com_port_pair_t& port,
   }
 #endif
 
-  search->second->receive_value(port.second, dev2val(dev));
+  search->second->receive_value(port.second,
+                                deliverable::to_value(std::move(dev)));
 
   this->try_collect(search->second);
 }
@@ -394,7 +392,7 @@ reducer::value_set reducer::action(value_set&& accepted) {
             : std::shared_ptr<contribution_type>();
     if (contrib) {
       if ((*contrib)->msg_ != nullptr) {
-        args.emplace_back(msg2value((*contrib)->msg_));
+        args.emplace_back((*contrib)->msg_);
       }
 
       auto& theirCb = (*contrib)->callback_;
@@ -414,7 +412,7 @@ reducer::value_set reducer::action(value_set&& accepted) {
     }
   }
 
-  auto result = ourCmbnr->send(std::move(args));
+  auto result = (*ourCmbnr)(std::move(args));
   auto contrib = make_typed_value<typename contribution_type::type>(
       std::move(result), ourCmbnr, ourCb);
   return component::make_set(0, std::move(contrib));
