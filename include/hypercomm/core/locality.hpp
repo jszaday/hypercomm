@@ -350,7 +350,7 @@ void entry_port::take_back(value_ptr&& value) {
 }
 
 void endpoint_source::take_back(value_ptr&& value) {
-  deliverable dev(std::move(value), this->ep_.port_);
+  deliverable dev(std::move(value), this->ep_);
   auto fn = this->ep_.get_handler();
   fn(access_context_(), dev);
 }

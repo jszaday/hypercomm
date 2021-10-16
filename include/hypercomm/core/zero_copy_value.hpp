@@ -4,6 +4,10 @@
 #include "../messaging/endpoint.hpp"
 
 namespace hypercomm {
+
+template <typename T>
+struct typed_value;
+
 struct zero_copy_value {
   std::vector<CkNcpyBuffer> buffers;
   std::vector<std::shared_ptr<void>> values;
@@ -12,10 +16,7 @@ struct zero_copy_value {
   message* msg;
   char* offset;
 
-  zero_copy_value(message* _)
-      : msg(_),
-        nReceived(0),
-        ep(std::forward_as_tuple(UsrToEnv(_)->getEpIdx(), _->dst)) {}
+  zero_copy_value(message* _) : msg(_), nReceived(0), ep(_) {}
 
   inline bool ready(void) const {
     return this->nReceived && (this->nReceived == this->buffers.size());
@@ -37,6 +38,9 @@ struct zero_copy_value {
       return true;
     }
   }
+
+  template <typename T>
+  static std::unique_ptr<typed_value<T>> to_typed(zero_copy_value*);
 };
 }  // namespace hypercomm
 

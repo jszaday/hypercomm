@@ -12,8 +12,8 @@ class endpoint {
   }
 
  public:
-  const int idx_;
-  const entry_port_ptr port_;
+  entry_port_ptr port_;
+  int idx_;
 
   endpoint(PUP::reconstruct) : endpoint(0x0) {}
   endpoint(void) : endpoint(PUP::reconstruct()) {}
@@ -27,6 +27,22 @@ class endpoint {
       : idx_(other.idx_), port_(std::move(other.port_)) {}
 
   endpoint(const endpoint& other) : idx_(other.idx_), port_(other.port_) {}
+
+  endpoint(CkMessage* msg) {
+    auto* env = UsrToEnv(msg);
+    this->idx_ = env->getEpIdx();
+    if (env->getMsgIdx() == message::index()) {
+      this->port_ = std::move(((message*)msg)->dst);
+    }
+  }
+
+  inline void export_to(CkMessage* msg) {
+    auto* env = UsrToEnv(msg);
+    env->setEpIdx(this->idx_);
+    if (env->getMsgIdx() == message::index()) {
+      ((message*)msg)->dst = std::move(this->port_);
+    }
+  }
 
   inline endpoint& operator=(const endpoint& other) {
     if (this != &other) {

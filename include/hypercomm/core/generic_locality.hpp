@@ -27,7 +27,7 @@ class generic_locality_ : public manageable_base_ {
       std::tuple<std::shared_ptr<void>, std::size_t, CkNcpyBufferPost>>
       buffers;
 
-  mapped_queue<component::value_type> port_queue;
+  mapped_queue<deliverable> port_queue;
   std::vector<component_id_t> invalidations;
   component_id_t component_authority = 0;
 
@@ -46,7 +46,12 @@ class generic_locality_ : public manageable_base_ {
     this->receive(dev);
   }
 
-  void receive(deliverable& dev);
+  inline void receive(deliverable& dev) { this->passthru(dev.endpoint(), dev); }
+
+  void passthru(const endpoint& ep, deliverable&);
+  void passthru(const destination& dst, deliverable&);
+  void passthru(const com_port_pair_t& ep, deliverable&);
+
   void loopback(const entry_port_ptr& port, component::value_type&& value);
   bool has_value(const entry_port_ptr& port) const;
 
@@ -55,9 +60,6 @@ class generic_locality_ : public manageable_base_ {
   void open(const entry_port_ptr& ours, Args... args) {
     this->open(ours, std::move(destination(std::forward<Args>(args)...)));
   }
-
-  void try_send(const destination& dest, component::value_type&& value);
-  void try_send(const com_port_pair_t& port, component::value_type&& value);
 
   void resync_port_queue(entry_port_iterator& it);
   void invalidate_port(const entry_port_ptr& port);
@@ -117,7 +119,6 @@ class generic_locality_ : public manageable_base_ {
  protected:
   void receive_message(CkMessage* msg);
   void receive_value(CkMessage* msg, const value_handler_fn_& fn);
-  void receive_value(const entry_port_ptr&, component::value_type&&);
 
   bool invalidated(const component_id_t& id);
 
