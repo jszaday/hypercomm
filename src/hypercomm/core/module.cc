@@ -24,8 +24,8 @@ value_handler_fn_ CkIndex_locality_base_::get_value_handler(const int& epIdx) {
   }
 }
 
-void call_demux_(generic_locality_* self, deliverable& value) {
-  self->receive(value);
+void call_demux_(generic_locality_* self, deliverable&& dev) {
+  self->receive(std::move(dev));
 }
 
 void call_execute_(CkMessage* msg, locality_base_* obj) { obj->execute(msg); }

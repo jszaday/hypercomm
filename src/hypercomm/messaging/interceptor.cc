@@ -72,10 +72,15 @@ message* pack_deferrable_(const entry_port_ptr& port,
   return msg;
 }
 
-message* repack_to_port(const entry_port_ptr& port,
-                        component::value_type&& value) {
+// TODO ( it would be good to rename this at some point )
+static message* repack_to_port(const entry_port_ptr& port,
+                               component::value_type&& value) {
   if (value->pupable) {
-    return pack_deferrable_(port, std::move(value));
+    auto flags = value->flags();
+    auto* msg = pack_deferrable_(port, std::move(value));
+    auto* env = UsrToEnv(msg);
+    env->setRef(flags | env->getRef());
+    return msg;
   } else {
     auto msg = value ? static_cast<message*>(value->release())
                      : message::make_null_message(port);
@@ -93,16 +98,19 @@ message* repack_to_port(const entry_port_ptr& port,
 }
 }  // namespace detail
 
-CkMessage* deliverable::to_message(deliverable& dev) {
+CkMessage* deliverable::to_message(deliverable&& dev) {
   CkAssert((bool)dev && dev.kind != kDeferred);
   if (dev.kind == deliverable::kMessage) {
-    return dev.release<CkMessage>();
+    auto* msg = dev.release<CkMessage>();
+    dev.endpoint().export_to(msg);
+    return msg;
   } else {
     // pack the value with its destination port to form a message
     value_ptr value(dev.release<hyper_value>());
     auto* msg =
         detail::repack_to_port(std::move(dev.ep_.port_), std::move(value));
     UsrToEnv(msg)->setEpIdx(dev.ep_.idx_);
+    CkAssertMsg(!dev.ep_.is_demux() || msg->dst, "invalid port copy!");
     return msg;
   }
 }
@@ -208,9 +216,21 @@ void interceptor::deliver_handler_(void* raw) {
   }
 }
 
+static bool has_valid_endpoint(envelope* env, CkMessage* msg) {
+  auto is_msg = env->getMsgIdx() == message::index();
+  auto is_demux =
+      env->getEpIdx() == CkIndex_locality_base_::idx_demux_CkMessage();
+  return (!(is_msg && is_demux) || ((message*)msg)->dst);
+}
+
 void interceptor::send_to_branch(const int& pe, const CkArrayID& aid,
                                  const CkArrayIndex& idx, CkMessage* msg) {
   auto* env = UsrToEnv(msg);
+
+  // this catches invalid deliveries on the sender-side
+  // (where it's debuggable!)
+  CkAssert(has_valid_endpoint(env, msg));
+
   if (pe == CkMyPe()) {
     if (env->isPacked()) {
       CkUnpackMessage(&env);
@@ -374,7 +394,7 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
     delivery::process(elt, std::move(payload), immediate);
   } else {
     auto mine = CkMyPe();
-    auto msg = deliverable::to_message(payload);
+    auto* msg = deliverable::to_message(std::move(payload));
     auto lastHome = validId ? lookup_or_update_(locMgr, post, id)
                             : lookup_fallback_(locMgr, post);
     // if we are the elt's home (and its last known loc)
@@ -392,12 +412,10 @@ void interceptor::deliver(const CkArrayID& aid, const CkArrayIndex& pre,
 }
 
 void delivery::process(ArrayElement* elt, deliverable&& dev, bool immediate) {
-  CkAssert((bool)dev);
-
   auto* cast = static_cast<generic_locality_*>(elt);
   if (immediate) {
     cast->update_context();
-    cast->receive(dev);
+    cast->receive(std::move(dev));
   } else {
     auto& aid = elt->ckGetArrayID();
     auto& idx = elt->ckGetArrayIndex();

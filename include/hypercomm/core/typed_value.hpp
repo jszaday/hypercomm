@@ -1,10 +1,11 @@
 #ifndef __HYPERCOMM_CORE_TYPED_VALUE_HPP__
 #define __HYPERCOMM_CORE_TYPED_VALUE_HPP__
 
-#include "../reductions/contribution.hpp"
 #include "../messaging/packing.hpp"
+#include "../reductions/contribution.hpp"
+#include "../serialization/is_pupable.hpp"
+
 #include "deliverable_value.hpp"
-#include "zero_copy_value.hpp"
 #include "config.hpp"
 
 namespace hypercomm {
@@ -78,11 +79,13 @@ class typed_value_impl_ : public typed_value<T> {
     }
   }
 
+  virtual CMK_REFNUM_TYPE flags(void) override {
+    return (is_contribution << messaging::__attribs__::kRedn);
+  }
+
   virtual hyper_value::message_type release(void) override {
     auto msg = pack_to_port({}, this->value());
-    if (is_contribution) {
-      msg->set_redn(true);
-    }
+    CkSetRefNum(msg, this->flags());
     return msg;
   }
 };
@@ -141,7 +144,7 @@ std::unique_ptr<typed_value<T>> zero_copy_value::to_typed(
 
 template <typename T>
 std::unique_ptr<typed_value<T>> dev2typed(
-    deliverable& dev, std::shared_ptr<value_source>&& src = {});
+    deliverable&& dev, std::shared_ptr<value_source>&& src = {});
 
 template <typename T>
 std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
@@ -149,7 +152,7 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
   if (typed_value<T>* p1 = dynamic_cast<typed_value<T>*>(value)) {
     return std::unique_ptr<typed_value<T>>((typed_value<T>*)ptr.release());
   } else if (deliverable_value* p2 = dynamic_cast<deliverable_value*>(value)) {
-    return dev2typed<T>(p2->dev, std::move(p2->source));
+    return dev2typed<T>(std::move(p2->dev), std::move(p2->source));
   } else {
     CkAbort("fatal> cannot convert %s to %s.\n",
             ptr ? typeid(ptr.get()).name() : "(nil)",
@@ -158,7 +161,7 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
 }
 
 template <typename T>
-std::unique_ptr<typed_value<T>> dev2typed(deliverable& dev,
+std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev,
                                           std::shared_ptr<value_source>&& src) {
   switch (dev.kind) {
     case deliverable::kDeferred: {
@@ -190,6 +193,39 @@ std::unique_ptr<typed_value<T>> dev2typed(deliverable& dev,
     }
   }
 }
+
+namespace core {
+
+template <typename Tuple, typename Enable = void>
+struct pup_guard;
+
+template <typename... Args>
+struct pup_guard<
+    std::tuple<Args...>,
+    typename std::enable_if<is_pupable<std::tuple<Args...>>::value>::type> {
+  using tuple_type = std::tuple<Args...>;
+
+  static typed_value_ptr<tuple_type> unpack(deliverable&& dev) {
+    return dev2typed<tuple_type>(dev);
+  }
+};
+
+template <typename... Args>
+struct pup_guard<
+    std::tuple<Args...>,
+    typename std::enable_if<!is_pupable<std::tuple<Args...>>::value>::type> {
+  using tuple_type = std::tuple<Args...>;
+
+  static typed_value_ptr<tuple_type> unpack(deliverable&& dev) {
+    NOT_IMPLEMENTED;
+  }
+};
+
+template <typename... Args>
+void typed_callback<Args...>::send(deliverable&& dev) {
+  this->send(pup_guard<tuple_type>::unpack(std::move(dev)));
+}
+}  // namespace core
 }  // namespace hypercomm
 
 #endif

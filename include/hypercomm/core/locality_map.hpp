@@ -1,7 +1,6 @@
 #ifndef __HYPERCOMM_CORE_LOCALITY_MAP_HPP__
 #define __HYPERCOMM_CORE_LOCALITY_MAP_HPP__
 
-#include "../messaging/packing.hpp"
 #include "immediate.hpp"
 
 #include <hypercomm/core/locality.decl.h>

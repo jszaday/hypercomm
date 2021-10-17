@@ -6,8 +6,15 @@
 namespace hypercomm {
 
 class hyper_value;
-
 using value_ptr = std::unique_ptr<hyper_value>;
+
+template <typename T>
+class typed_value;
+
+template <typename T>
+using typed_value_ptr = std::unique_ptr<typed_value<T>>;
+
+class deliverable;
 
 class value_source {
  public:
@@ -29,6 +36,8 @@ class hyper_value {
   }
   virtual message_type release(void) = 0;
   virtual bool recastable(void) const = 0;
+
+  virtual CMK_REFNUM_TYPE flags(void) = 0;
 };
 
 inline void try_return(value_ptr&& value) {

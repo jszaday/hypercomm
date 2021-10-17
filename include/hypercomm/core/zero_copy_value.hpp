@@ -4,10 +4,6 @@
 #include "../messaging/endpoint.hpp"
 
 namespace hypercomm {
-
-template <typename T>
-struct typed_value;
-
 struct zero_copy_value {
   std::vector<CkNcpyBuffer> buffers;
   std::vector<std::shared_ptr<void>> values;

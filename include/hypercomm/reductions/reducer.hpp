@@ -1,7 +1,7 @@
 #ifndef __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 #define __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 
-#include "contribution.hpp"
+#include "../sections/imprintable.hpp"
 
 namespace hypercomm {
 struct reducer : public hypercomm::component {

@@ -3,6 +3,7 @@
 
 #include "callback.hpp"
 #include "../serialization/pup.hpp"
+#include "../messaging/deliverable.hpp"
 
 namespace hypercomm {
 
@@ -14,7 +15,7 @@ struct inter_callback : public core::callback {
   inter_callback(const CkCallback& _1) : cb(_1) {}
 
   virtual void send(core::callback::value_type&& value) override {
-    cb.send(value->release());
+    cb.send(deliverable::to_message(std::move(value)));
   }
 
   virtual void __pup__(serdes& s) override { s | cb; }

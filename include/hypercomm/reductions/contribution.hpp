@@ -1,7 +1,8 @@
 #ifndef __HYPERCOMM_REDUCTIONS_CONTRIBUTION__
 #define __HYPERCOMM_REDUCTIONS_CONTRIBUTION__
 
-#include "../sections/imprintable.hpp"
+#include "../core/callback.hpp"
+#include "../messaging/deliverable.hpp"
 
 namespace hypercomm {
 class reducer;
@@ -18,8 +19,10 @@ class contribution {
 
   contribution(const tags::reconstruct &) {}
 
-  contribution(value_ptr &&_1, const combiner_ptr &_2, const callback_ptr &_3)
-      : msg_(_1->release()), combiner_(_2), callback_(_3) {}
+  contribution(deliverable &&_1, const combiner_ptr &_2, const callback_ptr &_3)
+      : msg_(deliverable::to_message(std::move(_1))),
+        combiner_(_2),
+        callback_(_3) {}
 };
 
 template <>

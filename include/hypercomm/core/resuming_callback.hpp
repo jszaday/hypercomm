@@ -8,16 +8,15 @@ namespace hypercomm {
 template <typename T>
 struct resuming_callback : public core::callback {
   using type = T;
-  using value_type = core::callback::value_type;
-  using result_type = typed_value<type>;
 
   CthThread th;
-  std::shared_ptr<result_type> result;
+  typed_value_ptr<T> result;
 
   resuming_callback(void) : th(nullptr) {}
 
+  using value_type = core::callback::value_type;
   virtual void send(value_type&& value) override {
-    this->result = value2typed<type>(std::move(value));
+    this->result = dev2typed<type>(std::move(value));
     if (this->th) {
       CthAwaken(this->th);
       this->th = nullptr;

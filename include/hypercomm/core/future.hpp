@@ -12,7 +12,7 @@ namespace hypercomm {
 
 struct future;
 
-inline void send2future(const future& f, value_ptr&& value);
+void send2future(const future& f, deliverable&& dev);
 
 using future_id_t = std::uint32_t;
 
@@ -30,9 +30,7 @@ struct future {
     return ss.str();
   }
 
-  inline void set(message* msg) { send2future(*this, msg2value(msg)); }
-
-  inline void set(value_ptr&& value) { send2future(*this, std::move(value)); }
+  inline void set(deliverable&& dev) { send2future(*this, std::move(dev)); }
 
   inline bool ready(void) const;
 

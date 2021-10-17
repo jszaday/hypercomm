@@ -4,7 +4,6 @@
 #include "core/proxy.hpp"
 #include "core/value.hpp"
 #include "core/callback.hpp"
-#include "core/immediate.hpp"
 #include "core/comparable.hpp"
 #include "core/impermanent.hpp"
 
