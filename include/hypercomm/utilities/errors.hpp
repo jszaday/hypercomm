@@ -18,7 +18,7 @@ __attribute__((format(printf, 1, 2)))
 inline void not_implemented [[noreturn]] (const char* msg, ...) {
   std::stringstream ss;
   ss << "fatal> feature not implemented, ";
-  ss << msg ? msg : "(nil)";
+  ss << (msg ? msg : "(nil)");
   ss << "." << std::endl;
   auto s = ss.str();
   auto* fmt = s.c_str();
