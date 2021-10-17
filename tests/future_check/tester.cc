@@ -7,8 +7,30 @@ using namespace hypercomm;
 
 const auto setup_environment = core::initialize;
 
+struct plus: public immediate_action<void(int, int)> {
+  plus(void) {}
+  plus(PUP::reconstruct) {}
+
+  virtual void action(int i, int j) override {
+    CkPrintf("%d + %d = %d\n", i, j, i + j);
+  }
+
+  virtual void __pup__(hypercomm::serdes&) override {}
+};
+
 struct main : public CBase_main {
-  main(CkArgMsg* m) { make_grouplike<CProxy_locality>().run(); }
+  main(CkArgMsg* m) { this->check_action(); }
+
+  void check_action(void) {
+    auto p = std::make_shared<plus>();
+    auto cb = std::static_pointer_cast<callback>(std::move(p));
+    auto t = make_typed_value<std::tuple<int, int>>(20, 22);
+
+    CkPrintf("checking typed callbacks: ");
+    cb->send(deliverable(std::move(t)));
+
+    make_grouplike<CProxy_locality>().run();
+  }
 };
 
 struct locality : public vil<CBase_locality, int> {

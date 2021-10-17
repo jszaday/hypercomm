@@ -10,8 +10,7 @@ template <typename Ret, typename... Args>
 struct immediate_action;
 
 template <typename... Args>
-struct immediate_action<void(Args...)>
-    : virtual public core::typed_callback<Args...> {
+struct immediate_action<void(Args...)> : public core::typed_callback<Args...> {
   using parent_type = core::typed_callback<Args...>;
   using tuple_type = typename parent_type::tuple_type;
 
@@ -27,13 +26,13 @@ struct immediate_action<void(Args...)>
 };
 
 template <typename Ret, typename... Args>
-struct immediate_action<Ret(Args...)> : virtual public core::immediate<false> {
+struct immediate_action<Ret(Args...)> : public core::immediate<false> {
   using tuple_type = std::tuple<Args...>;
 
   virtual Ret action(Args...) = 0;
 
   virtual deliverable operator()(deliverable&& dev) override {
-    auto val = core::pup_guard<tuple_type>::unpack(std::move(dev));
+    auto val = dev2typed<tuple_type>(std::move(dev));
     auto ret = make_typed_value<Ret>(tags::no_init());
 
     apply(
