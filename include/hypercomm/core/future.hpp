@@ -12,7 +12,7 @@ namespace hypercomm {
 
 struct future;
 
-inline void send2future(const future& f, deliverable&& dev);
+void send2future(const future& f, deliverable&& dev);
 
 using future_id_t = std::uint32_t;
 

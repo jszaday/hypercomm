@@ -45,17 +45,23 @@ class endpoint {
     }
   }
 
-  inline endpoint& operator=(const endpoint& other) {
+  inline endpoint& operator=(endpoint&& other) {
     if (this != &other) {
-      this->~endpoint();
-      new (this) endpoint(other);
+      this->port_ = std::move(other.port_);
+      this->idx_ = std::move(other.idx_);
     }
     return *this;
   }
 
-  inline bool valid(void) const {
-    return this->port_ || (this->idx_ != demux());
+  inline endpoint& operator=(const endpoint& other) {
+    if (this != &other) {
+      this->port_ = other.port_;
+      this->idx_ = other.idx_;
+    }
+    return *this;
   }
+
+  inline operator bool(void) const { return !this->is_demux() || this->port_; }
 
   inline value_handler_fn_ get_handler(void) const {
     return CkIndex_locality_base_::get_value_handler(this->idx_);
@@ -74,6 +80,23 @@ class endpoint {
   template <typename T>
   static constexpr bool constructible_from(void) {
     return std::is_constructible<endpoint, const T&>::value;
+  }
+
+  inline bool is_demux(void) const { return (this->idx_ == demux()); }
+
+  std::string to_string(void) const {
+    std::stringstream ss;
+    ss << "endpoint(";
+    if (!this->is_demux()) {
+      ss << "epIdx=" << this->idx_ << ",";
+    }
+    if (this->port_) {
+      ss << this->port_->to_string();
+    } else {
+      ss << "NULL";
+    }
+    ss << ")";
+    return ss.str();
   }
 };
 

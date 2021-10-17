@@ -277,17 +277,6 @@ inline void send2port(const element_ptr<Index>& proxy,
   send2port(base, port, std::move(value));
 }
 
-inline void send2future(const future& f, deliverable&& dev) {
-  // TODO ( do not assume array-issuedness )
-  auto src = std::dynamic_pointer_cast<element_proxy<CkArrayIndex>>(f.source);
-  CkAssertMsg(src, "future must be from a locality!");
-  const auto& base =
-      static_cast<const CProxyElement_ArrayElement&>(src->c_proxy());
-  // TODO ( send immediately looking forward! )
-  interceptor::send_async(base, std::make_shared<future_port>(f),
-                          std::move(dev));
-}
-
 template <typename Index>
 inline void broadcast_to(const proxy_ptr& proxy,
                          const std::shared_ptr<imprintable<Index>>& section,
@@ -345,18 +334,19 @@ bool vil<Base, Index>::check_future(const future& f) const {
 void forwarding_callback<CkArrayIndex>::send(callback::value_type&& value) {
   const auto& base =
       static_cast<const CProxyElement_locality_base_&>(this->proxy->c_proxy());
-  interceptor::send_async(base, this->ep, std::move(value));
+  value.update_endpoint(this->ep);
+  CkAssert((bool)value.endpoint());
+  interceptor::send_async(base, std::move(value));
 }
 
 void entry_port::take_back(value_ptr&& value) {
-  deliverable dev(std::move(value), this->shared_from_this());
-  access_context_()->receive(dev);
+  access_context_()->receive(
+      deliverable(std::move(value), this->shared_from_this()));
 }
 
 void endpoint_source::take_back(value_ptr&& value) {
-  deliverable dev(std::move(value), this->ep_);
   auto fn = this->ep_.get_handler();
-  fn(access_context_(), dev);
+  fn(access_context_(), deliverable(std::move(value), this->ep_));
 }
 }  // namespace hypercomm
 

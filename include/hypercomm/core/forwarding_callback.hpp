@@ -23,8 +23,8 @@ struct forwarding_callback<CkArrayIndex> : public core::callback {
 
   virtual void __pup__(serdes& s) override {
     s | this->proxy;
-    s | const_cast<int&>(this->ep.idx_);
-    s | const_cast<entry_port_ptr&>(this->ep.port_);
+    s | this->ep.idx_;
+    s | this->ep.port_;
   }
 };
 

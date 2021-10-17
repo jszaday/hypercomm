@@ -12,7 +12,7 @@ constexpr auto kVerbose = false;
 
 int kMailboxAddress;
 
-void receive_value(generic_locality_*, deliverable&);
+void receive_value(generic_locality_*, deliverable&&);
 
 void enroll_polymorphs(void) {
   hypercomm::init_polymorph_registry();
@@ -181,8 +181,9 @@ struct locality : public vil<CBase_locality, int> {
   }
 };
 
-void receive_value(generic_locality_* self, deliverable& val) {
-  ((locality*)self)->mb->receive_value(0, dev2typed<big_data<data_type>>(val));
+void receive_value(generic_locality_* self, deliverable&& dev) {
+  auto val = dev2typed<big_data<data_type>>(std::move(dev));
+  ((locality*)self)->mb->receive_value(0, std::move(val));
 }
 
 #define CK_TEMPLATES_ONLY

@@ -115,7 +115,7 @@ class interceptor : public CBase_interceptor {
   inline static is_valid_endpoint_t<T> send_async(
       const CProxyElement_ArrayElement& proxy, const T& ep,
       deliverable&& value) {
-    value.endpoint() = endpoint(ep);
+    value.update_endpoint(ep);
     interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(),
                             std::move(value));
   }
@@ -137,6 +137,12 @@ class interceptor : public CBase_interceptor {
   inline static void send_async(const CkArrayID& aid, const CkArrayIndex& idx,
                                 CkMessage* msg) {
     interceptor::send_async(aid, idx, deliverable(msg));
+  }
+
+  inline static void send_async(const CProxyElement_ArrayElement& proxy,
+                                deliverable&& dev) {
+    interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(),
+                            std::move(dev));
   }
 
   // asynchronously send a message to the specified index of aid

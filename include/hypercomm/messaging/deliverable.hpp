@@ -69,6 +69,11 @@ struct deliverable {
 
   inline hypercomm::endpoint& endpoint(void) { return this->ep_; }
 
+  template <typename... Args>
+  inline void update_endpoint(Args&&... args) {
+    this->ep_ = std::move(hypercomm::endpoint(std::forward<Args>(args)...));
+  }
+
   inline operator bool(void) const { return (this->storage_ != nullptr); }
 
   static value_ptr to_value(deliverable&& dev);

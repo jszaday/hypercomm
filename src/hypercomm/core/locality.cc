@@ -1,5 +1,6 @@
 #include <hypercomm/core/typed_value.hpp>
 #include <hypercomm/core/generic_locality.hpp>
+#include <hypercomm/core/future.hpp>
 #include <hypercomm/reductions/reducer.hpp>
 
 namespace hypercomm {
@@ -26,7 +27,9 @@ struct connector_ : public callback {
              const component_port_t& port)
       : self(_1), dst(com, port) {}
 
-  virtual void send(deliverable&& dev) override { self->passthru(dst, dev); }
+  virtual void send(deliverable&& dev) override {
+    self->passthru(dst, std::move(dev));
+  }
 
   virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }
 };
@@ -39,6 +42,19 @@ callback_ptr generic_locality_::make_connector(const component_id_t& com,
 
 namespace {
 CpvDeclare(generic_locality_*, locality_);
+}
+
+// TODO ( do not assume array-issuedness )
+// TODO ( send immediately looking forward! )
+void send2future(const future& f, deliverable&& dev) {
+  auto& src = f.source;
+  auto& proxy =
+      (dynamic_cast<element_proxy<CkArrayIndex>*>(src.get()))->c_proxy();
+  auto& base = static_cast<const CProxyElement_ArrayElement&>(proxy);
+  auto port = std::make_shared<future_port>(f);
+  auto* ctx = access_context_();
+  dev.update_endpoint(std::move(port));
+  interceptor::send_async(base, std::move(dev));
 }
 
 /* access the pointer of the currently executing locality
@@ -106,7 +122,7 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
   if (search != port_queue.end()) {
     auto& buffer = search->second;
     while (port->alive && !buffer.empty()) {
-      this->passthru(it->second, buffer.front());
+      this->passthru(it->second, std::move(buffer.front()));
       buffer.pop_front();
       QdProcess(1);
     }
@@ -116,13 +132,13 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
   }
 }
 
-void generic_locality_::passthru(const destination& dst, deliverable& dev) {
+void generic_locality_::passthru(const destination& dst, deliverable&& dev) {
   switch (dst.kind) {
     case destination::kEndpoint:
-      this->passthru(dst.ep(), dev);
+      this->passthru(dst.ep(), std::move(dev));
       break;
     case destination::kComponent:
-      this->passthru(dst.com_port(), dev);
+      this->passthru(dst.com_port(), std::move(dev));
       break;
     case destination::kCallback:
       // TODO set source of value?
@@ -133,18 +149,19 @@ void generic_locality_::passthru(const destination& dst, deliverable& dev) {
   }
 }
 
-void generic_locality_::passthru(const endpoint& ep, deliverable& dev) {
+void generic_locality_::passthru(const endpoint& ep, deliverable&& dev) {
   // update how the deliverable got to us
-  dev.endpoint() = ep;
+  dev.update_endpoint(ep);
   // then check how we should handle it
   if (ep.idx_ == CkIndex_locality_base_::idx_demux_CkMessage()) {
     auto& port = ep.port_;
     auto search = this->entry_ports.find(port);
     if (search == std::end(this->entry_ports)) {
+      CkAssertMsg(port, "port should not be null!");
       this->port_queue[port].push_back(std::move(dev));
       QdCreate(1);
     } else {
-      this->passthru(search->second, dev);
+      this->passthru(search->second, std::move(dev));
     }
   } else {
     if (dev.kind == deliverable::kMessage) {
@@ -152,7 +169,7 @@ void generic_locality_::passthru(const endpoint& ep, deliverable& dev) {
       dev.endpoint().export_to(msg);
       this->receive_message(msg);
     } else {
-      (ep.get_handler())(this, dev);
+      (ep.get_handler())(this, std::move(dev));
     }
   }
 }
@@ -220,9 +237,8 @@ struct zero_copy_payload_ {
 
     if (self->val_->ready()) {
       auto fn = self->val_->ep.get_handler();
-      deliverable dev(self->val_);
       self->parent_->update_context();
-      fn(self->parent_, dev);
+      fn(self->parent_, deliverable(self->val_));
     }
 
     delete self;
@@ -337,8 +353,7 @@ void generic_locality_::receive_value(CkMessage* raw,
       }
     }
   } else {
-    deliverable dev(msg);
-    fn(this, dev);
+    fn(this, deliverable(msg));
   }
 }
 
@@ -358,7 +373,7 @@ void generic_locality_::activate_component(const component_id_t& id) {
 }
 
 void generic_locality_::passthru(const com_port_pair_t& port,
-                                 deliverable& dev) {
+                                 deliverable&& dev) {
   auto search = components.find(port.first);
 #if CMK_ERROR_CHECKING
   if (search == std::end(components)) {

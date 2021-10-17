@@ -144,12 +144,7 @@ std::unique_ptr<typed_value<T>> zero_copy_value::to_typed(
 
 template <typename T>
 std::unique_ptr<typed_value<T>> dev2typed(
-    deliverable& dev, std::shared_ptr<value_source>&& src = {});
-
-template <typename T>
-std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev) {
-  return dev2typed<T>(dev);
-}
+    deliverable&& dev, std::shared_ptr<value_source>&& src = {});
 
 template <typename T>
 std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
@@ -157,7 +152,7 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
   if (typed_value<T>* p1 = dynamic_cast<typed_value<T>*>(value)) {
     return std::unique_ptr<typed_value<T>>((typed_value<T>*)ptr.release());
   } else if (deliverable_value* p2 = dynamic_cast<deliverable_value*>(value)) {
-    return dev2typed<T>(p2->dev, std::move(p2->source));
+    return dev2typed<T>(std::move(p2->dev), std::move(p2->source));
   } else {
     CkAbort("fatal> cannot convert %s to %s.\n",
             ptr ? typeid(ptr.get()).name() : "(nil)",
@@ -166,7 +161,7 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
 }
 
 template <typename T>
-std::unique_ptr<typed_value<T>> dev2typed(deliverable& dev,
+std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev,
                                           std::shared_ptr<value_source>&& src) {
   switch (dev.kind) {
     case deliverable::kDeferred: {

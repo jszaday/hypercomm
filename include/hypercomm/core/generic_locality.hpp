@@ -41,16 +41,14 @@ class generic_locality_ : public manageable_base_ {
   void update_context(void);
 
   template <typename... Args>
-  inline void receive(Args... args) {
+  inline void receive(Args&&... args) {
     deliverable dev(std::forward<Args>(args)...);
-    this->receive(dev);
+    this->passthru(dev.endpoint(), std::move(dev));
   }
 
-  inline void receive(deliverable& dev) { this->passthru(dev.endpoint(), dev); }
-
-  void passthru(const endpoint& ep, deliverable&);
-  void passthru(const destination& dst, deliverable&);
-  void passthru(const com_port_pair_t& ep, deliverable&);
+  void passthru(const endpoint& ep, deliverable&&);
+  void passthru(const destination& dst, deliverable&&);
+  void passthru(const com_port_pair_t& ep, deliverable&&);
 
   void loopback(const entry_port_ptr& port, component::value_type&& value);
   bool has_value(const entry_port_ptr& port) const;
@@ -144,7 +142,7 @@ class generic_locality_ : public manageable_base_ {
   }
 };
 
-template <void fn(generic_locality_*, deliverable&)>
+template <void fn(generic_locality_*, deliverable&&)>
 void CkIndex_locality_base_::value_handler(CkMessage* msg, CkMigratable* mig) {
   auto* self = static_cast<generic_locality_*>(mig);
   self->update_context();
