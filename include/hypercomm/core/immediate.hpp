@@ -32,7 +32,7 @@ struct immediate_action<Ret(Args...)> : public core::immediate<false> {
   virtual Ret action(Args...) = 0;
 
   virtual deliverable operator()(deliverable&& dev) override {
-    auto val = core::pup_guard<tuple_type>::unpack(std::move(dev));
+    auto val = dev2typed<tuple_type>(std::move(dev));
     auto ret = make_typed_value<Ret>(tags::no_init());
 
     apply(

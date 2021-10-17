@@ -53,8 +53,55 @@ class typed_value : public hyper_value {
   inline static std::unique_ptr<typed_value<T>> from_buffer(Args... args);
 };
 
+namespace detail {
+template <typename T, typename Enable = void>
+struct pup_guard;
+
+template <typename T>
+struct pup_guard<T, typename std::enable_if<is_pupable<T>::value>::type> {
+  template <storage_scheme Scheme>
+  inline static void unpack(CkMessage* msg, temporary<T, Scheme>& t) {
+    hypercomm::unpack(msg, t);
+  }
+
+  template <typename A>
+  inline static void pup(serdes& s, A& a) {
+    s | a;
+  }
+
+  template <typename A>
+  inline static message* pack_to_port(const entry_port_ptr& dst, A& a) {
+    return hypercomm::pack_to_port(dst, a);
+  }
+};
+
+template <typename T>
+class pup_guard<T, typename std::enable_if<!is_pupable<T>::value>::type> {
+  static void exit_ [[noreturn]] (void) {
+    not_implemented("type %s is not pupable", typeid(T).name());
+  }
+
+ public:
+  template <storage_scheme Scheme>
+  inline static void unpack(CkMessage*, temporary<T, Scheme>&) {
+    exit_();
+  }
+
+  template <typename A>
+  inline static void pup(serdes&, A&) {
+    exit_();
+  }
+
+  template <typename A>
+  inline static message* pack_to_port(const entry_port_ptr&, A&) {
+    exit_();
+  }
+};
+}  // namespace detail
+
 template <typename T, storage_scheme Scheme = kInline>
 class typed_value_impl_ : public typed_value<T> {
+  using guard_t = detail::pup_guard<T>;
   static constexpr auto is_contribution = typed_value<T>::is_contribution;
 
  public:
@@ -70,12 +117,12 @@ class typed_value_impl_ : public typed_value<T> {
     if (encapsulate) {
       if (Scheme == kInline) {
         std::shared_ptr<T> ptr(s.observe_source(), this->get());
-        s | ptr;
+        guard_t::pup(s, ptr);
       } else {
-        s | this->tmp;
+        guard_t::pup(s, this->tmp);
       }
     } else {
-      s | this->value();
+      guard_t::pup(s, this->value());
     }
   }
 
@@ -84,7 +131,7 @@ class typed_value_impl_ : public typed_value<T> {
   }
 
   virtual hyper_value::message_type release(void) override {
-    auto msg = pack_to_port({}, this->value());
+    auto msg = guard_t::pack_to_port({}, this->value());
     CkSetRefNum(msg, this->flags());
     return msg;
   }
@@ -109,7 +156,7 @@ std::unique_ptr<typed_value<T>> typed_value<T>::from_message(message_type msg) {
     return from_message(imsg);
   } else {
     auto result = make_value<typed_value_impl_<T, Scheme>>(tags::no_init{});
-    unpack(msg, result->tmp);
+    detail::pup_guard<T>::unpack(msg, result->tmp);
     return std::move(result);
   }
 }
@@ -196,34 +243,9 @@ std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev,
 
 namespace core {
 
-template <typename Tuple, typename Enable = void>
-struct pup_guard;
-
-template <typename... Args>
-struct pup_guard<
-    std::tuple<Args...>,
-    typename std::enable_if<is_pupable<std::tuple<Args...>>::value>::type> {
-  using tuple_type = std::tuple<Args...>;
-
-  static typed_value_ptr<tuple_type> unpack(deliverable&& dev) {
-    return dev2typed<tuple_type>(std::move(dev));
-  }
-};
-
-template <typename... Args>
-struct pup_guard<
-    std::tuple<Args...>,
-    typename std::enable_if<!is_pupable<std::tuple<Args...>>::value>::type> {
-  using tuple_type = std::tuple<Args...>;
-
-  static typed_value_ptr<tuple_type> unpack(deliverable&& dev) {
-    NOT_IMPLEMENTED;
-  }
-};
-
 template <typename... Args>
 void typed_callback<Args...>::send(deliverable&& dev) {
-  this->send(pup_guard<tuple_type>::unpack(std::move(dev)));
+  this->send(dev2typed<tuple_type>(std::move(dev)));
 }
 }  // namespace core
 }  // namespace hypercomm
