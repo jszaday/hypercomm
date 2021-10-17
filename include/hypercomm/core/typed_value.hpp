@@ -206,7 +206,7 @@ struct pup_guard<
   using tuple_type = std::tuple<Args...>;
 
   static typed_value_ptr<tuple_type> unpack(deliverable&& dev) {
-    return dev2typed<tuple_type>(dev);
+    return dev2typed<tuple_type>(std::move(dev));
   }
 };
 

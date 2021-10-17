@@ -9,8 +9,7 @@ namespace core {
 class callback : virtual public polymorph {
  public:
   using value_type = deliverable;
-
-  virtual void send(value_type&&) = 0;
+  virtual void send(deliverable&&) = 0;
 };
 
 template <typename... Args>
