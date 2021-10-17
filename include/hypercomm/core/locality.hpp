@@ -335,7 +335,6 @@ void forwarding_callback<CkArrayIndex>::send(callback::value_type&& value) {
   const auto& base =
       static_cast<const CProxyElement_locality_base_&>(this->proxy->c_proxy());
   value.update_endpoint(this->ep);
-  CkAssert((bool)value.endpoint());
   interceptor::send_async(base, std::move(value));
 }
 
