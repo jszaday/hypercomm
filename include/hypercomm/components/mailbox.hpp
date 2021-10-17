@@ -1,6 +1,7 @@
 #ifndef __HYPERCOMM_COMPONENTS_MAILBOX_HPP__
 #define __HYPERCOMM_COMPONENTS_MAILBOX_HPP__
 
+#include "../core/immediate.hpp"
 #include "../core/typed_value.hpp"
 #include "../utilities/weak_ref.hpp"
 #include "../core/generic_locality.hpp"
