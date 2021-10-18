@@ -28,6 +28,16 @@ struct dev_conv_<typed_value_ptr<T>> {
   }
 };
 
+template <typename T>
+struct invoker_ {
+  inline static void invoke(const T& t) { t(); }
+};
+
+template <>
+struct invoker_<std::nullptr_t> {
+  inline static void invoke(const std::nullptr_t&) {}
+};
+
 namespace components {
 template <typename Inputs, typename Outputs>
 class component : public base_ {
@@ -51,7 +61,7 @@ class component : public base_ {
 
  protected:
   using outgoing_type = outbox_<out_set>;
-  using incoming_type = std::deque<in_set>;
+  using incoming_type = std::list<in_set>;
   using incoming_iterator = typename incoming_type::iterator;
 
   incoming_type incoming_;
@@ -68,12 +78,17 @@ class component : public base_ {
   component(std::size_t id_)
       : base_(id_, n_inputs_, n_outputs_, acceptors.data(), in_types.data()) {}
 
+  virtual ~component() { this->empty_buffers_(); }
+
   template <std::size_t I>
-  static void accept(component<Inputs, Outputs>* self, in_elt_t<I>&& val) {
-    if (n_inputs_ == 1) {
+  inline static void accept(component<Inputs, Outputs>* self,
+                            in_elt_t<I>&& val) {
+    if (!val) {
+      self->on_invalidation_<I>();
+    } else if (n_inputs_ == 1) {
       // bypass seeking a partial set for single-input coms
       direct_stage<I>(self, std::move(val));
-    } else if (val) {
+    } else {
       // look for a set missing this value
       auto search = self->find_gap_<I>();
       const auto gapless = search == std::end(self->incoming_);
@@ -86,13 +101,10 @@ class component : public base_ {
       }
       // update the value in the set
       std::get<I>(*search) = std::move(val);
-      QdCreate(1);
       // check whether it's ready, and stage it if so!
       if (!gapless && is_ready(*search)) {
         self->stage_action(search);
       }
-    } else {
-      self->on_invalidation_<I>();
     }
   }
 
@@ -136,7 +148,12 @@ class component : public base_ {
 
   virtual void deactivate(status_ signal) override {
     this->active = false;
-    // TODO ...
+
+    this->empty_buffers_();
+    if (signal == status_::kInvalidation) {
+      this->send_invalidations_();
+    }
+
     this->notify_listeners(signal);
   }
 
@@ -151,6 +168,52 @@ class component : public base_ {
 
  private:
   template <std::size_t I>
+  inline static void return_(in_set& set) {
+    auto& val = std::get<I>(set);
+    try_return(std::move(val));
+  }
+
+  template <std::size_t I>
+  inline typename std::enable_if<(I == 0)>::type empty_buffer_(in_set& set) {
+    return_<I>(set);
+  }
+
+  template <std::size_t I>
+  inline typename std::enable_if<(I >= 1)>::type empty_buffer_(in_set& set) {
+    this->empty_buffer_<(I - 1)>(set);
+    return_<I>(set);
+  }
+
+  void empty_buffers_(void) {
+    if (this->incoming_.empty()) {
+      return;
+    } else {
+      // try to return all unused values and
+      for (auto& set : this->incoming_) {
+        empty_buffer_<(n_inputs_ - 1)>(set);
+      }
+      // clear values so they're not used again
+      this->incoming_.clear();
+    }
+  }
+
+  template <std::size_t O>
+  inline typename std::enable_if<(O == 0)>::type send_invalidation_(void) {}
+
+  template <std::size_t O>
+  inline typename std::enable_if<(O == 1)>::type send_invalidation_(void) {
+    (this->outgoing_).template invalidate<(O - 1)>();
+  }
+
+  template <std::size_t O>
+  inline typename std::enable_if<(O > 1)>::type send_invalidation_(void) {
+    this->send_invalidation_<(O - 1)>();
+    (this->outgoing_).template invalidate<(O - 1)>();
+  }
+
+  void send_invalidations_(void) { this->send_invalidation_<n_outputs_>(); }
+
+  template <std::size_t I>
   void on_invalidation_(void) {
     this->deactivate(kInvalidation);
   }
@@ -159,19 +222,15 @@ class component : public base_ {
     // this should be consistent with "find_ready"
     // and the opposite of "find_gap"
     this->incoming_.emplace_front(std::move(set));
-    QdCreate(n_inputs_);
   }
 
   template <std::size_t I>
   inline static typename std::enable_if<(I == 0) && (n_inputs_ == 1)>::type
   direct_stage(component<Inputs, Outputs>* self, in_elt_t<I>&& val) {
-    if (val) {
-      in_set set(std::move(val));
-      if (!self->stage_action(set)) {
-        self->buffer_ready_set_(std::move(set));
-      }
-    } else {
-      self->on_invalidation_<I>();
+    CkAssertMsg((bool)val, "not equipped for invalidations!");
+    in_set set(std::move(val));
+    if (!self->stage_action(set, nullptr)) {
+      self->buffer_ready_set_(std::move(set));
     }
   }
 
@@ -182,17 +241,16 @@ class component : public base_ {
   }
 
   inline void stage_action(const incoming_iterator& search) {
-    if (this->stage_action(*search)) {
-      this->incoming_.erase(search);
-      QdProcess(n_inputs_);
-    }
+    this->stage_action(*search, [&](void) { this->incoming_.erase(search); });
   }
 
   // returns true if the set was consumed
-  inline bool stage_action(in_set& set) {
+  template <typename Fn>
+  inline bool stage_action(in_set& set, const Fn& cleanup) {
     if (this->active) {
       try {
         auto res = this->action(set);
+        invoker_<Fn>::invoke(cleanup);
         this->outgoing_.unspool(res);
         if (!this->persistent) {
           this->deactivate(kCompletion);
@@ -200,6 +258,8 @@ class component : public base_ {
       } catch (suspension_& s) {
         if (this->id != s.com) {
           throw s;
+        } else {
+          invoker_<Fn>::invoke(cleanup);
         }
       }
       return true;

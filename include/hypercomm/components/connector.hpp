@@ -25,7 +25,10 @@ class connector_ {
   }
 
   ~connector_() {
-    if (dst_) dst_->~destination();
+    if (dst_) {
+      dst_->~destination();
+      dst_ = nullptr;
+    }
   }
 
   inline void relay(T&& value) const {
@@ -33,6 +36,8 @@ class connector_ {
   }
 
   inline bool ready(void) const { return this->dst_ != nullptr; }
+
+  inline void self_destruct(void) { this->~connector_(); }
 };
 }  // namespace components
 }  // namespace hypercomm

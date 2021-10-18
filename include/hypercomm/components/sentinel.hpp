@@ -118,10 +118,10 @@ class sentinel {
 
     if (self) {
       switch (status) {
-        case component::kCompletion:
+        case components::status_::kCompletion:
           (*self)->on_completion(com);
           break;
-        case component::kInvalidation:
+        case components::status_::kInvalidation:
           (*self)->on_invalidation(com);
           break;
         default:

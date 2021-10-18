@@ -12,6 +12,8 @@ template <typename T>
 class mailbox : public component<T, std::tuple<>> {
  public:
   using parent_t = component<T, std::tuple<>>;
+  using in_set = typename parent_t::in_set;
+  using value_type = typename std::tuple_element<0, in_set>::type;
 
   using predicate_type = std::shared_ptr<immediate_action<bool(const T&)>>;
   using action_type = callback_ptr;
@@ -20,20 +22,20 @@ class mailbox : public component<T, std::tuple<>> {
   class request {
    public:
     predicate_type pred;
-    action_type act;
+    destination dst;
 
     component_id_t com;
-    component::listener_type listener;
+    components::base_::listener_type listener;
 
-    request(const predicate_type& _1, callback_ptr&& _2)
-        : pred(_1), act(_2), com(0) {}
-
-    request(const predicate_type& _1, const callback_ptr& _2)
-        : pred(_1), act(_2), com(0) {}
+    template <typename... Args>
+    request(const predicate_type& pred_, Args&&... args)
+        : pred(pred_), dst(std::forward<Args>(args)...), com(0) {}
 
     inline bool matches(const T& t) { return !pred || pred->action(t); }
 
-    inline void action(value_type&& value) { act->send(std::move(value)); }
+    inline void action(value_type&& value) {
+      passthru_context_(dst, std::move(value));
+    }
   };
 
  protected:
@@ -47,10 +49,6 @@ class mailbox : public component<T, std::tuple<>> {
   mailbox(const id_t& _1) : parent_t(_1), weak_(new weak_ref_t(this)) {}
 
   ~mailbox() { weak_->reset(nullptr); }
-
-  virtual std::size_t n_inputs(void) const override { return 1; }
-  virtual std::size_t n_outputs(void) const override { return 0; }
-  virtual bool keep_alive(void) const override { return true; }
 
   inline reqiter_t put_request(const predicate_type& pred,
                                const callback_ptr& cb) {
@@ -72,7 +70,7 @@ class mailbox : public component<T, std::tuple<>> {
     auto* ctx = access_context_();
     auto search = this->find_in_buffer(pred);
     if (search == std::end(this->buffer_)) {
-      this->requests_.emplace_front(pred, ctx->make_connector(com, port));
+      this->requests_.emplace_front(pred, com, port);
       auto req = this->requests_.begin();
       req->com = com;
       req->listener =
@@ -82,12 +80,12 @@ class mailbox : public component<T, std::tuple<>> {
                              [](void* value) { delete (listener_type*)value; });
     } else {
       QdProcess(1);
-      ctx->components[com]->receive_value(port, std::move(*search));
+      ctx->components[com]->accept(port, std::move(*search));
       this->buffer_.erase(search);
     }
   }
 
-  virtual std::tuple<> action(parent_t::in_set& set) override {
+  virtual std::tuple<> action(in_set& set) override {
     auto& value = std::get<0>(set);
     auto search = this->find_matching(value);
 

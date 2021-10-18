@@ -64,15 +64,15 @@ struct deliverable {
 
   deliverable(deliverable&& other)
       : kind(other.kind), storage_(other.storage_), ep_(std::move(other.ep_)) {
-    other.storage_ = nullptr;
+    other.invalidate_();
   }
 
   deliverable& operator=(deliverable&& other) {
     if (this != &other) {
-      this->ep_ = std::move(other.ep_);
+      this->ep_ = other.ep_ ? std::move(other.ep_) : nullptr;
       this->storage_ = other.storage_;
-      other.storage_ = nullptr;
       this->kind = other.kind;
+      other.invalidate_();
     }
     return *this;
   }
@@ -94,6 +94,12 @@ struct deliverable {
 
   static value_ptr to_value(deliverable&& dev);
   static CkMessage* to_message(deliverable&& dev);
+
+ private:
+  inline void invalidate_(void) {
+    this->kind = kInvalid;
+    this->storage_ = nullptr;
+  }
 };
 
 template <>

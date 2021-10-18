@@ -45,6 +45,14 @@ namespace {
 CpvDeclare(generic_locality_*, locality_);
 }
 
+void try_return(deliverable&& dev) {
+  if (dev.kind == deliverable::kValue) {
+    try_return(value_ptr(dev.release<hyper_value>()));
+  } else {
+    not_implemented("...");
+  }
+}
+
 // TODO ( do not assume array-issuedness )
 // TODO ( send immediately looking forward! )
 void send2future(const future& f, deliverable&& dev) {

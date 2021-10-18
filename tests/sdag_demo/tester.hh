@@ -10,22 +10,19 @@
 
 using namespace hypercomm;
 
-struct test_component : public component {
-  std::size_t n_inputs_;
+template<typename... Ts>
+struct test_component : public component<std::tuple<Ts...>, std::tuple<>> {
+  using parent_t = component<std::tuple<Ts...>, std::tuple<>>;
+  using in_set = typename parent_t::in_set;
 
-  test_component(const id_t& _1, const std::size_t& _2)
-      : component(_1), n_inputs_(_2) {}
+  test_component(const id_t& id_): parent_t(id_) {}
 
-  virtual value_set action(value_set&& values) override {
+  virtual std::tuple<> action(in_set& set) override {
 #if CMK_VERBOSE
     CkPrintf("com%lu> i was invoked\n", this->id);
 #endif
     return {};
   }
-
-  virtual std::size_t n_inputs(void) const override { return this->n_inputs_; }
-
-  virtual std::size_t n_outputs(void) const override { return 0; }
 };
 
 #endif
