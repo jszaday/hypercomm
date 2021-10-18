@@ -105,14 +105,13 @@ class generic_locality_ : public manageable_base_ {
   //   this->components[src]->update_destination(srcPort, cb);
   // }
 
-  // inline void connect(const entry_port_ptr& srcPort, const component_id_t&
-  // dst,
-  //                     const component_port_t& dstPort) {
-  //   this->components[dst]->add_listener(
-  //       &on_status_change, new entry_port_ptr(srcPort),
-  //       [](void* value) { delete (entry_port_ptr*)value; });
-  //   this->open(srcPort, std::make_pair(dst, dstPort));
-  // }
+  inline void connect(const entry_port_ptr& srcPort, const component_id_t& dst,
+                      const component_port_t& dstPort) {
+    this->components[dst]->add_listener(
+        &on_status_change, new entry_port_ptr(srcPort),
+        [](void* value) { delete (entry_port_ptr*)value; });
+    this->open(srcPort, std::make_pair(dst, dstPort));
+  }
 
   // callback_ptr make_connector(const component_id_t& com,
   //                             const component_port_t& port);
@@ -150,6 +149,11 @@ void CkIndex_locality_base_::value_handler(CkMessage* msg, CkMigratable* mig) {
   auto* self = static_cast<generic_locality_*>(mig);
   self->update_context();
   self->receive_value(msg, fn);
+}
+
+template <typename... Args>
+void passthru_context_(Args&&... args) {
+  access_context_()->passthru(std::forward<Args>(args)...);
 }
 
 }  // namespace hypercomm

@@ -84,11 +84,11 @@ struct outbox_<std::tuple<Ts...>> {
     }
   }
 
-  template <std::size_t I>
-  inline bool connect_to(std::size_t com, std::size_t port) {
+  template <std::size_t I, typename... Args>
+  inline bool connect_to(Args&&... args) {
     auto& con = std::get<I>(this->connectors_);
     auto ready = con.ready();
-    new (&con) connector_<tuple_elt_t<I>>(com, port);
+    new (&con) connector_<tuple_elt_t<I>>(std::forward<Args>(args)...);
     return ready;
   }
 

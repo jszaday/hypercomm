@@ -1,10 +1,10 @@
 #ifndef __HYPERCOMM_COMPONENTS_IDENTIFIERS_HPP__
 #define __HYPERCOMM_COMPONENTS_IDENTIFIERS_HPP__
 
+#include <map>
 #include <memory>
 #include <cstdint>
 #include <utility>
-#include <unordered_map>
 
 namespace hypercomm {
 

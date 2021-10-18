@@ -102,7 +102,7 @@ class vil : public detail::base_<Base, Index>, public future_manager_ {
     auto next = ++(this->component_authority);
     auto inst = new T(next, std::move(args)...);
     this->components.emplace(next, inst);
-    return ((component*)inst)->id;
+    return static_cast<components::base_*>(inst)->id;
   }
 
   // NOTE ( generic collective proxy accessor method )
@@ -176,30 +176,28 @@ class vil : public detail::base_<Base, Index>, public future_manager_ {
     const auto& rdcr = this->emplace_component<reducer>(
         stamp, fn, ustream.size() + 1, dstream.empty() ? 1 : dstream.size());
 
-    auto count = 0;
     for (const auto& up : ustream) {
       auto ours = std::make_shared<reduction_port<Index>>(stamp, up);
-      this->connect(ours, rdcr, ++count);
+      this->connect(ours, rdcr, 0);
     }
 
     if (dstream.empty()) {
-      this->connect(rdcr, 0, cb);
+      rdcr->template output_to<0>(cb);
     } else {
       auto theirs =
           std::make_shared<reduction_port<Index>>(stamp, ident->mine());
 
-      count = 0;
       for (const auto& down : dstream) {
         auto downIdx = conv2idx<base_index_type>(down);
         auto fwd = forward_to(this->thisProxy[downIdx], theirs);
-        this->connect(rdcr, count++, std::move(fwd));
+        rdcr->template output_to<0>(std::move(fwd));
       }
     }
 
     this->activate_component(rdcr);
     auto contrib =
         make_typed_value<contribution>(deliverable(std::move(value)), fn, cb);
-    this->components[rdcr]->receive_value(0, std::move(contrib));
+    this->components[rdcr]->accept(0, std::move(contrib));
   }
 };
 
@@ -254,7 +252,8 @@ void generic_locality_::loopback(const entry_port_ptr& port,
                                  deliverable&& value) {
   auto elt = dynamic_cast<ArrayElement*>(this);
   CkAssert(elt != nullptr);
-  interceptor::send_async(elt->ckGetArrayID(), elt->ckGetArrayIndex(), port,
+  value.update_endpoint(port);
+  interceptor::send_async(elt->ckGetArrayID(), elt->ckGetArrayIndex(),
                           std::move(value));
 }
 

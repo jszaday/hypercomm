@@ -13,6 +13,8 @@ struct reducer : public component<deliverable, deliverable> {
   std::vector<deliverable> devs_;
 
  public:
+  using pair_type = typename stamp_type::value_type;
+
   hypercomm::combiner_ptr combiner;
   std::size_t n_ustream, n_dstream;
 
@@ -25,6 +27,7 @@ struct reducer : public component<deliverable, deliverable> {
         combiner(_3),
         n_ustream(_4),
         n_dstream(_5) {
+    CkAssert(this->n_dstream == 1);
     this->devs_.reserve(this->n_ustream);
     this->persistent = true;
   }

@@ -47,6 +47,19 @@ class destination {
   static_assert(std::is_trivially_destructible<com_port_pair_t>::value,
                 "expected pair to be trivially destructible!");
 
+  inline operator bool(void) const {
+    switch (this->kind) {
+      case kCallback:
+        return (bool)this->cb();
+      case kEndpoint:
+        return (bool)this->ep();
+      case kComponent:
+        return true;
+      default:
+        return false;
+    }
+  }
+
   ~destination() {
     switch (this->kind) {
       case kCallback:
@@ -79,16 +92,17 @@ class destination {
 template <>
 struct destination::initializer_<destination::kCallback> {
   template <typename... Args>
-  inline static void initialize(destination* self, Args... args) {
+  inline static void initialize(destination* self, Args&&... args) {
     self->kind = kCallback;
     new (&(self->storage_.cb)) callback_ptr(std::forward<Args>(args)...);
+    CkEnforce(self->kind == kCallback);
   }
 };
 
 template <>
 struct destination::initializer_<destination::kComponent> {
   template <typename... Args>
-  inline static void initialize(destination* self, Args... args) {
+  inline static void initialize(destination* self, Args&&... args) {
     self->kind = kComponent;
     new (&(self->storage_.com)) com_port_pair_t(std::forward<Args>(args)...);
   }
@@ -97,7 +111,7 @@ struct destination::initializer_<destination::kComponent> {
 template <>
 struct destination::initializer_<destination::kEndpoint> {
   template <typename... Args>
-  inline static void initialize(destination* self, Args... args) {
+  inline static void initialize(destination* self, Args&&... args) {
     self->kind = kEndpoint;
     new (&(self->storage_.ep)) endpoint(std::forward<Args>(args)...);
   }

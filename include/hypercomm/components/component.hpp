@@ -108,7 +108,13 @@ class component : public base_ {
         std::is_same<out_elt_t<O>,
                      typename component<Input_, Output_>::in_elt_t<I>>::value,
         "component types must be compatible");
-    bool prev = (this->outgoing_).template connect_to<O>(peer.id, I);
+    this->output_to<O>(peer.id, I);
+  }
+
+  template <std::size_t O, typename... Args>
+  void output_to(Args&&... args) {
+    bool prev =
+        (this->outgoing_).template connect_to<O>(std::forward<Args>(args)...);
     CkAssertMsg(!(this->active && prev),
                 "component must be offline to change outbound connections");
     if (this->active) {

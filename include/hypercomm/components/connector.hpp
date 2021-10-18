@@ -3,47 +3,36 @@
 
 #include <cstdint>
 #include "../serialization/construction.hpp"
+#include "../messaging/destination.hpp"
 
 namespace hypercomm {
+
+template <typename... Args>
+void passthru_context_(Args&&... args);
+
 namespace components {
 template <typename T>
-struct connector_ {
-  enum options_ { kInvalid, kWire };
+class connector_ {
+  destination* dst_;
+  std::aligned_storage<sizeof(destination), alignof(destination)> storage_;
 
-  options_ which_;
+ public:
+  connector_(void) : dst_(nullptr) {}
 
-  union u_state_ {
-    struct s_wire_ {
-      std::size_t com;
-      std::size_t port;
-
-      s_wire_(std::size_t com_, std::size_t port_) : com(com_), port(port_) {}
-    } wire_;
-
-    u_state_(tags::no_init) {}
-
-    u_state_(std::size_t com, std::size_t port) : wire_(com, port) {}
-  } state_;
-
-  connector_(void) : which_(kInvalid), state_(tags::no_init()) {}
-
-  connector_(std::size_t com, std::size_t port)
-      : which_(kWire), state_(com, port) {}
-
-  inline bool ready(void) const { return this->which_ != kInvalid; }
-
-  inline void relay(T&& value) {
-    switch (this->which_) {
-      case kWire:
-        // access_context_()->accept((this->state_).wire_.com,
-        //                           (this->state_).wire_.port,
-        //                           cast_value(std::move(value)));
-        break;
-      case kInvalid:
-        CkAbort("delivery to invalid connector!");
-        break;
-    }
+  template <typename... Args>
+  connector_(Args&&... args) : dst_((destination*)&storage_) {
+    new (dst_) destination(std::forward<Args>(args)...);
   }
+
+  ~connector_() {
+    if (dst_) dst_->~destination();
+  }
+
+  inline void relay(T&& value) const {
+    passthru_context_(*(this->dst_), std::move(value));
+  }
+
+  inline bool ready(void) const { return this->dst_ != nullptr; }
 };
 }  // namespace components
 }  // namespace hypercomm

@@ -2,6 +2,8 @@
 #define __HYPERCOMM_CORE_COMMON_HPP__
 
 #include "../messaging/common.hpp"
+#include "../components/identifiers.hpp"
+
 #include "proxy.hpp"
 #include "callback.hpp"
 

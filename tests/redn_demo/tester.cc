@@ -111,7 +111,7 @@ struct locality : public vil<CBase_locality, int> {
 };
 
 // NOTE ( this is effectively the body for the say_hello entry method )
-typename say_hello::value_set say_hello::action(value_set&& accepted) {
+typename std::tuple<> say_hello::action(std::tuple<deliverable>& accepted) {
   if (kVerbose) {
     CkPrintf("com%lu> hi, hi!\n", id);
   }
@@ -120,12 +120,12 @@ typename say_hello::value_set say_hello::action(value_set&& accepted) {
 }
 
 // NOTE ( this is effectively the body for the my_redn_com entry method )
-typename my_redn_com::value_set my_redn_com::action(value_set&& accepted) {
+std::tuple<> my_redn_com::action(my_redn_com::in_set& accepted) {
   // the accepted pool contains the first message received by this action
   // TODO <- fix this up once consume is added ->
   using tuple_type = std::tuple<array_proxy::index_type, int>;
   // unpack it to an index/int pair
-  auto tmp = value2typed<tuple_type>(std::move(accepted[0]));
+  auto& tmp = std::get<0>(accepted);
   auto& idx = std::get<0>(tmp->value());
   auto& numIters = std::get<1>(tmp->value());
   // make the function and callback

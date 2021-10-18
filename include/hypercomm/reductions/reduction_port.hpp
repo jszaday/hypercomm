@@ -10,9 +10,6 @@ namespace hypercomm {
 template <typename Index>
 class reduction_port : public entry_port {
  public:
-  using stamp_type = typename stamp_type;
-  using imprintable_ptr = typename reducer::imprintable_ptr;
-
   hash_code identity;  // TODO use something better here
   reduction_id_t count;
   Index index;
