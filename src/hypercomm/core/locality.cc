@@ -389,48 +389,54 @@ void generic_locality_::passthru(const com_port_pair_t& port,
   this->try_collect(search->second);
 }
 
-// reducer::value_set reducer::action(value_set&& accepted) {
-//   CkAssertMsg(this->n_dstream == 1, "reducers may only have one output");
+reducer::out_set reducer::action(reducer::in_set& set) {
+  CkAssertMsg(this->n_dstream == 1, "reducers may only have one output");
 
-//   auto cmp = comparable_comparator<callback_ptr>();
-//   callback_ptr ourCb;
+  auto& dev = std::get<0>(set);
+  this->devs_.emplace_back(std::move(dev));
+  this->persistent = (this->devs_.size() < this->n_ustream);
+  // if we're still waiting on values, suspend!
+  if (this->persistent) {
+    this->suspend();
+  }
 
-//   auto& ourCmbnr = this->combiner;
+  callback_ptr ourCb;
+  auto& ourCmbnr = this->combiner;
+  // auto cmp = comparable_comparator<callback_ptr>();
 
-//   using contribution_type = typed_value<contribution>;
-//   typename combiner::argument_type args;
-//   for (auto& pair : accepted) {
-//     auto& raw = pair.second;
-//     auto contrib =
-//         raw ? value2typed<typename contribution_type::type>(std::move(raw))
-//             : std::shared_ptr<contribution_type>();
-//     if (contrib) {
-//       if ((*contrib)->msg_ != nullptr) {
-//         args.emplace_back((*contrib)->msg_);
-//       }
+  using contribution_type = typed_value<contribution>;
+  typename combiner::argument_type args;
+  for (auto& raw : this->devs_) {
+    auto contrib =
+        raw ? dev2typed<typename contribution_type::type>(std::move(raw))
+            : std::shared_ptr<contribution_type>();
+    if (contrib) {
+      if ((*contrib)->msg_ != nullptr) {
+        args.emplace_back((*contrib)->msg_);
+      }
 
-//       auto& theirCb = (*contrib)->callback_;
-//       if (theirCb) {
-//         if (ourCb) {
-//           // CkAssertMsg(cmp(cb, (*contrib)->callback_), "callbacks must
-//           // match");
-//         } else {
-//           ourCb = theirCb;
-//         }
-//       }
+      auto& theirCb = (*contrib)->callback_;
+      if (theirCb) {
+        if (ourCb) {
+          // CkAssertMsg(cmp(cb, (*contrib)->callback_), "callbacks must
+          // match");
+        } else {
+          ourCb = theirCb;
+        }
+      }
 
-//       auto& theirCmbnr = (*contrib)->combiner_;
-//       if (!ourCmbnr && theirCmbnr) {
-//         ourCmbnr = theirCmbnr;
-//       }
-//     }
-//   }
+      auto& theirCmbnr = (*contrib)->combiner_;
+      if (!ourCmbnr && theirCmbnr) {
+        ourCmbnr = theirCmbnr;
+      }
+    }
+  }
 
-//   auto result = (*ourCmbnr)(std::move(args));
-//   auto contrib = make_typed_value<typename contribution_type::type>(
-//       std::move(result), ourCmbnr, ourCb);
-//   return component::make_set(0, std::move(contrib));
-// }
+  auto result = (*ourCmbnr)(std::move(args));
+  auto contrib = make_typed_value<typename contribution_type::type>(
+      std::move(result), ourCmbnr, ourCb);
+  return std::make_tuple(std::move(contrib));
+}
 
 void generic_locality_::open(const entry_port_ptr& ours, destination&& theirs) {
   ours->alive = true;

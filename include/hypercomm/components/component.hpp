@@ -9,8 +9,8 @@
 namespace hypercomm {
 
 template <>
-struct wrap_<deliverable, typed_value_ptr> {
-  using type = deliverable;
+struct wrap_<std::tuple<deliverable>, typed_value_ptr> {
+  using type = std::tuple<deliverable>;
 };
 
 template <typename T, typename Enable = void>
@@ -185,10 +185,16 @@ class component : public base_ {
   // returns true if the set was consumed
   inline bool stage_action(in_set& set) {
     if (this->active) {
-      auto res = this->action(set);
-      this->outgoing_.unspool(res);
-      if (!this->persistent) {
-        this->deactivate(kCompletion);
+      try {
+        auto res = this->action(set);
+        this->outgoing_.unspool(res);
+        if (!this->persistent) {
+          this->deactivate(kCompletion);
+        }
+      } catch (suspension_& s) {
+        if (this->id != s.com) {
+          throw s;
+        }
       }
       return true;
     } else {

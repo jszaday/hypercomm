@@ -9,6 +9,8 @@ struct reducer : public component<deliverable, deliverable> {
  private:
   imprintable_ptr imprintable_;
   reduction_id_t count_;
+  using parent_t = component<deliverable, deliverable>;
+  std::vector<deliverable> devs_;
 
  public:
   hypercomm::combiner_ptr combiner;
@@ -17,12 +19,15 @@ struct reducer : public component<deliverable, deliverable> {
   reducer(const component_id_t &_1, const pair_type &_2,
           const hypercomm::combiner_ptr &_3, const std::size_t &_4,
           const std::size_t &_5)
-      : component(_1),
+      : parent_t(_1),
         imprintable_(_2.first),
         count_(_2.second),
         combiner(_3),
         n_ustream(_4),
-        n_dstream(_5) {}
+        n_dstream(_5) {
+    this->devs_.reserve(this->n_ustream);
+    this->persistent = true;
+  }
 
   inline pair_type stamp(void) const {
     return std::make_pair(this->imprintable_, this->count_);
@@ -42,7 +47,9 @@ struct reducer : public component<deliverable, deliverable> {
   // virtual std::size_t n_outputs(void) const override { return
   // this->n_dstream; }
 
-  // virtual value_set action(value_set &&accepted) override;
+  using in_set = parent_t::in_set;
+  using out_set = parent_t::out_set;
+  virtual out_set action(in_set &accepted) override;
 };
 }  // namespace hypercomm
 

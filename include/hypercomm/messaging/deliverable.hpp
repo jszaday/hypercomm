@@ -11,7 +11,7 @@ struct delivery;
 struct deliverable {
   friend class delivery;
 
-  enum kind_ { kMessage, kValue, kDeferred };
+  enum kind_ { kInvalid, kMessage, kValue, kDeferred };
 
   kind_ kind;
 
@@ -24,6 +24,8 @@ struct deliverable {
   hypercomm::endpoint ep_;
 
  public:
+  deliverable(void) : kind(kInvalid), storage_(nullptr), ep_() {}
+
   deliverable(CkMessage* msg) : kind(kMessage), storage_(msg), ep_(msg) {}
 
   deliverable(zero_copy_value* zc)
@@ -51,6 +53,10 @@ struct deliverable {
       case kDeferred:
         if (this->storage_) delete (zero_copy_value*)this->storage_;
         break;
+      case kInvalid:
+        break;
+      default:
+        not_implemented("unrecognized deliverable kind!");
     }
   }
 
@@ -59,6 +65,16 @@ struct deliverable {
   deliverable(deliverable&& other)
       : kind(other.kind), storage_(other.storage_), ep_(std::move(other.ep_)) {
     other.storage_ = nullptr;
+  }
+
+  deliverable& operator=(deliverable&& other) {
+    if (this != &other) {
+      this->ep_ = std::move(other.ep_);
+      this->storage_ = other.storage_;
+      other.storage_ = nullptr;
+      this->kind = other.kind;
+    }
+    return *this;
   }
 
   template <typename T>

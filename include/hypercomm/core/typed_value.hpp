@@ -235,8 +235,7 @@ std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev,
       return value2typed<T>(value_ptr(val));
     }
     default: {
-      NOT_IMPLEMENTED;
-      return {};
+      not_implemented("unrecognized deliverable kind!");
     }
   }
 }

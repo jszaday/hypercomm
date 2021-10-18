@@ -87,7 +87,7 @@ class mailbox : public component<T, std::tuple<>> {
     }
   }
 
-  virtual std::tuple<> action(typename parent_t::in_set&& set) override {
+  virtual std::tuple<> action(parent_t::in_set& set) override {
     auto& value = std::get<0>(set);
     auto search = this->find_matching(value);
 

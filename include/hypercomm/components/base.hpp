@@ -13,6 +13,14 @@ namespace hypercomm {
 namespace components {
 enum status_ { kCompletion, kInvalidation };
 
+struct suspension_ : public std::exception {
+  const component_id_t com;
+
+  suspension_(const component_id_t& com_) : com(com_) {}
+
+  const char* what() const throw() { return "component suspended"; }
+};
+
 class base_ {
  public:
   const std::size_t id;
@@ -70,6 +78,8 @@ class base_ {
     this->listeners_.emplace_front(std::forward<Args>(args)...);
     return std::begin(this->listeners_);
   }
+
+  inline void suspend(void) { throw suspension_(this->id); }
 
   inline void remove_listener(const listener_type& it) {
     if (it != std::end(this->listeners_)) {
