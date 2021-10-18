@@ -1,173 +1,279 @@
 #ifndef __HYPERCOMM_COMPONENTS_COMPONENT_HPP__
 #define __HYPERCOMM_COMPONENTS_COMPONENT_HPP__
 
-#include "../core.hpp"
-
-#include "identifiers.hpp"
+#include <ck.h>
+#include "base.hpp"
+#include "outbox.hpp"
+#include "../core/typed_value.hpp"
 
 namespace hypercomm {
 
-class component : virtual public impermanent {
- protected:
-  struct listener_;
-  std::list<listener_> listeners_;
+template <>
+struct wrap_<deliverable, typed_value_ptr> {
+  using type = deliverable;
+};
 
+template <typename T, typename Enable = void>
+struct dev_conv_;
+
+template <>
+struct dev_conv_<deliverable> {
+  static deliverable convert(deliverable&& dev) { return std::move(dev); }
+};
+
+template <typename T>
+struct dev_conv_<typed_value_ptr<T>> {
+  static typed_value_ptr<T> convert(deliverable&& dev) {
+    return dev2typed<T>(std::move(dev));
+  }
+};
+
+namespace components {
+template <typename Inputs, typename Outputs>
+class component : public base_ {
  public:
-  friend class generic_locality_;
+  using in_type = typename tuplify_<Inputs>::type;
+  using out_type = typename tuplify_<Outputs, true>::type;
 
-  using value_type = value_ptr;
-  using value_set = std::map<component_port_t, value_type>;
-  using incoming_type = std::deque<value_set>;
+  using in_set = typename wrap_<in_type, typed_value_ptr>::type;
+  using out_set = typename wrap_<out_type, typed_value_ptr>::type;
 
-  enum status { kCompletion, kInvalidation };
+  template <std::size_t I>
+  using in_elt_t = typename std::tuple_element<I, in_set>::type;
 
-  using listener_type = typename decltype(listeners_)::iterator;
-  using status_listener_fn = void (*)(const component*, status, void*);
-
-  const component_id_t id;
-  bool activated;
-
-  component(const component_id_t& _1) : id(_1), activated(false) {}
-
-  virtual ~component() {
-    // dumps all held values and propagates invalidations downstream
-    this->ret_inv_values();
-#if CMK_VERBOSE
-    // we have values but nowhere to send 'em
-    auto n_outgoing = this->outgoing.size();
-    if (n_outgoing > 0) {
-      CkError("warning> com%lu destroyed with %lu unsent message(s).\n",
-              this->id, n_outgoing);
-    }
-#endif
-  }
-
-  // determeines whether the component should stay
-  // "alive" after its acted
-  virtual bool keep_alive(void) const override;
-
-  // determines how components respond to invalidations
-  // => true -- tolerates invalidations
-  // => false -- invalidations are destructive
-  // (note: it is false by default)
-  virtual bool permissive(void) const;
-
-  // used by the RTS to determine when to GC a component
-  // (typically, after all staged values have been sent)
-  virtual bool collectible(void) const;
-
-  // the component's number of input ports
-  virtual std::size_t n_inputs(void) const = 0;
-
-  // the component's number of output ports
-  virtual std::size_t n_outputs(void) const = 0;
-
-  // number of expected values (typically #inputs)
-  virtual std::size_t n_expected(void) const { return this->n_inputs(); }
-
-  // action called when a value set is ready
-  virtual value_set action(value_set&& values) = 0;
-
-  // used to send a value to a component
-  // null values are treated as invalidations
-  void receive_value(const component_port_t& port, value_type&& value);
-
-  // updates the cb that a port's value is sent to
-  void update_destination(const component_port_t& port, const callback_ptr& cb);
-
-  // called when a component is first "activated" in the RTS
-  void activate(void);
-
-  // subscribes a status listener
-  template <typename... Args>
-  inline listener_type add_listener(Args... args) {
-    this->listeners_.emplace_front(std::forward<Args>(args)...);
-    return std::begin(this->listeners_);
-  }
-
-  inline void remove_listener(const listener_type& it) {
-    if (it != std::end(this->listeners_)) {
-      this->listeners_.erase(it);
-    }
-  }
-
-  // sends invalidation or completion notifications
-  template <status Status>
-  inline void notify_listeners(void) {
-#if CMK_VERBOSE
-    CkPrintf("com%lu> notifying %lu listener(s) of status change to %s.\n",
-             this->id, this->listeners_.size(),
-             (Status == kInvalidation) ? "invalid" : "complete");
-#endif
-    while (!this->listeners_.empty()) {
-      auto& l = this->listeners_.back();
-      l(this, Status);
-      this->listeners_.pop_back();
-    }
-  }
-
-  template <typename... Args>
-  // create a value set and initialize it a variable number of port/value pairs
-  inline static value_set make_varset(Args&&... args) {
-    using value_type = typename value_set::value_type;
-    value_set set;
-    auto insert = [&](value_type&& value) -> void {
-      set.insert(std::move(value));
-    };
-    using expander = int[];
-    (void)expander{0, (void(insert(std::move(args))), 0)...};
-    return std::move(set);
-  }
-
-  // create a value set and initialize it with the port/value pair
-  inline static value_set make_set(const component_port_t& port,
-                                   value_type&& value) {
-    value_set set;
-    set.emplace(port, std::move(value));
-    return std::move(set);
-  }
-
- protected:
-  struct listener_ {
-    using fn_t = status_listener_fn;
-    using deleter_t = void (*)(void*);
-
-    fn_t fn;
-    void* arg;
-    deleter_t deleter;
-
-    listener_(listener_&&) = delete;
-    listener_(const listener_&) = delete;
-    listener_(const fn_t& fn_, void* arg_ = nullptr,
-              const deleter_t& deleter_ = nullptr)
-        : fn(fn_), arg(arg_), deleter(deleter_) {}
-
-    ~listener_() {
-      if (this->arg) this->deleter(this->arg);
-    }
-
-    inline void operator()(const component* self, status nu) {
-      fn(self, nu, this->arg);
-      this->arg = nullptr;
-    }
-  };
-
-  // staging area for incomplete value sets
-  incoming_type incoming;
-  // buffer of yet-unsent values
-  std::map<component_port_t, std::deque<value_type>> outgoing;
-  // buffer of unfulfilled callbacks
-  std::map<component_port_t, std::deque<callback_ptr>> routes;
+  template <std::size_t O>
+  using out_elt_t = typename std::tuple_element<O, out_type>::type;
 
  private:
-  void stage_action(incoming_type::iterator*);
+  static constexpr std::size_t n_inputs_ = std::tuple_size<in_type>::value;
+  static constexpr std::size_t n_outputs_ = std::tuple_size<out_type>::value;
+  static_assert(n_inputs_ >= 1, "expected at least one input!");
 
-  void on_invalidation(void);
+ protected:
+  using outgoing_type = outbox_<out_set>;
+  using incoming_type = std::deque<in_set>;
+  using incoming_iterator = typename incoming_type::iterator;
 
-  void unspool_values(value_set&);
+  incoming_type incoming_;
+  outgoing_type outgoing_;
 
-  void ret_inv_values(void);
+ public:
+  using accept_array_t = std::array<accept_fn_t, n_inputs_>;
+  static accept_array_t acceptors;
+#if HYPERCOMM_ERROR_CHECKING
+  using in_type_array_t = std::array<std::type_index, n_inputs_>;
+  static in_type_array_t in_types;
+#endif
+
+  component(std::size_t id_)
+      : base_(id_, n_inputs_, n_outputs_, acceptors.data(), in_types.data()) {}
+
+  template <std::size_t I>
+  static void accept(component<Inputs, Outputs>* self, in_elt_t<I>&& val) {
+    if (n_inputs_ == 1) {
+      // bypass seeking a partial set for single-input coms
+      direct_stage<I>(self, std::move(val));
+    } else if (val) {
+      // look for a set missing this value
+      auto search = self->find_gap_<I>();
+      const auto gapless = search == std::end(self->incoming_);
+      // if we couldn't find one:
+      if (gapless) {
+        // create a new set
+        self->incoming_.emplace_front();
+        // then update the search iterator
+        search = self->incoming_.begin();
+      }
+      // update the value in the set
+      std::get<I>(*search) = std::move(val);
+      QdCreate(1);
+      // check whether it's ready, and stage it if so!
+      if (!gapless && is_ready(*search)) {
+        self->stage_action(search);
+      }
+    } else {
+      self->on_invalidation_<I>();
+    }
+  }
+
+  template <std::size_t I>
+  static void accept(base_* base, deliverable&& dev) {
+    auto* self = static_cast<component<Inputs, Outputs>*>(base);
+    accept<I>(self, dev_conv_<in_elt_t<I>>::convert(std::move(dev)));
+  }
+
+  template <std::size_t O, std::size_t I, typename Input_, typename Output_>
+  void output_to(const component<Input_, Output_>& peer) {
+    static_assert(
+        std::is_same<out_elt_t<O>,
+                     typename component<Input_, Output_>::in_elt_t<I>>::value,
+        "component types must be compatible");
+    bool prev = (this->outgoing_).template connect_to<O>(peer.id, I);
+    CkAssertMsg(!(this->active && prev),
+                "component must be offline to change outbound connections");
+    if (this->active) {
+      (this->outgoing_).template try_flush<O>();
+    }
+  }
+
+  virtual out_set action(in_set&) = 0;
+
+  virtual void activate(void) override {
+    CkAssertMsg(!this->active, "component already online");
+    this->activated = this->active = true;
+    incoming_iterator search;
+    while (this->active &&
+           (search = this->find_ready_()) != std::end(this->incoming_)) {
+      this->stage_action(search);
+    }
+  }
+
+  virtual void deactivate(status_ signal) override {
+    this->active = false;
+    // TODO ...
+    this->notify_listeners(signal);
+  }
+
+  virtual bool collectible(void) const override {
+    return this->activated && !this->active && this->outgoing_.empty();
+  }
+
+ protected:
+  inline static bool is_ready(const in_set& set) {
+    return is_ready_<n_inputs_ - 1>(set);
+  }
+
+ private:
+  template <std::size_t I>
+  void on_invalidation_(void) {
+    this->deactivate(kInvalidation);
+  }
+
+  void buffer_ready_set_(in_set&& set) {
+    // this should be consistent with "find_ready"
+    // and the opposite of "find_gap"
+    this->incoming_.emplace_front(std::move(set));
+    QdCreate(n_inputs_);
+  }
+
+  template <std::size_t I>
+  inline static typename std::enable_if<(I == 0) && (n_inputs_ == 1)>::type
+  direct_stage(component<Inputs, Outputs>* self, in_elt_t<I>&& val) {
+    if (val) {
+      in_set set(std::move(val));
+      if (!self->stage_action(set)) {
+        self->buffer_ready_set_(std::move(set));
+      }
+    } else {
+      self->on_invalidation_<I>();
+    }
+  }
+
+  template <std::size_t I>
+  inline static typename std::enable_if<(I >= 0) && (n_inputs_ > 1)>::type
+  direct_stage(component<Inputs, Outputs>* self, in_elt_t<I>&& val) {
+    CkAbort("-- unreachable --");
+  }
+
+  inline void stage_action(const incoming_iterator& search) {
+    if (this->stage_action(*search)) {
+      this->incoming_.erase(search);
+      QdProcess(n_inputs_);
+    }
+  }
+
+  // returns true if the set was consumed
+  inline bool stage_action(in_set& set) {
+    if (this->active) {
+      auto res = this->action(set);
+      this->outgoing_.unspool(res);
+      if (!this->persistent) {
+        this->deactivate(kCompletion);
+      }
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  inline incoming_iterator find_ready_(void) {
+    if (!this->incoming_.empty()) {
+      for (auto it = std::begin(this->incoming_);
+           it != std::end(this->incoming_); it++) {
+        if (is_ready(*it)) {
+          return it;
+        }
+      }
+    }
+    return std::end(this->incoming_);
+  }
+
+  template <std::size_t I>
+  inline incoming_iterator find_gap_(void) {
+    if (!this->incoming_.empty()) {
+      auto search = this->incoming_.rbegin();
+      for (; search != this->incoming_.rend(); search++) {
+        if (!std::get<I>(*search)) {
+          return --search.base();
+        }
+      }
+    }
+
+    return std::end(this->incoming_);
+  }
+
+  template <std::size_t I>
+  inline static typename std::enable_if<I == 0, bool>::type is_ready_(
+      const in_set& set) {
+    return (bool)std::get<I>(set);
+  }
+
+  template <std::size_t I>
+  inline static typename std::enable_if<I >= 1, bool>::type is_ready_(
+      const in_set& set) {
+    return (bool)std::get<I>(set) && is_ready_<(I - 1)>(set);
+  }
+
+  template <std::size_t I, typename Array>
+  inline static typename std::enable_if<(I == 0)>::type make_acceptors_(
+      Array& arr) {
+    using elt_t = typename Array::value_type;
+    new (&arr[I]) elt_t(accept<I>);
+  }
+
+  template <std::size_t I, typename Array>
+  inline static typename std::enable_if<(I >= 1)>::type make_acceptors_(
+      Array& arr) {
+    using elt_t = typename Array::value_type;
+    new (&arr[I]) elt_t(accept<I>);
+    make_acceptors_<(I - 1), Array>(arr);
+  }
+
+  template <typename Array>
+  inline static Array make_acceptors_(void) {
+    using type = Array;
+    std::aligned_storage<sizeof(type), alignof(type)> storage;
+    auto* arr = reinterpret_cast<type*>(&storage);
+    make_acceptors_<n_inputs_ - 1, type>(*arr);
+    return *arr;
+  }
 };
+
+#if HYPERCOMM_ERROR_CHECKING
+template <typename Inputs, typename Outputs>
+typename component<Inputs, Outputs>::in_type_array_t
+    component<Inputs, Outputs>::in_types =
+        make_type_list_<component<Inputs, Outputs>::in_type,
+                        component<Inputs, Outputs>::n_inputs_>();
+#endif
+
+template <typename Inputs, typename Outputs>
+typename component<Inputs, Outputs>::accept_array_t
+    component<Inputs, Outputs>::acceptors =
+        component<Inputs, Outputs>::make_acceptors_<accept_array_t>();
+}  // namespace components
+template <typename Input, typename Output>
+using component = components::component<Input, Output>;
 }  // namespace hypercomm
 
 #endif

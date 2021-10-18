@@ -19,26 +19,27 @@ value_ptr deliverable::to_value(deliverable&& dev) {
 }
 
 // TODO this is a temporary solution
-struct connector_ : public callback {
-  generic_locality_* self;
-  destination dst;
+// struct connector_ : public callback {
+//   generic_locality_* self;
+//   destination dst;
 
-  connector_(generic_locality_* _1, const component_id_t& com,
-             const component_port_t& port)
-      : self(_1), dst(com, port) {}
+//   connector_(generic_locality_* _1, const component_id_t& com,
+//              const component_port_t& port)
+//       : self(_1), dst(com, port) {}
 
-  virtual void send(deliverable&& dev) override {
-    self->passthru(dst, std::move(dev));
-  }
+//   virtual void send(deliverable&& dev) override {
+//     self->passthru(dst, std::move(dev));
+//   }
 
-  virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }
-};
+//   virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }
+// };
 
-callback_ptr generic_locality_::make_connector(const component_id_t& com,
-                                               const component_port_t& port) {
-  return callback_ptr(new connector_(this, com, port),
-                      [](callback* cb) { delete (connector_*)cb; });
-}
+// callback_ptr generic_locality_::make_connector(const component_id_t& com,
+//                                                const component_port_t& port)
+//                                                {
+//   return callback_ptr(new connector_(this, com, port),
+//                       [](callback* cb) { delete (connector_*)cb; });
+// }
 
 namespace {
 CpvDeclare(generic_locality_*, locality_);
@@ -79,9 +80,8 @@ void generic_locality_::invalidate_component(const component_id_t& id) {
   auto search = this->components.find(id);
   if (search != std::end(this->components)) {
     auto& com = search->second;
-    auto was_alive = com->alive;
-    com->alive = false;
-    com->on_invalidation();
+    auto was_alive = com->is_active();
+    com->deactivate(components::status_::kInvalidation);
     if (was_alive) {
       this->components.erase(search);
     } else {
@@ -384,54 +384,53 @@ void generic_locality_::passthru(const com_port_pair_t& port,
   }
 #endif
 
-  search->second->receive_value(port.second,
-                                deliverable::to_value(std::move(dev)));
+  search->second->accept(port.second, std::move(dev));
 
   this->try_collect(search->second);
 }
 
-reducer::value_set reducer::action(value_set&& accepted) {
-  CkAssertMsg(this->n_dstream == 1, "reducers may only have one output");
+// reducer::value_set reducer::action(value_set&& accepted) {
+//   CkAssertMsg(this->n_dstream == 1, "reducers may only have one output");
 
-  auto cmp = comparable_comparator<callback_ptr>();
-  callback_ptr ourCb;
+//   auto cmp = comparable_comparator<callback_ptr>();
+//   callback_ptr ourCb;
 
-  auto& ourCmbnr = this->combiner;
+//   auto& ourCmbnr = this->combiner;
 
-  using contribution_type = typed_value<contribution>;
-  typename combiner::argument_type args;
-  for (auto& pair : accepted) {
-    auto& raw = pair.second;
-    auto contrib =
-        raw ? value2typed<typename contribution_type::type>(std::move(raw))
-            : std::shared_ptr<contribution_type>();
-    if (contrib) {
-      if ((*contrib)->msg_ != nullptr) {
-        args.emplace_back((*contrib)->msg_);
-      }
+//   using contribution_type = typed_value<contribution>;
+//   typename combiner::argument_type args;
+//   for (auto& pair : accepted) {
+//     auto& raw = pair.second;
+//     auto contrib =
+//         raw ? value2typed<typename contribution_type::type>(std::move(raw))
+//             : std::shared_ptr<contribution_type>();
+//     if (contrib) {
+//       if ((*contrib)->msg_ != nullptr) {
+//         args.emplace_back((*contrib)->msg_);
+//       }
 
-      auto& theirCb = (*contrib)->callback_;
-      if (theirCb) {
-        if (ourCb) {
-          // CkAssertMsg(cmp(cb, (*contrib)->callback_), "callbacks must
-          // match");
-        } else {
-          ourCb = theirCb;
-        }
-      }
+//       auto& theirCb = (*contrib)->callback_;
+//       if (theirCb) {
+//         if (ourCb) {
+//           // CkAssertMsg(cmp(cb, (*contrib)->callback_), "callbacks must
+//           // match");
+//         } else {
+//           ourCb = theirCb;
+//         }
+//       }
 
-      auto& theirCmbnr = (*contrib)->combiner_;
-      if (!ourCmbnr && theirCmbnr) {
-        ourCmbnr = theirCmbnr;
-      }
-    }
-  }
+//       auto& theirCmbnr = (*contrib)->combiner_;
+//       if (!ourCmbnr && theirCmbnr) {
+//         ourCmbnr = theirCmbnr;
+//       }
+//     }
+//   }
 
-  auto result = (*ourCmbnr)(std::move(args));
-  auto contrib = make_typed_value<typename contribution_type::type>(
-      std::move(result), ourCmbnr, ourCb);
-  return component::make_set(0, std::move(contrib));
-}
+//   auto result = (*ourCmbnr)(std::move(args));
+//   auto contrib = make_typed_value<typename contribution_type::type>(
+//       std::move(result), ourCmbnr, ourCb);
+//   return component::make_set(0, std::move(contrib));
+// }
 
 void generic_locality_::open(const entry_port_ptr& ours, destination&& theirs) {
   ours->alive = true;

@@ -1,6 +1,7 @@
 #ifndef __HYPERCOMM_CORE_GENLOC_HPP__
 #define __HYPERCOMM_CORE_GENLOC_HPP__
 
+#include "../components/component.hpp"
 #include "../messaging/interceptor.hpp"
 #include "../tree_builder/manageable_base.hpp"
 
@@ -50,7 +51,7 @@ class generic_locality_ : public manageable_base_ {
   void passthru(const destination& dst, deliverable&&);
   void passthru(const com_port_pair_t& ep, deliverable&&);
 
-  void loopback(const entry_port_ptr& port, component::value_type&& value);
+  void loopback(const entry_port_ptr& port, deliverable&& value);
   bool has_value(const entry_port_ptr& port) const;
 
   void open(const entry_port_ptr& ours, destination&& theirs);
@@ -90,29 +91,31 @@ class generic_locality_ : public manageable_base_ {
     }
   }
 
-  inline void connect(const component_id_t& src,
-                      const component_port_t& srcPort,
-                      const component_id_t& dst,
-                      const component_port_t& dstPort) {
-    this->components[src]->update_destination(
-        srcPort, this->make_connector(dst, dstPort));
-  }
+  // inline void connect(const component_id_t& src,
+  //                     const component_port_t& srcPort,
+  //                     const component_id_t& dst,
+  //                     const component_port_t& dstPort) {
+  //   this->components[src]->update_destination(
+  //       srcPort, this->make_connector(dst, dstPort));
+  // }
 
-  inline void connect(const component_id_t& src,
-                      const component_port_t& srcPort, const callback_ptr& cb) {
-    this->components[src]->update_destination(srcPort, cb);
-  }
+  // inline void connect(const component_id_t& src,
+  //                     const component_port_t& srcPort, const callback_ptr&
+  //                     cb) {
+  //   this->components[src]->update_destination(srcPort, cb);
+  // }
 
-  inline void connect(const entry_port_ptr& srcPort, const component_id_t& dst,
-                      const component_port_t& dstPort) {
-    this->components[dst]->add_listener(
-        &on_status_change, new entry_port_ptr(srcPort),
-        [](void* value) { delete (entry_port_ptr*)value; });
-    this->open(srcPort, std::make_pair(dst, dstPort));
-  }
+  // inline void connect(const entry_port_ptr& srcPort, const component_id_t&
+  // dst,
+  //                     const component_port_t& dstPort) {
+  //   this->components[dst]->add_listener(
+  //       &on_status_change, new entry_port_ptr(srcPort),
+  //       [](void* value) { delete (entry_port_ptr*)value; });
+  //   this->open(srcPort, std::make_pair(dst, dstPort));
+  // }
 
-  callback_ptr make_connector(const component_id_t& com,
-                              const component_port_t& port);
+  // callback_ptr make_connector(const component_id_t& com,
+  //                             const component_port_t& port);
 
  protected:
   void receive_message(CkMessage* msg);
@@ -134,8 +137,8 @@ class generic_locality_ : public manageable_base_ {
     }
   }
 
-  static void on_status_change(const component*, component::status status,
-                               void* arg) {
+  static void on_status_change(const components::base_*,
+                               components::status_ status, void* arg) {
     auto* port = (entry_port_ptr*)arg;
     access_context_()->invalidate_port(*port);
     delete port;

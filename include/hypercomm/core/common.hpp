@@ -2,16 +2,13 @@
 #define __HYPERCOMM_CORE_COMMON_HPP__
 
 #include "../messaging/common.hpp"
-#include "../components/component.hpp"
+#include "proxy.hpp"
 #include "callback.hpp"
 
 namespace hypercomm {
 
 template <typename T>
 using impl_index_t = typename index_for<T>::type;
-
-template <typename A, typename Enable = void>
-class comproxy;
 
 class imprintable_base_;
 

@@ -9,8 +9,10 @@
 namespace hypercomm {
 
 template <typename T>
-class mailbox : public component {
+class mailbox : public component<T, std::tuple<>> {
  public:
+  using parent_t = component<T, std::tuple<>>;
+
   using predicate_type = std::shared_ptr<immediate_action<bool(const T&)>>;
   using action_type = callback_ptr;
   using weak_ref_t = utilities::weak_ref<mailbox>;
@@ -35,14 +37,14 @@ class mailbox : public component {
   };
 
  protected:
-  std::deque<std::unique_ptr<typed_value<T>>> buffer_;
+  std::deque<typed_value_ptr<T>> buffer_;
   std::list<request> requests_;
   std::shared_ptr<weak_ref_t> weak_;
 
   using reqiter_t = typename decltype(requests_)::iterator;
 
  public:
-  mailbox(const id_t& _1) : component(_1), weak_(new weak_ref_t(this)) {}
+  mailbox(const id_t& _1) : parent_t(_1), weak_(new weak_ref_t(this)) {}
 
   ~mailbox() { weak_->reset(nullptr); }
 
@@ -85,8 +87,8 @@ class mailbox : public component {
     }
   }
 
-  virtual value_set action(value_set&& accepted) override {
-    auto value = value2typed<T>(std::move(accepted[0]));
+  virtual std::tuple<> action(typename parent_t::in_set&& set) override {
+    auto& value = std::get<0>(set);
     auto search = this->find_matching(value);
 
     if (search == std::end(this->requests_)) {
@@ -136,8 +138,8 @@ class mailbox : public component {
  private:
   using listener_type = std::pair<std::shared_ptr<weak_ref_t>, reqiter_t>;
 
-  static void on_status_change(const component*, component::status status,
-                               void* arg) {
+  static void on_status_change(const components::base_*,
+                               components::status_ status, void* arg) {
     auto* listener = (listener_type*)arg;
     auto& self = *(listener->first);
     if (self) {

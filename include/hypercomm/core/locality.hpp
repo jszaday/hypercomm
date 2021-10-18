@@ -160,15 +160,14 @@ class vil : public detail::base_<Base, Index>, public future_manager_ {
   }
 
   template <typename T>
-  void local_contribution(const T& which, component::value_type&& value,
+  void local_contribution(const T& which, deliverable&& value,
                           const combiner_ptr& fn, const callback_ptr& cb) {
     local_contribution(this->identity_for(which), std::move(value), fn, cb);
   }
 
  protected:
-  void local_contribution(const identity_ptr& ident,
-                          component::value_type&& value, const combiner_ptr& fn,
-                          const callback_ptr& cb) {
+  void local_contribution(const identity_ptr& ident, deliverable&& value,
+                          const combiner_ptr& fn, const callback_ptr& cb) {
     auto next = ident->next_reduction();
     auto ustream = ident->upstream();
     auto dstream = ident->downstream();
@@ -252,7 +251,7 @@ void deliver(const element_proxy<Index>& proxy, message* msg) {
 }
 
 void generic_locality_::loopback(const entry_port_ptr& port,
-                                 component::value_type&& value) {
+                                 deliverable&& value) {
   auto elt = dynamic_cast<ArrayElement*>(this);
   CkAssert(elt != nullptr);
   interceptor::send_async(elt->ckGetArrayID(), elt->ckGetArrayIndex(), port,
@@ -263,15 +262,14 @@ template <typename Proxy,
           typename = typename std::enable_if<std::is_base_of<
               CProxyElement_locality_base_, Proxy>::value>::type>
 inline void send2port(const Proxy& proxy, const entry_port_ptr& port,
-                      component::value_type&& value) {
+                      deliverable&& value) {
   interceptor::send_async(proxy, port, std::move(value));
 }
 
 // NOTE this should always be used for invalidations
 template <typename Index>
 inline void send2port(const element_ptr<Index>& proxy,
-                      const entry_port_ptr& port,
-                      component::value_type&& value) {
+                      const entry_port_ptr& port, deliverable&& value) {
   const auto& base =
       static_cast<const CProxyElement_locality_base_&>(proxy->c_proxy());
   send2port(base, port, std::move(value));

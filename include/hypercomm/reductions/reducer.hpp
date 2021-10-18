@@ -1,14 +1,11 @@
 #ifndef __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 #define __HYPERCOMM_REDUCTIONS_REDUCER_HPP__
 
-#include "../sections/imprintable.hpp"
+#include "common.hpp"
+#include "../components/component.hpp"
 
 namespace hypercomm {
-struct reducer : public hypercomm::component {
-  using imprintable_ptr = std::shared_ptr<imprintable_base_>;
-  using stamp_type = comparable_map<imprintable_ptr, reduction_id_t>;
-  using pair_type = typename stamp_type::value_type;
-
+struct reducer : public component<deliverable, deliverable> {
  private:
   imprintable_ptr imprintable_;
   reduction_id_t count_;
@@ -37,13 +34,15 @@ struct reducer : public hypercomm::component {
     return (search != std::end(stamp)) && (this->count_ >= search->second);
   }
 
-  virtual bool permissive(void) const override { return true; }
+  // virtual bool permissive(void) const override { return true; }
 
-  virtual std::size_t n_inputs(void) const override { return this->n_ustream; }
+  // virtual std::size_t n_inputs(void) const override { return this->n_ustream;
+  // }
 
-  virtual std::size_t n_outputs(void) const override { return this->n_dstream; }
+  // virtual std::size_t n_outputs(void) const override { return
+  // this->n_dstream; }
 
-  virtual value_set action(value_set &&accepted) override;
+  // virtual value_set action(value_set &&accepted) override;
 };
 }  // namespace hypercomm
 

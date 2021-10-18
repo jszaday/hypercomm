@@ -25,7 +25,7 @@ class sentinel {
 
   ~sentinel() { weak_->reset(nullptr); }
 
-  void on_completion(const component* com) {
+  void on_completion(const components::base_* com) {
     const auto& id = com->id;
     auto search = this->groups_.find(id);
     if (search != std::end(this->groups_)) {
@@ -46,7 +46,7 @@ class sentinel {
     }
   }
 
-  void on_invalidation(const component* com) {
+  void on_invalidation(const components::base_* com) {
     const auto& id = com->id;
     auto search = this->groups_.find(id);
     if (search == std::end(this->groups_)) {
@@ -111,8 +111,8 @@ class sentinel {
  private:
   using listener_type = decltype(weak_);
 
-  static void on_status_change(const component* com, component::status status,
-                               void* arg) {
+  static void on_status_change(const components::base_* com,
+                               components::status_ status, void* arg) {
     auto* listener = (listener_type*)arg;
     auto& self = *listener;
 
