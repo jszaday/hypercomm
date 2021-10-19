@@ -132,8 +132,8 @@ struct locality : public vil<CBase_locality, int> {
 
     for (auto i = 0; i < numIters; i += 1) {
       // the constructor argument represents the nbr of inputs
-      auto com0 = this->emplace_component<test_component>(1);
-      auto com1 = this->emplace_component<test_component>(2);
+      auto com0 = this->emplace_component<test_component<deliverable>>();
+      auto com1 = this->emplace_component<test_component<deliverable, deliverable>>();
 
       // no pattern-matching is necessary, so the predicate is
       // null. additionally, each of these connect to a port

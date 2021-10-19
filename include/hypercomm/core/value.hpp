@@ -53,6 +53,13 @@ inline void try_return(value_ptr&& value) {
 #endif
 }
 
+template <typename T>
+inline void try_return(typed_value_ptr<T>&& value) {
+  try_return(value_ptr(value.release()));
+}
+
+void try_return(deliverable&& dev);
+
 template <typename T, typename... Args>
 inline std::unique_ptr<T> make_value(Args... args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));

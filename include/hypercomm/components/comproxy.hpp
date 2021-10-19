@@ -5,9 +5,12 @@
 
 namespace hypercomm {
 
+template <typename A, typename Enable = void>
+class comproxy;
+
 template <typename A>
-class comproxy<
-    A, typename std::enable_if<std::is_base_of<component, A>::value>::type> {
+class comproxy<A, typename std::enable_if<
+                      std::is_base_of<components::base_, A>::value>::type> {
   static constexpr auto nil_id_ = std::numeric_limits<component_id_t>::max();
   component_id_t id_;
 
@@ -29,6 +32,8 @@ class comproxy<
   A* operator->(void) const noexcept {
     return access_context_()->get_component<A>(this->id_);
   }
+
+  A& operator*(void) const noexcept { return *(this->operator->()); }
 
   operator component_id_t(void) const noexcept { return this->id_; }
 

@@ -1,12 +1,11 @@
 #include <charm++.h>
 
-#include "../reductions/reducer.hpp"
+#include "../reductions/common.hpp"
 
 namespace hypercomm {
 class locality_base_ : public ArrayElement {
  public:
   using base_index_type = CkArrayIndex;
-  using stamp_type = typename reducer::stamp_type;
 
   virtual void execute(CkMessage* msg) = 0;
   virtual void replace_downstream(CkMessage* msg) { NOT_IMPLEMENTED; }

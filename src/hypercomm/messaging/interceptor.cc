@@ -19,8 +19,7 @@ void delete_value_(const void*, CkDataMsg* msg) {
   delete ptr;
 }
 
-message* pack_deferrable_(const entry_port_ptr& port,
-                          component::value_type&& uniq) {
+message* pack_deferrable_(const entry_port_ptr& port, value_ptr&& uniq) {
   std::shared_ptr<hyper_value> value(uniq.release());
   std::vector<serdes::deferred_type> deferred;
   std::vector<CkNcpyBuffer> buffers;
@@ -73,8 +72,7 @@ message* pack_deferrable_(const entry_port_ptr& port,
 }
 
 // TODO ( it would be good to rename this at some point )
-static message* repack_to_port(const entry_port_ptr& port,
-                               component::value_type&& value) {
+static message* repack_to_port(const entry_port_ptr& port, value_ptr&& value) {
   if (value->pupable) {
     auto flags = value->flags();
     auto* msg = pack_deferrable_(port, std::move(value));

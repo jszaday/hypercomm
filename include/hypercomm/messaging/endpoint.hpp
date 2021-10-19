@@ -30,6 +30,7 @@ class endpoint {
   endpoint(const endpoint& other) : idx_(other.idx_), port_(other.port_) {}
 
   endpoint(CkMessage* msg) {
+    CkAssertMsg(msg, "cannot 'learn' from null msg");
     auto* env = UsrToEnv(msg);
     this->idx_ = env->getEpIdx();
     if (env->getMsgIdx() == message::index()) {
@@ -61,7 +62,9 @@ class endpoint {
     return *this;
   }
 
-  inline operator bool(void) const { return !this->is_demux() || this->port_; }
+  inline operator bool(void) const {
+    return (this->idx_ != 0x0) && (!this->is_demux() || this->port_);
+  }
 
   inline value_handler_fn_ get_handler(void) const {
     return CkIndex_locality_base_::get_value_handler(this->idx_);

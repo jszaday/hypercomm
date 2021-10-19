@@ -11,7 +11,7 @@ struct delivery;
 struct deliverable {
   friend class delivery;
 
-  enum kind_ { kMessage, kValue, kDeferred };
+  enum kind_ { kInvalid, kMessage, kValue, kDeferred };
 
   kind_ kind;
 
@@ -24,6 +24,8 @@ struct deliverable {
   hypercomm::endpoint ep_;
 
  public:
+  deliverable(void) : kind(kInvalid), storage_(nullptr), ep_() {}
+
   deliverable(CkMessage* msg) : kind(kMessage), storage_(msg), ep_(msg) {}
 
   deliverable(zero_copy_value* zc)
@@ -51,6 +53,10 @@ struct deliverable {
       case kDeferred:
         if (this->storage_) delete (zero_copy_value*)this->storage_;
         break;
+      case kInvalid:
+        break;
+      default:
+        not_implemented("unrecognized deliverable kind!");
     }
   }
 
@@ -58,7 +64,19 @@ struct deliverable {
 
   deliverable(deliverable&& other)
       : kind(other.kind), storage_(other.storage_), ep_(std::move(other.ep_)) {
-    other.storage_ = nullptr;
+    other.invalidate_();
+  }
+
+  deliverable& operator=(deliverable&& other) {
+    if (this != &other) {
+      if (other.ep_) {
+        this->ep_ = std::move(other.ep_);
+      }
+      this->storage_ = other.storage_;
+      this->kind = other.kind;
+      other.invalidate_();
+    }
+    return *this;
   }
 
   template <typename T>
@@ -74,10 +92,27 @@ struct deliverable {
     this->ep_ = std::move(hypercomm::endpoint(std::forward<Args>(args)...));
   }
 
-  inline operator bool(void) const { return (this->storage_ != nullptr); }
+  inline operator bool(void) const {
+    switch (this->kind) {
+      case kDeferred:
+        return this->storage_ && ((zero_copy_value*)this->storage_)->ready();
+      case kMessage:
+        return this->storage_;
+      case kValue:
+        return true;
+      default:
+        return false;
+    }
+  }
 
   static value_ptr to_value(deliverable&& dev);
   static CkMessage* to_message(deliverable&& dev);
+
+ private:
+  inline void invalidate_(void) {
+    this->kind = kInvalid;
+    this->storage_ = nullptr;
+  }
 };
 
 template <>

@@ -18,30 +18,22 @@ value_ptr deliverable::to_value(deliverable&& dev) {
   }
 }
 
-// TODO this is a temporary solution
-struct connector_ : public callback {
-  generic_locality_* self;
-  destination dst;
-
-  connector_(generic_locality_* _1, const component_id_t& com,
-             const component_port_t& port)
-      : self(_1), dst(com, port) {}
-
-  virtual void send(deliverable&& dev) override {
-    self->passthru(dst, std::move(dev));
-  }
-
-  virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }
-};
-
-callback_ptr generic_locality_::make_connector(const component_id_t& com,
-                                               const component_port_t& port) {
-  return callback_ptr(new connector_(this, com, port),
-                      [](callback* cb) { delete (connector_*)cb; });
-}
-
 namespace {
 CpvDeclare(generic_locality_*, locality_);
+}
+
+void try_return(deliverable&& dev) {
+  CkAssertMsg(dev, "invalid deliverable!");
+  if (dev.kind == deliverable::kValue) {
+    auto* val = dev.release<hyper_value>();
+    try_return(value_ptr(val));
+  } else {
+    CkAssertMsg(dev.endpoint(), "invalid destination!");
+    auto* ctx = access_context_();
+    auto& aid = ctx->ckGetArrayID();
+    auto& idx = ctx->ckGetArrayIndex();
+    interceptor::send_async(aid, idx, std::move(dev));
+  }
 }
 
 // TODO ( do not assume array-issuedness )
@@ -79,9 +71,8 @@ void generic_locality_::invalidate_component(const component_id_t& id) {
   auto search = this->components.find(id);
   if (search != std::end(this->components)) {
     auto& com = search->second;
-    auto was_alive = com->alive;
-    com->alive = false;
-    com->on_invalidation();
+    auto was_alive = com->is_active();
+    com->deactivate(components::status_::kInvalidation);
     if (was_alive) {
       this->components.erase(search);
     } else {
@@ -135,7 +126,8 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
 void generic_locality_::passthru(const destination& dst, deliverable&& dev) {
   switch (dst.kind) {
     case destination::kEndpoint:
-      this->passthru(dst.ep(), std::move(dev));
+      dev.update_endpoint(dst.ep());
+      this->receive(std::move(dev));
       break;
     case destination::kComponent:
       this->passthru(dst.com_port(), std::move(dev));
@@ -149,12 +141,13 @@ void generic_locality_::passthru(const destination& dst, deliverable&& dev) {
   }
 }
 
-void generic_locality_::passthru(const endpoint& ep, deliverable&& dev) {
-  // update how the deliverable got to us
-  dev.update_endpoint(ep);
-  // then check how we should handle it
+void generic_locality_::receive(deliverable&& dev) {
+  // check how we should handle it
+  auto& ep = dev.endpoint();
+  CkAssertMsg((bool)ep && dev, "invalid delivery!");
   if (ep.idx_ == CkIndex_locality_base_::idx_demux_CkMessage()) {
-    auto& port = ep.port_;
+    auto port = ep.port_;  // copy the ptr to the port
+                           // since we may move it later
     auto search = this->entry_ports.find(port);
     if (search == std::end(this->entry_ports)) {
       CkAssertMsg(port, "port should not be null!");
@@ -166,10 +159,11 @@ void generic_locality_::passthru(const endpoint& ep, deliverable&& dev) {
   } else {
     if (dev.kind == deliverable::kMessage) {
       auto* msg = dev.release<CkMessage>();
-      dev.endpoint().export_to(msg);
+      ep.export_to(msg);
       this->receive_message(msg);
     } else {
-      (ep.get_handler())(this, std::move(dev));
+      auto fn = ep.get_handler();
+      fn(this, std::move(dev));
     }
   }
 }
@@ -384,27 +378,34 @@ void generic_locality_::passthru(const com_port_pair_t& port,
   }
 #endif
 
-  search->second->receive_value(port.second,
-                                deliverable::to_value(std::move(dev)));
+  search->second->accept(port.second, std::move(dev));
 
   this->try_collect(search->second);
 }
 
-reducer::value_set reducer::action(value_set&& accepted) {
+reducer::out_set reducer::action(reducer::in_set& set) {
   CkAssertMsg(this->n_dstream == 1, "reducers may only have one output");
 
-  auto cmp = comparable_comparator<callback_ptr>();
-  callback_ptr ourCb;
+  auto& dev = std::get<0>(set);
+  this->devs_.emplace_back(std::move(dev));
+  this->persistent = (this->devs_.size() < this->n_ustream);
+  // if we're still waiting on values, suspend!
+  if (this->persistent) {
+    this->suspend();
+  }
 
+  callback_ptr ourCb;
   auto& ourCmbnr = this->combiner;
+  // auto cmp = comparable_comparator<callback_ptr>();
 
   using contribution_type = typed_value<contribution>;
   typename combiner::argument_type args;
-  for (auto& pair : accepted) {
-    auto& raw = pair.second;
+  for (auto it = std::begin(this->devs_); it != std::end(this->devs_);) {
+    auto& raw = *it;
     auto contrib =
-        raw ? value2typed<typename contribution_type::type>(std::move(raw))
+        raw ? dev2typed<typename contribution_type::type>(std::move(raw))
             : std::shared_ptr<contribution_type>();
+
     if (contrib) {
       if ((*contrib)->msg_ != nullptr) {
         args.emplace_back((*contrib)->msg_);
@@ -425,12 +426,14 @@ reducer::value_set reducer::action(value_set&& accepted) {
         ourCmbnr = theirCmbnr;
       }
     }
+
+    it = this->devs_.erase(it);
   }
 
   auto result = (*ourCmbnr)(std::move(args));
   auto contrib = make_typed_value<typename contribution_type::type>(
       std::move(result), ourCmbnr, ourCb);
-  return component::make_set(0, std::move(contrib));
+  return std::make_tuple(std::move(contrib));
 }
 
 void generic_locality_::open(const entry_port_ptr& ours, destination&& theirs) {

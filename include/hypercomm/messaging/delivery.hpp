@@ -15,7 +15,7 @@ struct delivery {
 
   delivery(const CkArrayID& _1, const CkArrayIndex& _2, deliverable&& _3)
       : aid(_1), idx(_2), payload(std::move(_3)) {
-    CkAssert((bool)payload);
+    CkAssert((bool)this->payload);
     std::fill(this->core, this->core + CmiReservedHeaderSize, '\0');
     CmiSetHandler(this, handler());
   }

@@ -9,49 +9,39 @@
 using namespace hypercomm;
 
 template<typename T>
-void unpack_array(const value_ptr& _1, std::size_t** n, T** arr) {
-  auto& dev = dynamic_cast<deliverable_value*>(_1.get())->dev;
-  auto msg = (message*)dev.peek<CkMessage>();
-  *n = (std::size_t*)msg->payload;
-  *arr = (T*)(msg->payload + sizeof(n));
-}
+struct gen_values : public hypercomm::component<std::tuple<>, std::tuple<T, T, T>> {
+  using parent_t = hypercomm::component<std::tuple<>, std::tuple<T, T, T>>;
+  using in_set = typename parent_t::in_set;
+  using out_set = typename parent_t::out_set;
 
-template<typename T>
-struct gen_values : public hypercomm::component {
   std::size_t n;
   int selfIdx;
 
-  gen_values(const id_t& _1, const int& _2, const std::size_t& _3) : component(_1), selfIdx(_2), n(_3) {}
+  gen_values(const id_t& _1, const int& _2, const std::size_t& _3) : parent_t(_1), selfIdx(_2), n(_3) {}
 
-  virtual std::size_t n_inputs(void) const override { return 0; }
-
-  virtual std::size_t n_outputs(void) const override { return 3; }
-
-  virtual value_set action(value_set&&) override;
+  virtual out_set action(in_set&) override;
 };
 
 template<typename T>
-struct add_values : public hypercomm::component {
-  add_values(const id_t& _1) : component(_1) {}
+struct add_values : public hypercomm::component<std::tuple<T, T>, T> {
+  using parent_t = hypercomm::component<std::tuple<T, T>, T>;
+  using in_set = typename parent_t::in_set;
+  using out_set = typename parent_t::out_set;
 
-  virtual std::size_t n_inputs(void) const override { return 2; }
+  add_values(const id_t& _1) : parent_t(_1) {}
 
-  virtual std::size_t n_outputs(void) const override { return 1; }
-
-  virtual value_set action(value_set&&) override;
+  virtual out_set action(in_set&) override;
 };
 
 template<typename T>
-struct print_values : public hypercomm::component {
+struct print_values : public hypercomm::component<std::tuple<T>, std::tuple<>> {
+  using parent_t = hypercomm::component<std::tuple<T>, std::tuple<>>;
+
   int selfIdx;
 
-  print_values(const id_t& _1, const int& _2) : component(_1), selfIdx(_2) {}
+  print_values(const id_t& _1, const int& _2) : parent_t(_1), selfIdx(_2) {}
 
-  virtual std::size_t n_inputs(void) const override { return 1; }
-
-  virtual std::size_t n_outputs(void) const override { return 0; }
-
-  virtual value_set action(value_set&&) override;
+  virtual std::tuple<> action(std::tuple<typed_value_ptr<T>>&) override;
 };
 
 #endif

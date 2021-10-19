@@ -1,7 +1,7 @@
 #include <hypercomm/reductions/reducer.hpp>
 
 namespace PUP {
-inline void operator|(er& p, hypercomm::reducer::stamp_type& t) {
+inline void operator|(er& p, hypercomm::stamp_type& t) {
   hypercomm::interpup(p, t);
 }
 }
@@ -64,8 +64,8 @@ class Test : public manageable<vil<CBase_Test, int>> {
  public:
   Test(void) = default;
 
-  Test(association_ptr_&& ptr, reducer::stamp_type&& stamp)
-      : manageable(std::forward<association_ptr_>(ptr), std::forward<reducer::stamp_type>(stamp)) {
+  Test(association_ptr_&& ptr, stamp_type&& stamp)
+      : manageable(std::forward<association_ptr_>(ptr), std::forward<stamp_type>(stamp)) {
     auto& mine = this->__index__();
     CkAssertMsg(mine % 2 != 0, "expected an odd index");
     this->make_contribution();
@@ -79,6 +79,9 @@ class Test : public manageable<vil<CBase_Test, int>> {
       auto next = conv2idx<CkArrayIndex>(mine + numElements + 1);
       auto child = locProxy.ckLocalBranch()->create_child(this, next);
       thisProxy[next].insert(child.first, child.second);
+      // insertions can be run inline with one PE!
+      // (need to ensure we come back afterwards)
+      this->update_context();
     } else if (mine < numElements) {
       thisProxy[conv2idx<CkArrayIndex>(mine)].ckDestroy();
       return;
