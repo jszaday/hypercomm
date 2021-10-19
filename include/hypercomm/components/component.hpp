@@ -52,7 +52,7 @@ class component : public base_ {
   using in_elt_t = typename std::tuple_element<I, in_set>::type;
 
   template <std::size_t O>
-  using out_elt_t = typename std::tuple_element<O, out_type>::type;
+  using out_elt_t = typename std::tuple_element<O, out_set>::type;
 
  private:
   static constexpr std::size_t n_inputs_ = std::tuple_size<in_type>::value;

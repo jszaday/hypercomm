@@ -10,6 +10,21 @@ namespace hypercomm {
 template <typename... Args>
 void passthru_context_(Args&&... args);
 
+namespace detail {
+template <typename T>
+struct inv_;
+
+template <typename T>
+struct inv_<typed_value_ptr<T>> {
+  static typed_value_ptr<T> get(void) { return typed_value_ptr<T>(); }
+};
+
+template <>
+struct inv_<deliverable> {
+  static deliverable get(void) { return deliverable((hyper_value*)nullptr); }
+};
+}  // namespace detail
+
 namespace components {
 template <typename T>
 class connector_ {
@@ -37,7 +52,10 @@ class connector_ {
 
   inline bool ready(void) const { return this->dst_ != nullptr; }
 
-  inline void self_destruct(void) { this->~connector_(); }
+  inline void implode(void) {
+    this->relay(detail::inv_<T>::get());
+    this->~connector_();
+  }
 };
 }  // namespace components
 }  // namespace hypercomm

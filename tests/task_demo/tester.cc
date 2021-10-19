@@ -5,7 +5,7 @@
 #include <ctime>
 #include <cstdlib>
 
-using value_type = float;
+using value_type = std::vector<float>;
 
 void enroll_polymorphs(void) {
   hypercomm::init_polymorph_registry();
@@ -94,81 +94,72 @@ struct locality : public vil<CBase_locality, int> {
     auto com3 = this->emplace_component<print_values<value_type>>(selfIdx);
 
     // gen_values.(0) => print values 1
-    this->connect(com0, 0, com1, 0);
+    com0->template output_to<0, 0>(*com1);
     // gen_values.(1) => add values
-    this->connect(com0, 1, com2, 0);
+    com0->template output_to<1, 0>(*com2);
     // gen_values.(2) => recv_value@neighbor
     auto neighborIdx = conv2idx<CkArrayIndex>((selfIdx + 1) % n);
     auto fwd = forward_to(thisProxy[neighborIdx], recv_value);
-    this->connect(com0, 2, fwd);
+    com0->template output_to<2>(std::move(fwd));
     // recv_value@here => add values
     this->connect(recv_value, com2, 1);
     // add_values => print values 2
-    this->connect(com2, 0, com3, 0);
+    com2->template output_to<0, 0>(*com3);
 
     this->activate_component(com3);
     this->activate_component(com2);
     this->activate_component(com1);
     this->activate_component(com0);
+
+    // kickoff the sequence
+    this->passthru(std::make_pair(com0->id, 0), make_unit_value());
   }
 };
 
 template <typename T>
-typename gen_values<T>::value_set gen_values<T>::action(value_set&&) {
-  auto msg_size = sizeof(T) * this->n + sizeof(this->n);
-  auto msg = message::make_message(msg_size, {});
-  *((decltype(this->n)*)msg->payload) = this->n;
-  auto arr = (T*)(msg->payload + sizeof(this->n));
+typename gen_values<T>::out_set gen_values<T>::action(in_set&) {
+  value_type arr(n);
 
   for (auto i = 0; i < this->n; i += 1) {
-    arr[i] = (T)(i % this->n + this->selfIdx + 1);
+    arr[i] = (typename T::value_type)(i % this->n + this->selfIdx + 1);
   }
 
-  auto copy0 = utilities::copy_message(msg);
-  auto copy1 = utilities::copy_message(msg);
-  return make_varset(std::make_pair(0, msg2value(msg)),
-                     std::make_pair(1, msg2value(copy0)),
-                     std::make_pair(2, msg2value(copy1)));
+  return std::make_tuple(
+    make_typed_value<value_type>(arr),
+    make_typed_value<value_type>(arr),
+    make_typed_value<value_type>(arr)
+  );
 }
 
 template <typename T>
-typename add_values<T>::value_set add_values<T>::action(value_set&& accepted) {
-  auto& lhsMsg = accepted[0];
-  auto& rhsMsg = accepted[1];
+typename add_values<T>::out_set add_values<T>::action(in_set& set) {
+  auto& lhs = std::get<0>(set)->value();
+  auto& rhs = std::get<1>(set)->value();
 
-  std::size_t* m;
-  T* lhs;
-  unpack_array(lhsMsg, &m, &lhs);
+  auto m = lhs.size();
+  auto n = rhs.size();
 
-  std::size_t* n;
-  T* rhs;
-  unpack_array(rhsMsg, &n, &rhs);
-
-  if (*m != *n) {
+  if (m != n) {
     CkAbort("add_values> array size mismatch");
   }
 
-  for (auto i = 0; i < *n; i += 1) {
+  for (auto i = 0; i < n; i += 1) {
     lhs[i] += rhs[i];
   }
 
-  return make_set(0, std::move(lhsMsg));
+  return std::move(std::get<0>(set));
 }
 
 template <typename T>
-typename print_values<T>::value_set print_values<T>::action(
-    value_set&& accepted) {
-  const auto& msg = accepted[0];
-
-  std::size_t* n;
-  T* arr;
-  unpack_array(msg, &n, &arr);
+typename std::tuple<> print_values<T>::action(std::tuple<typed_value_ptr<T>>& set) {
+  auto& val = std::get<0>(set)->value();
+  std::size_t n = val.size();
 
   std::stringstream ss;
   ss << "com" << this->id << "@vil" << selfIdx << "> ";
   ss << "[ ";
-  for (auto i = 0; i < *n; i += 1) {
-    ss << arr[i] << " ";
+  for (auto i = 0; i < n; i += 1) {
+    ss << val[i] << " ";
   }
   ss << "]";
 

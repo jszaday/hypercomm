@@ -95,10 +95,7 @@ struct outbox_<std::tuple<Ts...>> {
   template <std::size_t I>
   inline void invalidate(void) {
     auto& con = std::get<I>(this->connectors_);
-    if (con.ready()) {
-      con.relay(value_ptr());
-      con.self_destruct();
-    }
+    if (con.ready()) con.implode();
   }
 
   template <std::size_t I>
