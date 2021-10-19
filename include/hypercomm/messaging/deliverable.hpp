@@ -90,7 +90,10 @@ struct deliverable {
     this->ep_ = std::move(hypercomm::endpoint(std::forward<Args>(args)...));
   }
 
-  inline operator bool(void) const { return (this->storage_ != nullptr); }
+  inline operator bool(void) const {
+    return (this->kind == kValue || this->storage_ != nullptr) &&
+           (this->kind != kInvalid);
+  }
 
   static value_ptr to_value(deliverable&& dev);
   static CkMessage* to_message(deliverable&& dev);

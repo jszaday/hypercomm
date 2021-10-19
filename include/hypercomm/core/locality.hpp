@@ -195,8 +195,7 @@ class vil : public detail::base_<Base, Index>, public future_manager_ {
     }
 
     this->activate_component(rdcr);
-    auto contrib =
-        make_typed_value<contribution>(deliverable(std::move(value)), fn, cb);
+    auto contrib = make_typed_value<contribution>(std::move(value), fn, cb);
     this->components[rdcr]->accept(0, std::move(contrib));
   }
 };

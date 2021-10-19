@@ -230,9 +230,13 @@ std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev,
     case deliverable::kValue: {
       auto& ep = dev.endpoint();
       auto* val = dev.release<hyper_value>();
-      val->source = src ? std::move(src)
-                        : std::make_shared<endpoint_source>(std::move(ep));
-      return value2typed<T>(value_ptr(val));
+      if (val == nullptr) {
+        return typed_value_ptr<T>();
+      } else {
+        val->source = src ? std::move(src)
+                          : std::make_shared<endpoint_source>(std::move(ep));
+        return value2typed<T>(value_ptr(val));
+      }
     }
     default: {
       not_implemented("unrecognized deliverable kind!");
