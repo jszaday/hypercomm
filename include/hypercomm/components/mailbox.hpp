@@ -46,8 +46,7 @@ class mailbox : public component<T, std::tuple<>> {
   using reqiter_t = typename decltype(requests_)::iterator;
 
  public:
-  mailbox(const id_t& _1)
-  : parent_t(_1), weak_(new weak_ref_t(this)) {
+  mailbox(const id_t& _1) : parent_t(_1), weak_(new weak_ref_t(this)) {
     this->persistent = true;
   }
 

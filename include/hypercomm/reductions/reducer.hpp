@@ -43,14 +43,6 @@ struct reducer : public component<deliverable, deliverable> {
     return (search != std::end(stamp)) && (this->count_ >= search->second);
   }
 
-  // virtual bool permissive(void) const override { return true; }
-
-  // virtual std::size_t n_inputs(void) const override { return this->n_ustream;
-  // }
-
-  // virtual std::size_t n_outputs(void) const override { return
-  // this->n_dstream; }
-
   using in_set = parent_t::in_set;
   using out_set = parent_t::out_set;
   virtual out_set action(in_set &accepted) override;

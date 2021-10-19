@@ -117,8 +117,9 @@ class component : public base_ {
   template <std::size_t O, std::size_t I, typename Input_, typename Output_>
   void output_to(const component<Input_, Output_>& peer) {
     static_assert(
-        std::is_same<out_elt_t<O>,
-                     typename component<Input_, Output_>::template in_elt_t<I>>::value,
+        std::is_same<
+            out_elt_t<O>,
+            typename component<Input_, Output_>::template in_elt_t<I>>::value,
         "component types must be compatible");
     this->output_to<O>(peer.id, I);
   }

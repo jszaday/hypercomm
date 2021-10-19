@@ -18,39 +18,15 @@ value_ptr deliverable::to_value(deliverable&& dev) {
   }
 }
 
-// TODO this is a temporary solution
-// struct connector_ : public callback {
-//   generic_locality_* self;
-//   destination dst;
-
-//   connector_(generic_locality_* _1, const component_id_t& com,
-//              const component_port_t& port)
-//       : self(_1), dst(com, port) {}
-
-//   virtual void send(deliverable&& dev) override {
-//     self->passthru(dst, std::move(dev));
-//   }
-
-//   virtual void __pup__(serdes& s) override { CkAbort("don't send me"); }
-// };
-
-// callback_ptr generic_locality_::make_connector(const component_id_t& com,
-//                                                const component_port_t& port)
-//                                                {
-//   return callback_ptr(new connector_(this, com, port),
-//                       [](callback* cb) { delete (connector_*)cb; });
-// }
-
 namespace {
 CpvDeclare(generic_locality_*, locality_);
 }
 
 void try_return(deliverable&& dev) {
-  if (dev.kind == deliverable::kValue) {
-    try_return(value_ptr(dev.release<hyper_value>()));
-  } else {
-    not_implemented("...");
-  }
+  auto* ctx = access_context_();
+  auto& aid = ctx->ckGetArrayID();
+  auto& idx = ctx->ckGetArrayIndex();
+  interceptor::send_async(aid, idx, std::move(dev));
 }
 
 // TODO ( do not assume array-issuedness )

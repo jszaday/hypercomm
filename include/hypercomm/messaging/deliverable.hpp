@@ -93,8 +93,7 @@ struct deliverable {
   inline operator bool(void) const {
     switch (this->kind) {
       case kDeferred:
-        return this->storage_ &&
-          ((zero_copy_value*)this->storage_)->ready();
+        return this->storage_ && ((zero_copy_value*)this->storage_)->ready();
       case kMessage:
         return this->storage_;
       case kValue:
