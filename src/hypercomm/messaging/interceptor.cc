@@ -22,7 +22,6 @@ void delete_value_(const void*, CkDataMsg* msg) {
 message* pack_deferrable_(const entry_port_ptr& port, value_ptr&& uniq) {
   std::shared_ptr<hyper_value> value(uniq.release());
   std::vector<serdes::deferred_type> deferred;
-  std::vector<CkNcpyBuffer> buffers;
   // find the size of the value, and extract any
   // buffers to be deferred (and sent via RDMA)
   auto pupSize = ([&](void) {
@@ -41,6 +40,9 @@ message* pack_deferrable_(const entry_port_ptr& port, value_ptr&& uniq) {
     // otherwise, drop the overhead of encapsulation
     msgSize -= ptr_record::instance_size;
   }
+  // reserve memory for a buncha' buffers
+  std::vector<CkNcpyBuffer> buffers;
+  buffers.reserve(deferred.size());
   // for every deferred block of memory
   for (auto& tup : deferred) {
     // create a (shared) pointer to the memory

@@ -61,21 +61,21 @@ struct deferred_base_ {
 
 template <typename T>
 struct deferred_ : public deferred_base_ {
-  using ref_type = std::reference_wrapper<std::shared_ptr<T>>;
-  std::vector<ref_type> refs;
+  using ptr_type = std::shared_ptr<T>;
+  std::vector<ptr_type*> ptrs;
 
-  inline void push_back(std::shared_ptr<T>& _) { refs.emplace_back(_); }
+  inline void push_back(ptr_type& ptr) { this->ptrs.emplace_back(&ptr); }
 
   virtual void reset(std::shared_ptr<void>&& _) override {
     auto typed = std::static_pointer_cast<T>(std::move(_));
-    CkAssertMsg(!this->refs.empty(), "expected to reset at least one value!");
-    for (auto& ref : this->refs) {
-      new (&(ref.get())) std::shared_ptr<T>(typed);
+    CkAssertMsg(!this->ptrs.empty(), "expected to reset at least one value!");
+    for (auto& ptr : this->ptrs) {
+      new (ptr) std::shared_ptr<T>(typed);
     }
   }
 
   virtual std::shared_ptr<void> get(void) override {
-    auto& ref = this->refs.front().get();
+    auto& ref = *(this->ptrs.front());
     return std::static_pointer_cast<void>(ref);
   }
 };
@@ -152,7 +152,7 @@ class serdes {
       std::tuple<ptr_id_t, std::size_t, std::shared_ptr<void>>;
   inline void get_deferred(std::vector<deferred_type>& vect) {
     using value_type = decltype(this->deferred)::value_type;
-
+    vect.reserve(this->deferred.size());
     std::transform(
         std::begin(this->deferred), std::end(this->deferred),
         std::back_inserter(vect), [](const value_type& pair) -> deferred_type {
