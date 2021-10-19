@@ -13,6 +13,12 @@ struct wrap_<std::tuple<deliverable>, typed_value_ptr> {
   using type = std::tuple<deliverable>;
 };
 
+template <typename T>
+struct wrap_<std::tuple<typed_value_ptr<T>>, typed_value_ptr> {
+  // don't wrap things if they're already wrapped!
+  using type = std::tuple<typed_value_ptr<T>>;
+};
+
 template <typename T, typename Enable = void>
 struct dev_conv_;
 

@@ -39,8 +39,8 @@ class mailbox : public component<T, std::tuple<>> {
   };
 
  protected:
-  std::deque<typed_value_ptr<T>> buffer_;
   std::list<request> requests_;
+  std::deque<value_type> buffer_;
   std::shared_ptr<weak_ref_t> weak_;
 
   using reqiter_t = typename decltype(requests_)::iterator;
@@ -124,7 +124,7 @@ class mailbox : public component<T, std::tuple<>> {
 
   using request_iterator = typename decltype(requests_)::iterator;
 
-  inline reqiter_t find_matching(const std::unique_ptr<typed_value<T>>& _1) {
+  inline reqiter_t find_matching(const value_type& _1) {
     auto& value = _1->value();
     for (auto it = (this->requests_).rbegin(); it != (this->requests_).rend();
          it++) {
