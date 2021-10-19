@@ -324,7 +324,9 @@ class component : public base_ {
   template <typename Array>
   inline static Array make_acceptors_(void) {
     using type = Array;
-    std::aligned_storage<sizeof(type), alignof(type)> storage;
+    using storage_type =
+        typename std::aligned_storage<sizeof(type), alignof(type)>::type;
+    storage_type storage;
     auto* arr = reinterpret_cast<type*>(&storage);
     make_acceptors_<n_inputs_ - 1, type>(*arr);
     return *arr;

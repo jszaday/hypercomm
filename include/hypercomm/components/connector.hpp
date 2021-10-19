@@ -28,8 +28,10 @@ struct inv_<deliverable> {
 namespace components {
 template <typename T>
 class connector_ {
+  using storage_t = typename std::aligned_storage<sizeof(destination),
+                                                  alignof(destination)>::type;
+  storage_t storage_;
   destination* dst_;
-  std::aligned_storage<sizeof(destination), alignof(destination)> storage_;
 
  public:
   connector_(void) : dst_(nullptr) {}

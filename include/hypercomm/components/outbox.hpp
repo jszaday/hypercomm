@@ -59,8 +59,8 @@ struct outbox_<std::tuple<Ts...>> {
 
   template <std::size_t I>
   inline typename std::enable_if<(I >= 1)>::type unspool_(tuple_type& tuple) {
-    this->deliver_<I>(tuple);
     unspool_<(I - 1)>(tuple);
+    this->deliver_<I>(tuple);
   }
 
   template <std::size_t I>
@@ -74,6 +74,8 @@ struct outbox_<std::tuple<Ts...>> {
   }
 
  public:
+  outbox_(void) : buffer_(), connectors_() {}
+
   template <std::size_t I>
   inline void try_flush(void) {
     auto& buf = std::get<I>(this->buffer_);
@@ -87,20 +89,18 @@ struct outbox_<std::tuple<Ts...>> {
   template <std::size_t I, typename... Args>
   inline bool connect_to(Args&&... args) {
     auto& con = std::get<I>(this->connectors_);
-    auto ready = con.ready();
+    bool prev = con.ready();
+    if (prev) con.implode();
     new (&con) connector_<tuple_elt_t<I>>(std::forward<Args>(args)...);
-    return ready;
+    CkAssertMsg(con.ready(),
+                "con not invalidated before set, or failure to initialize");
+    return prev;
   }
 
   template <std::size_t I>
   inline void invalidate(void) {
     auto& con = std::get<I>(this->connectors_);
     if (con.ready()) con.implode();
-  }
-
-  template <std::size_t I>
-  inline buffer_elt_t<I>& get(void) {
-    return std::get<I>(this->buffer_);
   }
 
   inline void unspool(tuple_type& tuple) {

@@ -25,7 +25,9 @@ inline typename std::enable_if<(I >= 1)>::type make_type_list_(
 template <typename Tuple, std::size_t N>
 std::array<std::type_index, N> make_type_list_(void) {
   using type = std::array<std::type_index, N>;
-  std::aligned_storage<sizeof(type), alignof(type)> storage;
+  using storage_type =
+      typename std::aligned_storage<sizeof(type), alignof(type)>::type;
+  storage_type storage;
   auto* arr = reinterpret_cast<type*>(&storage);
   make_type_list_<Tuple, N, N - 1>(*arr);
   return *arr;
