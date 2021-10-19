@@ -211,8 +211,6 @@ class tree_builder : public CBase_tree_builder, public array_listener {
     return static_cast<ArrayElement *>(this->lookup(aid, idx, true));
   }
 
-  using stamp_type = manageable_base_::stamp_type;
-
   // overload of create_child
   std::pair<association_ptr_, stamp_type> create_child(
       const element_type &elt, const index_type &child) {
