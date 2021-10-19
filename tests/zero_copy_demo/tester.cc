@@ -182,8 +182,10 @@ struct locality : public vil<CBase_locality, int> {
 };
 
 void receive_value(generic_locality_* self, deliverable&& dev) {
-  auto val = dev2typed<big_data<data_type>>(std::move(dev));
-  ((locality*)self)->mb->receive_value(0, std::move(val));
+  using namespace components;
+  auto& com = *((locality*)self)->mb;
+  ((base_&)com).accept(0, std::move(dev));
+  CkAbort("this isn't working at the moment...\n");
 }
 
 #define CK_TEMPLATES_ONLY
