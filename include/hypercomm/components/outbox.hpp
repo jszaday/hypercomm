@@ -107,6 +107,11 @@ struct outbox_<std::tuple<Ts...>> {
     this->unspool_<(n_outputs - 1)>(tuple);
   }
 
+  template <std::size_t I>
+  inline bool is_ready(void) const {
+    return std::get<I>(this->connectors_).ready();
+  }
+
   inline bool empty(void) const { return this->empty_<(n_outputs - 1)>(); }
 };
 }  // namespace components

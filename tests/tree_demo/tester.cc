@@ -79,6 +79,9 @@ class Test : public manageable<vil<CBase_Test, int>> {
       auto next = conv2idx<CkArrayIndex>(mine + numElements + 1);
       auto child = locProxy.ckLocalBranch()->create_child(this, next);
       thisProxy[next].insert(child.first, child.second);
+      // insertions can be run inline with one PE!
+      // (need to ensure we come back afterwards)
+      this->update_context();
     } else if (mine < numElements) {
       thisProxy[conv2idx<CkArrayIndex>(mine)].ckDestroy();
       return;

@@ -29,6 +29,7 @@ struct reducer : public component<deliverable, deliverable> {
         n_dstream(_5) {
     CkAssert(this->n_dstream == 1);
     this->devs_.reserve(this->n_ustream);
+    this->permissive = true;
     this->persistent = true;
   }
 

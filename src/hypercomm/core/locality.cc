@@ -414,10 +414,12 @@ reducer::out_set reducer::action(reducer::in_set& set) {
 
   using contribution_type = typed_value<contribution>;
   typename combiner::argument_type args;
-  for (auto& raw : this->devs_) {
+  for (auto it = std::begin(this->devs_); it != std::end(this->devs_);) {
+    auto& raw = *it;
     auto contrib =
         raw ? dev2typed<typename contribution_type::type>(std::move(raw))
             : std::shared_ptr<contribution_type>();
+
     if (contrib) {
       if ((*contrib)->msg_ != nullptr) {
         args.emplace_back((*contrib)->msg_);
@@ -438,6 +440,8 @@ reducer::out_set reducer::action(reducer::in_set& set) {
         ourCmbnr = theirCmbnr;
       }
     }
+
+    it = this->devs_.erase(it);
   }
 
   auto result = (*ourCmbnr)(std::move(args));

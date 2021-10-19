@@ -61,7 +61,7 @@ class component : public base_ {
 
  protected:
   using outgoing_type = outbox_<out_set>;
-  using incoming_type = std::list<in_set>;
+  using incoming_type = std::deque<in_set>;
   using incoming_iterator = typename incoming_type::iterator;
 
   incoming_type incoming_;
@@ -83,7 +83,7 @@ class component : public base_ {
   template <std::size_t I>
   inline static void accept(component<Inputs, Outputs>* self,
                             in_elt_t<I>&& val) {
-    if (!val) {
+    if (!(val || self->permissive)) {
       self->on_invalidation_<I>();
     } else if (n_inputs_ == 1) {
       // bypass seeking a partial set for single-input coms
@@ -132,6 +132,11 @@ class component : public base_ {
     if (this->active) {
       (this->outgoing_).template try_flush<O>();
     }
+  }
+
+  template <std::size_t O>
+  inline bool has_output(void) const {
+    return (this->outgoing_).template is_ready<O>();
   }
 
   virtual out_set action(in_set&) = 0;

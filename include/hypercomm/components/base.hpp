@@ -30,14 +30,10 @@ class base_ {
   using accept_fn_t = void (*)(base_*, deliverable&&);
   using status_listener_fn_t = void (*)(const base_*, status_, void*);
 
-  // TODOs:
-  // - add_listener
-  // - update_destination(callback)
-  // - ret inv values
-
  protected:
   bool active;
   bool activated;
+  bool permissive;
   bool persistent;
   struct listener_;
 
@@ -60,6 +56,7 @@ class base_ {
         active(false),
         activated(false),
         persistent(false),
+        permissive(false),
         acceptors(acceptors_),
         in_types(in_types_) {}
 #endif
