@@ -69,7 +69,9 @@ struct deliverable {
 
   deliverable& operator=(deliverable&& other) {
     if (this != &other) {
-      this->ep_ = other.ep_ ? std::move(other.ep_) : nullptr;
+      if (other.ep_) {
+        this->ep_ = std::move(other.ep_);
+      }
       this->storage_ = other.storage_;
       this->kind = other.kind;
       other.invalidate_();

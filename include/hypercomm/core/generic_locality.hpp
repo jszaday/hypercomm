@@ -41,13 +41,7 @@ class generic_locality_ : public manageable_base_ {
 
   void update_context(void);
 
-  template <typename... Args>
-  inline void receive(Args&&... args) {
-    deliverable dev(std::forward<Args>(args)...);
-    this->passthru(dev.endpoint(), std::move(dev));
-  }
-
-  void passthru(const endpoint& ep, deliverable&&);
+  void receive(deliverable&&);
   void passthru(const destination& dst, deliverable&&);
   void passthru(const com_port_pair_t& ep, deliverable&&);
 
@@ -91,20 +85,6 @@ class generic_locality_ : public manageable_base_ {
     }
   }
 
-  // inline void connect(const component_id_t& src,
-  //                     const component_port_t& srcPort,
-  //                     const component_id_t& dst,
-  //                     const component_port_t& dstPort) {
-  //   this->components[src]->update_destination(
-  //       srcPort, this->make_connector(dst, dstPort));
-  // }
-
-  // inline void connect(const component_id_t& src,
-  //                     const component_port_t& srcPort, const callback_ptr&
-  //                     cb) {
-  //   this->components[src]->update_destination(srcPort, cb);
-  // }
-
   inline void connect(const entry_port_ptr& srcPort, const component_id_t& dst,
                       const component_port_t& dstPort) {
     this->components[dst]->add_listener(
@@ -112,9 +92,6 @@ class generic_locality_ : public manageable_base_ {
         [](void* value) { delete (entry_port_ptr*)value; });
     this->open(srcPort, std::make_pair(dst, dstPort));
   }
-
-  // callback_ptr make_connector(const component_id_t& com,
-  //                             const component_port_t& port);
 
  protected:
   void receive_message(CkMessage* msg);

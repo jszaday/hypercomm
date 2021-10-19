@@ -23,10 +23,17 @@ CpvDeclare(generic_locality_*, locality_);
 }
 
 void try_return(deliverable&& dev) {
-  auto* ctx = access_context_();
-  auto& aid = ctx->ckGetArrayID();
-  auto& idx = ctx->ckGetArrayIndex();
-  interceptor::send_async(aid, idx, std::move(dev));
+  CkAssertMsg(dev, "invalid deliverable!");
+  if (dev.kind == deliverable::kValue) {
+    auto* val = dev.release<hyper_value>();
+    try_return(value_ptr(val));
+  } else {
+    CkAssertMsg(dev.endpoint(), "invalid destination!");
+    auto* ctx = access_context_();
+    auto& aid = ctx->ckGetArrayID();
+    auto& idx = ctx->ckGetArrayIndex();
+    interceptor::send_async(aid, idx, std::move(dev));
+  }
 }
 
 // TODO ( do not assume array-issuedness )
@@ -119,7 +126,8 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
 void generic_locality_::passthru(const destination& dst, deliverable&& dev) {
   switch (dst.kind) {
     case destination::kEndpoint:
-      this->passthru(dst.ep(), std::move(dev));
+      dev.update_endpoint(dst.ep());
+      this->receive(std::move(dev));
       break;
     case destination::kComponent:
       this->passthru(dst.com_port(), std::move(dev));
@@ -133,12 +141,13 @@ void generic_locality_::passthru(const destination& dst, deliverable&& dev) {
   }
 }
 
-void generic_locality_::passthru(const endpoint& ep, deliverable&& dev) {
-  // update how the deliverable got to us
-  dev.update_endpoint(ep);
-  // then check how we should handle it
+void generic_locality_::receive(deliverable&& dev) {
+  // check how we should handle it
+  auto& ep = dev.endpoint();
+  CkAssertMsg((bool)ep && dev, "invalid delivery!");
   if (ep.idx_ == CkIndex_locality_base_::idx_demux_CkMessage()) {
-    auto& port = ep.port_;
+    auto port = ep.port_;  // copy the ptr to the port
+                           // since we may move it later
     auto search = this->entry_ports.find(port);
     if (search == std::end(this->entry_ports)) {
       CkAssertMsg(port, "port should not be null!");
@@ -150,10 +159,11 @@ void generic_locality_::passthru(const endpoint& ep, deliverable&& dev) {
   } else {
     if (dev.kind == deliverable::kMessage) {
       auto* msg = dev.release<CkMessage>();
-      dev.endpoint().export_to(msg);
+      ep.export_to(msg);
       this->receive_message(msg);
     } else {
-      (ep.get_handler())(this, std::move(dev));
+      auto fn = ep.get_handler();
+      fn(this, std::move(dev));
     }
   }
 }

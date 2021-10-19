@@ -176,7 +176,7 @@ class component : public base_ {
   template <std::size_t I>
   inline static void return_(in_set& set) {
     auto& val = std::get<I>(set);
-    try_return(std::move(val));
+    if (val) try_return(std::move(val));
   }
 
   template <std::size_t I>

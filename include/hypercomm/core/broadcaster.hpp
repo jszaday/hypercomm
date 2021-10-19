@@ -53,7 +53,8 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
 
     // after that is done, check whether we should locally accept the bcast
     if (identity->accept_broadcast(count)) {
-      locality->receive(utilities::unwrap_message(std::move(msg_)));
+      deliverable dev(utilities::unwrap_message(std::move(msg_)));
+      locality->receive(std::move(dev));
     }
   }
 
