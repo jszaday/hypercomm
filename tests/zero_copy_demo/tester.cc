@@ -185,7 +185,6 @@ void receive_value(generic_locality_* self, deliverable&& dev) {
   using namespace components;
   auto& com = *((locality*)self)->mb;
   ((base_&)com).accept(0, std::move(dev));
-  CkAbort("this isn't working at the moment...\n");
 }
 
 #define CK_TEMPLATES_ONLY
