@@ -53,41 +53,30 @@ struct ptr_record {
   inline bool is_deferred() const { return kind == DEFERRED; }
 };
 
-struct generic_ptr_ {
-  virtual void reset(const std::shared_ptr<void>&) = 0;
-  virtual std::shared_ptr<void> lock(void) = 0;
+struct deferred_base_ {
+  std::size_t size;
+  virtual std::shared_ptr<void> get(void) = 0;
+  virtual void reset(std::shared_ptr<void>&&) = 0;
 };
 
 template <typename T>
-struct generic_ptr_impl_ : public generic_ptr_ {
-  std::shared_ptr<T>& ptr;
-  generic_ptr_impl_(std::shared_ptr<T>& _) : ptr(_) {}
+struct deferred_ : public deferred_base_ {
+  using ref_type = std::reference_wrapper<std::shared_ptr<T>>;
+  std::vector<ref_type> refs;
 
-  virtual void reset(const std::shared_ptr<void>& _) override {
-    auto typed = std::static_pointer_cast<T>(_);
-    new (&this->ptr) std::shared_ptr<T>(std::move(typed));
-  }
+  inline void push_back(std::shared_ptr<T>& _) { refs.emplace_back(_); }
 
-  virtual std::shared_ptr<void> lock(void) override {
-    CkAssertMsg(this->ptr, "pointer died before pup!");
-    return std::static_pointer_cast<void>(this->ptr);
-  }
-};
-
-struct deferred_ {
-  std::size_t size;
-  std::vector<std::unique_ptr<generic_ptr_>> ptrs;
-
-  template <typename T>
-  inline void push_back(std::shared_ptr<T>& _) {
-    ptrs.emplace_back(new generic_ptr_impl_<T>(_));
-  }
-
-  inline void reset(std::shared_ptr<void>&& _) {
-    CkAssertMsg(!this->ptrs.empty(), "expected to reset at least one value!");
-    for (auto& ptr : this->ptrs) {
-      ptr->reset(_);
+  virtual void reset(std::shared_ptr<void>&& _) override {
+    auto typed = std::static_pointer_cast<T>(std::move(_));
+    CkAssertMsg(!this->refs.empty(), "expected to reset at least one value!");
+    for (auto& ref : this->refs) {
+      new (&(ref.get())) std::shared_ptr<T>(typed);
     }
+  }
+
+  virtual std::shared_ptr<void> get(void) override {
+    auto& ref = this->refs.front().get();
+    return std::static_pointer_cast<void>(ref);
   }
 };
 
@@ -95,7 +84,7 @@ class serdes {
   template <typename K, typename V>
   using owner_less_map = std::map<K, V, std::owner_less<K>>;
 
-  std::map<ptr_id_t, deferred_> deferred;
+  std::map<ptr_id_t, std::unique_ptr<deferred_base_>> deferred;
   std::map<ptr_id_t, std::weak_ptr<void>> instances;
 
   std::weak_ptr<void> source;
@@ -148,8 +137,15 @@ class serdes {
   inline void put_deferred(const ptr_record& rec, std::shared_ptr<T>& t) {
     CkAssertMsg(this->deferrable, "unexpected deferred values!");
     auto& def = this->deferred[rec.id];
-    def.size = (std::size_t)rec.ty;
-    def.push_back(t);
+    deferred_<T>* ptr;
+    if (def) {
+      ptr = static_cast<deferred_<T>*>(def.get());
+    } else {
+      ptr = new deferred_<T>();
+      def.reset(ptr);
+    }
+    ptr->size = (std::size_t)rec.ty;
+    ptr->push_back(t);
   }
 
   using deferred_type =
@@ -157,13 +153,12 @@ class serdes {
   inline void get_deferred(std::vector<deferred_type>& vect) {
     using value_type = decltype(this->deferred)::value_type;
 
-    std::transform(std::begin(this->deferred), std::end(this->deferred),
-                   std::back_inserter(vect),
-                   [](const value_type& pair) -> deferred_type {
-                     auto& inst = pair.second;
-                     return std::make_tuple(pair.first, inst.size,
-                                            inst.ptrs.front()->lock());
-                   });
+    std::transform(
+        std::begin(this->deferred), std::end(this->deferred),
+        std::back_inserter(vect), [](const value_type& pair) -> deferred_type {
+          auto& inst = pair.second;
+          return std::make_tuple(pair.first, inst->size, inst->get());
+        });
 
 #if CMK_ERROR_CHECKING
     auto sorted =
@@ -182,7 +177,7 @@ class serdes {
                              std::shared_ptr<void>&& value) {
     auto it = std::begin(this->deferred);
     std::advance(it, idx);
-    (it->second).reset(std::move(value));
+    (it->second)->reset(std::move(value));
   }
 
   inline bool packing() const { return state == state_t::PACKING; }
