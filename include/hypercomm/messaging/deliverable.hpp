@@ -89,7 +89,8 @@ struct deliverable {
 
   template <typename... Args>
   inline void update_endpoint(Args&&... args) {
-    this->ep_ = std::move(hypercomm::endpoint(std::forward<Args>(args)...));
+    hypercomm::endpoint ep(std::forward<Args>(args)...);
+    this->ep_ = std::move(ep);
   }
 
   inline operator bool(void) const {

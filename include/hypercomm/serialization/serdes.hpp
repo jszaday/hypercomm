@@ -186,22 +186,22 @@ class serdes {
 
   inline std::size_t size() { return current - start; }
 
+  inline void fast_copy(char* dst, const char* src, std::size_t n_bytes) {
+    memcpy(dst, src, n_bytes);
+  }
+
   template <typename T>
   inline void copy(T* data, std::size_t n = 1) {
     const auto nBytes = n * sizeof(T);
-    // TODO test whether we need: CK_ALIGN(nBytes, sizeof(T));
-    const auto nAlign = 0;
     switch (state) {
       case PACKING:
-        std::copy(reinterpret_cast<char*>(data),
-                  reinterpret_cast<char*>(data) + nBytes, current + nAlign);
+        fast_copy(current, reinterpret_cast<char*>(data), nBytes);
         break;
       case UNPACKING:
-        std::copy(current + nAlign, current + nAlign + nBytes,
-                  reinterpret_cast<char*>(data));
+        fast_copy(reinterpret_cast<char*>(data), current, nBytes);
         break;
     }
-    advanceBytes(nAlign + nBytes);
+    advanceBytes(nBytes);
   }
 
   inline void advanceBytes(std::size_t size) { current += size; }

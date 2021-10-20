@@ -347,7 +347,7 @@ void generic_locality_::receive_value(CkMessage* raw,
       }
     }
   } else {
-    fn(this, deliverable(msg));
+    fn(this, deliverable(raw));
   }
 }
 
