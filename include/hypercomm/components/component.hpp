@@ -86,6 +86,7 @@ class component : public base_ {
 
   virtual ~component() { this->empty_buffers_(); }
 
+ protected:
   template <std::size_t I>
   inline static void accept(component<Inputs, Outputs>* self,
                             in_elt_t<I>&& val) {
@@ -120,6 +121,7 @@ class component : public base_ {
     accept<I>(self, dev_conv_<in_elt_t<I>>::convert(std::move(dev)));
   }
 
+ public:
   template <std::size_t O, std::size_t I, typename Input_, typename Output_>
   void output_to(const component<Input_, Output_>& peer) {
     static_assert(
@@ -357,6 +359,12 @@ template <typename Inputs, typename Outputs>
 typename component<Inputs, Outputs>::accept_array_t
     component<Inputs, Outputs>::acceptors =
         component<Inputs, Outputs>::make_acceptors_<accept_array_t>();
+
+inline void components::base_::accept(std::size_t port, deliverable&& dev) {
+  CkAssertMsg(port < this->n_inputs, "port out of range!");
+  CkAssertMsg((bool)dev.endpoint(), "received unreturnable value!");
+  (this->acceptors[port])(this, std::move(dev));
+}
 }  // namespace components
 template <typename Input, typename Output>
 using component = components::component<Input, Output>;

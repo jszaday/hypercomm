@@ -186,11 +186,7 @@ std::unique_ptr<typed_value<T>> zero_copy_value::to_typed(
 }
 
 template <typename T>
-typed_value_ptr<T> dev2typed(deliverable&& dev);
-
-template <typename T>
-inline typed_value_ptr<T> value2typed(value_ptr&& ptr_) {
-  auto* ptr = ptr_.release();
+inline typed_value_ptr<T> value2typed(hyper_value* ptr) {
 #if CMK_ERROR_CHECKING
   auto* val = dynamic_cast<typed_value<T>*>(ptr);
   if (ptr && !val) {
@@ -203,7 +199,7 @@ inline typed_value_ptr<T> value2typed(value_ptr&& ptr_) {
 }
 
 template <typename T>
-std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev) {
+inline std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev) {
   switch (dev.kind) {
     case deliverable::kDeferred: {
       auto* zc = dev.release<zero_copy_value>();
@@ -227,7 +223,7 @@ std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev) {
         return typed_value_ptr<T>();
       } else {
         val->source = std::move(ep);
-        return value2typed<T>(value_ptr(val));
+        return value2typed<T>(val);
       }
     }
     default: {

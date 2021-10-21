@@ -12,7 +12,9 @@ CpvDeclare(generic_locality_*, locality_);
 void try_return(deliverable&& dev) {
   CkAssertMsg(dev, "invalid deliverable!");
   if (dev.kind == deliverable::kValue) {
+    // TODO ( should this use the default return path? )
     auto* val = dev.release<hyper_value>();
+    val->source = std::move(dev.endpoint());
     try_return(value_ptr(val));
   } else {
     CkAssertMsg(dev.endpoint(), "invalid destination!");
@@ -143,15 +145,13 @@ void generic_locality_::receive(deliverable&& dev) {
     } else {
       this->passthru(search->second, std::move(dev));
     }
+  } else if (dev.kind == deliverable::kMessage) {
+    auto* msg = dev.release<CkMessage>();
+    ep.export_to(msg);
+    this->receive_message(msg);
   } else {
-    if (dev.kind == deliverable::kMessage) {
-      auto* msg = dev.release<CkMessage>();
-      ep.export_to(msg);
-      this->receive_message(msg);
-    } else {
-      auto fn = ep.get_handler();
-      fn(this, std::move(dev));
-    }
+    auto fn = ep.get_handler();
+    fn(this, std::move(dev));
   }
 }
 

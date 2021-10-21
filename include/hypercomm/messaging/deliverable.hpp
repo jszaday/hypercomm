@@ -24,24 +24,23 @@ struct deliverable {
   hypercomm::endpoint ep_;
 
  public:
-  deliverable(void) : kind(kInvalid), storage_(nullptr), ep_() {}
+  deliverable(void)
+      : kind(kInvalid), storage_(nullptr), ep_(PUP::reconstruct()) {}
 
   deliverable(CkMessage* msg) : kind(kMessage), storage_(msg), ep_(msg) {}
 
   deliverable(zero_copy_value* zc)
       : kind(kDeferred), storage_(zc), ep_(std::move(zc->ep)) {}
 
-  // TODO ( steal EP from value! )
   template <typename... Args>
-  deliverable(hyper_value* val, Args... args)
-      : kind(kValue), storage_(val), ep_(args...) {}
+  deliverable(hyper_value* val)
+      : kind(kValue), storage_(val), ep_(std::move(val->source)) {}
 
   template <typename T>
   deliverable(std::unique_ptr<T>&& ptr) : deliverable(ptr.release()) {}
 
   template <typename T, typename... Args>
-  deliverable(std::unique_ptr<T>&& ptr, Args... args)
-      : deliverable(ptr.release(), std::forward<Args>(args)...) {}
+  deliverable(std::unique_ptr<T>&& ptr, Args&&... args);
 
   ~deliverable() {
     switch (kind) {
@@ -126,10 +125,21 @@ struct deliverable::kind_for_<hyper_value> {
   static constexpr auto value = kValue;
 };
 
+template <typename T>
+struct deliverable::kind_for_<typed_value<T>> {
+  static constexpr auto value = kValue;
+};
+
 template <>
 struct deliverable::kind_for_<zero_copy_value> {
   static constexpr auto value = kDeferred;
 };
+
+template <typename T, typename... Args>
+inline deliverable::deliverable(std::unique_ptr<T>&& ptr, Args&&... args)
+    : kind(kind_for_<T>::value),
+      storage_(ptr.release()),
+      ep_(std::forward<Args>(args)...) {}
 
 template <typename T>
 inline T* deliverable::release(void) {

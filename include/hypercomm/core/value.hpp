@@ -12,7 +12,8 @@ class hyper_value {
 
   virtual ~hyper_value() = default;
 
-  hyper_value(CMK_REFNUM_TYPE flags_) : flags(flags_) {}
+  hyper_value(CMK_REFNUM_TYPE flags_)
+      : flags(flags_), source(PUP::reconstruct()) {}
 
   virtual void pup_buffer(serdes& s, const bool& encapsulate) = 0;
 

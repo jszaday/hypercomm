@@ -135,15 +135,12 @@ inline void passthru_context_(Args&&... args) {
 
 inline void try_return(value_ptr&& value) {
   if (value) {
-    destination dst(std::move(value->source));
-    if (dst) {
-      passthru_context_(dst, deliverable(std::move(value)));
-      return;
-    }
-  }
+    access_context_()->receive(deliverable(std::move(value)));
+  } else {
 #if CMK_VERBOSE
-  CkError("warning> unable to return value %p.\n", value.get());
+    CkError("warning> unable to return null value!");
 #endif
+  }
 }
 
 template <typename T>
