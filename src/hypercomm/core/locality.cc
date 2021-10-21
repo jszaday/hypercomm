@@ -4,19 +4,6 @@
 #include <hypercomm/reductions/reducer.hpp>
 
 namespace hypercomm {
-// TODO this is a temporary solution!
-value_ptr deliverable::to_value(deliverable&& dev) {
-  if (dev.kind == deliverable::kValue) {
-    value_ptr val(dev.release<hyper_value>());
-    if (val) {
-      val->source =
-          std::make_shared<endpoint_source>(std::move(dev.endpoint()));
-    }
-    return std::move(val);
-  } else {
-    return make_value<deliverable_value>(std::move(dev));
-  }
-}
 
 namespace {
 CpvDeclare(generic_locality_*, locality_);
@@ -189,7 +176,7 @@ generic_locality_::~generic_locality_() {
   for (auto& pair : this->port_queue) {
     auto& port = pair.first;
     for (auto& value : pair.second) {
-      this->loopback(port, deliverable::to_value(std::move(value)));
+      this->loopback(port, std::move(value));
 
       QdProcess(1);
     }

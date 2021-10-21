@@ -5,7 +5,6 @@
 #include "../reductions/contribution.hpp"
 #include "../serialization/is_pupable.hpp"
 
-#include "deliverable_value.hpp"
 #include "config.hpp"
 
 namespace hypercomm {
@@ -190,20 +189,21 @@ std::unique_ptr<typed_value<T>> zero_copy_value::to_typed(
 }
 
 template <typename T>
-std::unique_ptr<typed_value<T>> dev2typed(
-    deliverable&& dev, std::shared_ptr<value_source>&& src = {});
+typed_value_ptr<T> dev2typed(deliverable&& dev,
+                             std::shared_ptr<value_source>&& src = {});
 
 template <typename T>
-std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
-  auto* value = ptr.get();
-  if (typed_value<T>* p1 = dynamic_cast<typed_value<T>*>(value)) {
-    return std::unique_ptr<typed_value<T>>((typed_value<T>*)ptr.release());
-  } else if (deliverable_value* p2 = dynamic_cast<deliverable_value*>(value)) {
-    return dev2typed<T>(std::move(p2->dev), std::move(p2->source));
-  } else {
-    CkAbort("fatal> cannot convert %s to %s.\n",
-            ptr ? typeid(*ptr).name() : "(nil)", typeid(typed_value<T>).name());
+inline typed_value_ptr<T> value2typed(value_ptr&& ptr_) {
+  auto* ptr = ptr_.release();
+#if CMK_ERROR_CHECKING
+  auto* val = dynamic_cast<typed_value<T>*>(ptr);
+  if (ptr && !val) {
+    CkAbort("could not cast %s to %s\n", typeid(*ptr).name(), typeid(T).name());
   }
+#else
+  auto* val = static_cast<typed_value<T>*>(ptr);
+#endif
+  return typed_value_ptr<T>(val);
 }
 
 template <typename T>

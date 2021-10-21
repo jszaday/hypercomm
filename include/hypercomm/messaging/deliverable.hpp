@@ -106,7 +106,6 @@ struct deliverable {
     }
   }
 
-  static value_ptr to_value(deliverable&& dev);
   static CkMessage* to_message(deliverable&& dev);
 
  private:
