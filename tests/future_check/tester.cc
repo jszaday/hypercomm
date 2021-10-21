@@ -43,7 +43,7 @@ struct locality : public vil<CBase_locality, int> {
     using test_type = std::shared_ptr<int>;
     test_type t(new test_type::element_type(42));
     auto value = make_typed_value<std::tuple<test_type, test_type>>(t, t);
-    f.set(deliverable(value->release()));
+    f.set(deliverable(value->as_message()));
 
     do {
       CthYield();

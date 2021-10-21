@@ -31,6 +31,7 @@ struct deliverable {
   deliverable(zero_copy_value* zc)
       : kind(kDeferred), storage_(zc), ep_(std::move(zc->ep)) {}
 
+  // TODO ( steal EP from value! )
   template <typename... Args>
   deliverable(hyper_value* val, Args... args)
       : kind(kValue), storage_(val), ep_(args...) {}

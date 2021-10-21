@@ -15,6 +15,8 @@ template <typename T>
 class typed_value : public hyper_value {
  protected:
   static constexpr auto is_contribution = std::is_same<contribution, T>::value;
+  static constexpr CMK_REFNUM_TYPE flags = is_contribution
+                                           << messaging::__attribs__::kRedn;
 
   const void* storage;
   const storage_scheme scheme;
@@ -23,7 +25,7 @@ class typed_value : public hyper_value {
   using type = T;
 
   typed_value(const void* _1, const storage_scheme& _2)
-      : hyper_value(true), storage(_1), scheme(_2) {}
+      : hyper_value(flags), storage(_1), scheme(_2) {}
 
   // avoids a costly virtual method dispatch
   inline T* get(void) noexcept {
@@ -46,7 +48,7 @@ class typed_value : public hyper_value {
   inline T* operator->(void) noexcept { return this->get(); }
 
   template <storage_scheme Scheme = kInline>
-  static std::unique_ptr<typed_value<T>> from_message(message_type msg);
+  static std::unique_ptr<typed_value<T>> from_message(CkMessage* msg);
 
   template <typename... Args>
   inline static std::unique_ptr<typed_value<T>> from_buffer(Args... args);
@@ -110,8 +112,6 @@ class typed_value_impl_ : public typed_value<T> {
   typed_value_impl_(Args... args)
       : typed_value<T>(&tmp, Scheme), tmp(std::forward<Args>(args)...) {}
 
-  virtual bool recastable(void) const override { return false; }
-
   virtual void pup_buffer(serdes& s, const bool& encapsulate) override {
     if (encapsulate) {
       if (Scheme == kInline) {
@@ -125,13 +125,10 @@ class typed_value_impl_ : public typed_value<T> {
     }
   }
 
-  virtual CMK_REFNUM_TYPE flags(void) override {
-    return (is_contribution << messaging::__attribs__::kRedn);
-  }
-
-  virtual hyper_value::message_type release(void) override {
+  // TODO ( deprecate this? )
+  virtual message* as_message(void) const override {
     auto msg = guard_t::pack_to_port({}, this->value());
-    CkSetRefNum(msg, this->flags());
+    CkSetRefNum(msg, this->flags);
     return msg;
   }
 };
@@ -146,7 +143,7 @@ inline std::unique_ptr<typed_value<T>> typed_value<T>::from_buffer(
 
 template <typename T>
 template <storage_scheme Scheme>
-std::unique_ptr<typed_value<T>> typed_value<T>::from_message(message_type msg) {
+std::unique_ptr<typed_value<T>> typed_value<T>::from_message(CkMessage* msg) {
   if (utilities::is_null_message(msg)) {
     return std::unique_ptr<typed_value<T>>();
   } else if (!is_contribution && utilities::is_reduction_message(msg)) {
@@ -189,8 +186,7 @@ std::unique_ptr<typed_value<T>> zero_copy_value::to_typed(
 }
 
 template <typename T>
-typed_value_ptr<T> dev2typed(deliverable&& dev,
-                             std::shared_ptr<value_source>&& src = {});
+typed_value_ptr<T> dev2typed(deliverable&& dev);
 
 template <typename T>
 inline typed_value_ptr<T> value2typed(value_ptr&& ptr_) {
@@ -207,8 +203,7 @@ inline typed_value_ptr<T> value2typed(value_ptr&& ptr_) {
 }
 
 template <typename T>
-std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev,
-                                          std::shared_ptr<value_source>&& src) {
+std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev) {
   switch (dev.kind) {
     case deliverable::kDeferred: {
       auto* zc = dev.release<zero_copy_value>();
@@ -221,8 +216,7 @@ std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev,
       auto* msg = dev.release<CkMessage>();
       auto typed = typed_value<T>::from_message(msg);
       if (typed) {
-        typed->source = src ? std::move(src)
-                            : std::make_shared<endpoint_source>(std::move(ep));
+        typed->source = std::move(ep);
       }
       return std::move(typed);
     }
@@ -232,8 +226,7 @@ std::unique_ptr<typed_value<T>> dev2typed(deliverable&& dev,
       if (val == nullptr) {
         return typed_value_ptr<T>();
       } else {
-        val->source = src ? std::move(src)
-                          : std::make_shared<endpoint_source>(std::move(ep));
+        val->source = std::move(ep);
         return value2typed<T>(value_ptr(val));
       }
     }

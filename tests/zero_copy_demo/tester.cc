@@ -60,7 +60,7 @@ struct main : public CBase_main {
     auto localities = CProxy_locality(msg->aid);
     auto value = make_typed_value<configuration>(numReps, 10, numIters);
 
-    localities.run(value->release());
+    localities.run(value->as_message());
   }
 };
 

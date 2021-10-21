@@ -7,9 +7,6 @@
 
 namespace hypercomm {
 
-template <typename... Args>
-void passthru_context_(Args&&... args);
-
 namespace detail {
 template <typename T>
 struct inv_;

@@ -333,16 +333,6 @@ void forwarding_callback<CkArrayIndex>::send(callback::value_type&& value) {
   value.update_endpoint(this->ep);
   interceptor::send_async(base, std::move(value));
 }
-
-void entry_port::take_back(value_ptr&& value) {
-  access_context_()->receive(
-      deliverable(std::move(value), this->shared_from_this()));
-}
-
-void endpoint_source::take_back(value_ptr&& value) {
-  auto fn = this->ep_.get_handler();
-  fn(access_context_(), deliverable(std::move(value), this->ep_));
-}
 }  // namespace hypercomm
 
 #include "wait_any.hpp"
