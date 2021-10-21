@@ -362,7 +362,9 @@ typename component<Inputs, Outputs>::accept_array_t
 
 inline void components::base_::accept(std::size_t port, deliverable&& dev) {
   CkAssertMsg(port < this->n_inputs, "port out of range!");
+#if HYPERCOMM_STRICT_MODE
   CkAssertMsg((bool)dev.endpoint(), "received unreturnable value!");
+#endif
   (this->acceptors[port])(this, std::move(dev));
 }
 }  // namespace components
