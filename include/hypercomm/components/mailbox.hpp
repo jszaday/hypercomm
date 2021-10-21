@@ -15,7 +15,8 @@ class mailbox : public component<T, std::tuple<>> {
   using in_set = typename parent_t::in_set;
   using value_type = typename std::tuple_element<0, in_set>::type;
 
-  using predicate_type = std::shared_ptr<immediate_action<bool(const T&)>>;
+  using predicate_type =
+      std::shared_ptr<immediate_action<bool(const value_type&)>>;
   using action_type = callback_ptr;
   using weak_ref_t = utilities::weak_ref<mailbox>;
 
@@ -31,7 +32,9 @@ class mailbox : public component<T, std::tuple<>> {
     request(const predicate_type& pred_, Args&&... args)
         : pred(pred_), dst(std::forward<Args>(args)...), com(0) {}
 
-    inline bool matches(const T& t) { return !pred || pred->action(t); }
+    inline bool matches(const value_type& t) {
+      return !pred || pred->action(t);
+    }
 
     inline void action(value_type&& value) {
       passthru_context_(dst, std::move(value));
@@ -39,8 +42,8 @@ class mailbox : public component<T, std::tuple<>> {
   };
 
  protected:
-  std::deque<typed_value_ptr<T>> buffer_;
   std::list<request> requests_;
+  std::deque<value_type> buffer_;
   std::shared_ptr<weak_ref_t> weak_;
 
   using reqiter_t = typename decltype(requests_)::iterator;
@@ -115,7 +118,7 @@ class mailbox : public component<T, std::tuple<>> {
   inline buffer_iterator find_in_buffer(const predicate_type& pred) {
     buffer_iterator search = std::begin(this->buffer_);
     for (; search != std::end(this->buffer_); search++) {
-      if (!pred || pred->action((*search)->value())) {
+      if (!pred || pred->action(*search)) {
         break;
       }
     }
@@ -124,8 +127,7 @@ class mailbox : public component<T, std::tuple<>> {
 
   using request_iterator = typename decltype(requests_)::iterator;
 
-  inline reqiter_t find_matching(const std::unique_ptr<typed_value<T>>& _1) {
-    auto& value = _1->value();
+  inline reqiter_t find_matching(const value_type& value) {
     for (auto it = (this->requests_).rbegin(); it != (this->requests_).rend();
          it++) {
       if (it->matches(value)) {

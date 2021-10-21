@@ -53,41 +53,30 @@ struct ptr_record {
   inline bool is_deferred() const { return kind == DEFERRED; }
 };
 
-struct generic_ptr_ {
-  virtual void reset(const std::shared_ptr<void>&) = 0;
-  virtual std::shared_ptr<void> lock(void) = 0;
+struct deferred_base_ {
+  std::size_t size;
+  virtual std::shared_ptr<void> get(void) = 0;
+  virtual void reset(std::shared_ptr<void>&&) = 0;
 };
 
 template <typename T>
-struct generic_ptr_impl_ : public generic_ptr_ {
-  std::shared_ptr<T>& ptr;
-  generic_ptr_impl_(std::shared_ptr<T>& _) : ptr(_) {}
+struct deferred_ : public deferred_base_ {
+  using ptr_type = std::shared_ptr<T>;
+  std::vector<ptr_type*> ptrs;
 
-  virtual void reset(const std::shared_ptr<void>& _) override {
-    auto typed = std::static_pointer_cast<T>(_);
-    new (&this->ptr) std::shared_ptr<T>(std::move(typed));
-  }
+  inline void push_back(ptr_type& ptr) { this->ptrs.emplace_back(&ptr); }
 
-  virtual std::shared_ptr<void> lock(void) override {
-    CkAssertMsg(this->ptr, "pointer died before pup!");
-    return std::static_pointer_cast<void>(this->ptr);
-  }
-};
-
-struct deferred_ {
-  std::size_t size;
-  std::vector<std::unique_ptr<generic_ptr_>> ptrs;
-
-  template <typename T>
-  inline void push_back(std::shared_ptr<T>& _) {
-    ptrs.emplace_back(new generic_ptr_impl_<T>(_));
-  }
-
-  inline void reset(std::shared_ptr<void>&& _) {
+  virtual void reset(std::shared_ptr<void>&& _) override {
+    auto typed = std::static_pointer_cast<T>(std::move(_));
     CkAssertMsg(!this->ptrs.empty(), "expected to reset at least one value!");
     for (auto& ptr : this->ptrs) {
-      ptr->reset(_);
+      new (ptr) std::shared_ptr<T>(typed);
     }
+  }
+
+  virtual std::shared_ptr<void> get(void) override {
+    auto& ref = *(this->ptrs.front());
+    return std::static_pointer_cast<void>(ref);
   }
 };
 
@@ -95,7 +84,7 @@ class serdes {
   template <typename K, typename V>
   using owner_less_map = std::map<K, V, std::owner_less<K>>;
 
-  std::map<ptr_id_t, deferred_> deferred;
+  std::map<ptr_id_t, std::unique_ptr<deferred_base_>> deferred;
   std::map<ptr_id_t, std::weak_ptr<void>> instances;
 
   std::weak_ptr<void> source;
@@ -148,22 +137,28 @@ class serdes {
   inline void put_deferred(const ptr_record& rec, std::shared_ptr<T>& t) {
     CkAssertMsg(this->deferrable, "unexpected deferred values!");
     auto& def = this->deferred[rec.id];
-    def.size = (std::size_t)rec.ty;
-    def.push_back(t);
+    deferred_<T>* ptr;
+    if (def) {
+      ptr = static_cast<deferred_<T>*>(def.get());
+    } else {
+      ptr = new deferred_<T>();
+      def.reset(ptr);
+    }
+    ptr->size = (std::size_t)rec.ty;
+    ptr->push_back(t);
   }
 
   using deferred_type =
       std::tuple<ptr_id_t, std::size_t, std::shared_ptr<void>>;
   inline void get_deferred(std::vector<deferred_type>& vect) {
     using value_type = decltype(this->deferred)::value_type;
-
-    std::transform(std::begin(this->deferred), std::end(this->deferred),
-                   std::back_inserter(vect),
-                   [](const value_type& pair) -> deferred_type {
-                     auto& inst = pair.second;
-                     return std::make_tuple(pair.first, inst.size,
-                                            inst.ptrs.front()->lock());
-                   });
+    vect.reserve(this->deferred.size());
+    std::transform(
+        std::begin(this->deferred), std::end(this->deferred),
+        std::back_inserter(vect), [](const value_type& pair) -> deferred_type {
+          auto& inst = pair.second;
+          return std::make_tuple(pair.first, inst->size, inst->get());
+        });
 
 #if CMK_ERROR_CHECKING
     auto sorted =
@@ -182,7 +177,7 @@ class serdes {
                              std::shared_ptr<void>&& value) {
     auto it = std::begin(this->deferred);
     std::advance(it, idx);
-    (it->second).reset(std::move(value));
+    (it->second)->reset(std::move(value));
   }
 
   inline bool packing() const { return state == state_t::PACKING; }
@@ -191,22 +186,22 @@ class serdes {
 
   inline std::size_t size() { return current - start; }
 
+  inline void fast_copy(char* dst, const char* src, std::size_t n_bytes) {
+    memcpy(dst, src, n_bytes);
+  }
+
   template <typename T>
   inline void copy(T* data, std::size_t n = 1) {
     const auto nBytes = n * sizeof(T);
-    // TODO test whether we need: CK_ALIGN(nBytes, sizeof(T));
-    const auto nAlign = 0;
     switch (state) {
       case PACKING:
-        std::copy(reinterpret_cast<char*>(data),
-                  reinterpret_cast<char*>(data) + nBytes, current + nAlign);
+        fast_copy(current, reinterpret_cast<char*>(data), nBytes);
         break;
       case UNPACKING:
-        std::copy(current + nAlign, current + nAlign + nBytes,
-                  reinterpret_cast<char*>(data));
+        fast_copy(reinterpret_cast<char*>(data), current, nBytes);
         break;
     }
-    advanceBytes(nAlign + nBytes);
+    advanceBytes(nBytes);
   }
 
   inline void advanceBytes(std::size_t size) { current += size; }

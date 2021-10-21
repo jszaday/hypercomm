@@ -1,9 +1,9 @@
-#include <charm++.h>
-
 #include "tester.hh"
 
-#include <ctime>
+#include <charm++.h>
+
 #include <cstdlib>
+#include <ctime>
 
 #ifndef DECOMP_FACTOR
 #define DECOMP_FACTOR 4
@@ -32,7 +32,9 @@ struct main : public CBase_main {
   CProxy_receiver receivers;
   CProxy_sender senders;
 
-  main(CkArgMsg* m) : numIters(atoi(m->argv[1])), numReps(numIters / 2 + 1) {
+  main(CkArgMsg* m)
+      : numIters(m->argc >= 2 ? atoi(m->argv[1]) : 128),
+        numReps(numIters / 2 + 1) {
     if (numReps > kMaxReps) numReps = kMaxReps;
     numElements = kDecompFactor * CkNumPes();
 
@@ -73,7 +75,8 @@ struct receiver : public vil<CBase_receiver, int> {
   int numIters;
 
   receiver(const int& _1)
-      : numIters(_1), recv_port(std::make_shared<persistent_port>(0)),
+      : numIters(_1),
+        recv_port(std::make_shared<persistent_port>(0)),
         mbox(this->emplace_component<mailbox<int>>()) {
     this->connect(recv_port, this->mbox, 0);
 

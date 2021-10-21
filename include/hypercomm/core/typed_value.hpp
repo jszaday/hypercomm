@@ -202,8 +202,7 @@ std::unique_ptr<typed_value<T>> value2typed(value_ptr&& ptr) {
     return dev2typed<T>(std::move(p2->dev), std::move(p2->source));
   } else {
     CkAbort("fatal> cannot convert %s to %s.\n",
-            ptr ? typeid(ptr.get()).name() : "(nil)",
-            typeid(typed_value<T>).name());
+            ptr ? typeid(*ptr).name() : "(nil)", typeid(typed_value<T>).name());
   }
 }
 

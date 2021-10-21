@@ -96,27 +96,19 @@ class interceptor : public CBase_interceptor {
   static void send_to_branch(const int& pe, const CkArrayID& aid,
                              const CkArrayIndex& idx, CkMessage* msg);
 
-  template <typename T>
+  template <typename T, typename Value>
   inline static is_valid_endpoint_t<T> send_async(const CkArrayID& aid,
                                                   const CkArrayIndex& idx,
-                                                  const T& ep,
-                                                  value_ptr&& value) {
-    interceptor::send_async(aid, idx, deliverable(std::move(value), ep));
+                                                  const T& ep, Value&& value) {
+    deliverable dev(std::forward<Value>(value));
+    dev.update_endpoint(ep);
+    interceptor::send_async(aid, idx, std::move(dev));
   }
 
-  template <typename T>
+  template <typename T, typename Value>  // ^
   inline static is_valid_endpoint_t<T> send_async(
-      const CProxyElement_ArrayElement& proxy, const T& ep, value_ptr&& value) {
+      const CProxyElement_ArrayElement& proxy, const T& ep, Value&& value) {
     interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(), ep,
-                            std::move(value));
-  }
-
-  template <typename T>
-  inline static is_valid_endpoint_t<T> send_async(
-      const CProxyElement_ArrayElement& proxy, const T& ep,
-      deliverable&& value) {
-    value.update_endpoint(ep);
-    interceptor::send_async(proxy.ckGetArrayID(), proxy.ckGetIndex(),
                             std::move(value));
   }
 
