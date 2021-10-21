@@ -16,6 +16,11 @@ struct is_pupable<std::tuple<T>> {
   static constexpr auto value = is_pupable<T>::value;
 };
 
+template <typename A, typename B>
+struct is_pupable<std::pair<A, B>> {
+  static constexpr auto value = is_pupable<A>::value && is_pupable<B>::value;
+};
+
 template <typename T, typename... Ts>
 struct is_pupable<std::tuple<T, Ts...>, std::enable_if<sizeof...(Ts) >= 1>> {
   static constexpr auto value =

@@ -4,19 +4,6 @@
 #include <hypercomm/reductions/reducer.hpp>
 
 namespace hypercomm {
-// TODO this is a temporary solution!
-value_ptr deliverable::to_value(deliverable&& dev) {
-  if (dev.kind == deliverable::kValue) {
-    value_ptr val(dev.release<hyper_value>());
-    if (val) {
-      val->source =
-          std::make_shared<endpoint_source>(std::move(dev.endpoint()));
-    }
-    return std::move(val);
-  } else {
-    return make_value<deliverable_value>(std::move(dev));
-  }
-}
 
 namespace {
 CpvDeclare(generic_locality_*, locality_);
@@ -25,7 +12,9 @@ CpvDeclare(generic_locality_*, locality_);
 void try_return(deliverable&& dev) {
   CkAssertMsg(dev, "invalid deliverable!");
   if (dev.kind == deliverable::kValue) {
+    // TODO ( should this use the default return path? )
     auto* val = dev.release<hyper_value>();
+    val->source = std::move(dev.endpoint());
     try_return(value_ptr(val));
   } else {
     CkAssertMsg(dev.endpoint(), "invalid destination!");
@@ -156,15 +145,13 @@ void generic_locality_::receive(deliverable&& dev) {
     } else {
       this->passthru(search->second, std::move(dev));
     }
+  } else if (dev.kind == deliverable::kMessage) {
+    auto* msg = dev.release<CkMessage>();
+    ep.export_to(msg);
+    this->receive_message(msg);
   } else {
-    if (dev.kind == deliverable::kMessage) {
-      auto* msg = dev.release<CkMessage>();
-      ep.export_to(msg);
-      this->receive_message(msg);
-    } else {
-      auto fn = ep.get_handler();
-      fn(this, std::move(dev));
-    }
+    auto fn = ep.get_handler();
+    fn(this, std::move(dev));
   }
 }
 
@@ -189,7 +176,7 @@ generic_locality_::~generic_locality_() {
   for (auto& pair : this->port_queue) {
     auto& port = pair.first;
     for (auto& value : pair.second) {
-      this->loopback(port, deliverable::to_value(std::move(value)));
+      this->loopback(port, std::move(value));
 
       QdProcess(1);
     }

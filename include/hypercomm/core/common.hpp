@@ -5,7 +5,6 @@
 #include "../components/identifiers.hpp"
 
 #include "proxy.hpp"
-#include "callback.hpp"
 
 namespace hypercomm {
 
@@ -49,6 +48,24 @@ using collective_ptr = std::shared_ptr<hypercomm::collective_proxy<Index>>;
 template <typename Action>
 CkMessage* pack_action(const Action&);
 
+class deliverable;
+
+class hyper_value;
+using value_ptr = std::unique_ptr<hyper_value>;
+
+template <typename T>
+class typed_value;
+
+template <typename T>
+using typed_value_ptr = std::unique_ptr<typed_value<T>>;
+
+template <typename... Args>
+inline void passthru_context_(Args&&... args);
+
+template <typename T>
+inline void try_return(typed_value_ptr<T>&& value);
+
+void try_return(deliverable&& dev);
 }  // namespace hypercomm
 
 #include "../serialization/pup.hpp"

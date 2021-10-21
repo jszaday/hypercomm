@@ -1,6 +1,7 @@
 #ifndef __HYPERCOMM_COMPONENTS_BASE_HPP__
 #define __HYPERCOMM_COMPONENTS_BASE_HPP__
 
+#define HYPERCOMM_STRICT_MODE 0
 #define HYPERCOMM_ERROR_CHECKING 1
 
 #include <typeindex>
@@ -87,10 +88,7 @@ class base_ {
   inline bool is_active(void) const { return this->active; }
 
   // we need a way to accept arbitrary messages
-  inline void accept(std::size_t port, deliverable&& dev) {
-    CkAssertMsg(port < this->n_inputs, "port out of range!");
-    (this->acceptors[port])(this, std::move(dev));
-  }
+  inline void accept(std::size_t port, deliverable&& dev);
 
 #if HYPERCOMM_ERROR_CHECKING
   // checks whether a given port can accept a value with the type

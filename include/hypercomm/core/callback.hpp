@@ -1,8 +1,8 @@
 #ifndef __HYPERCOMM_CORE_CALLBACK_HPP__
 #define __HYPERCOMM_CORE_CALLBACK_HPP__
 
-#include "../serialization/construction.hpp"
 #include "value.hpp"
+#include "../serialization/construction.hpp"
 
 namespace hypercomm {
 namespace core {

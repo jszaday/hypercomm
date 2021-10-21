@@ -65,7 +65,7 @@ bool locality_registered_(void) {
 
 __msg__ *__msg__::make_message(const std::size_t &user_size,
                                const entry_port_ptr &dst) {
-  const auto real_size = hypercomm::size(dst);
+  const auto real_size = dst ? hypercomm::size(dst) : sizeof(kIgnored);
   const auto port_size = (real_size < kMinPortSize) ? kMinPortSize : real_size;
   const auto total_size = hdr_size + port_size + user_size;
   // NOTE default allocation via new(...) doesn't seem to work here

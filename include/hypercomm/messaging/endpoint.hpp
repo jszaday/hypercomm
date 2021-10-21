@@ -1,7 +1,6 @@
 #ifndef __HYPERCOMM_MESSAGING_ENDPOINT_HPP__
 #define __HYPERCOMM_MESSAGING_ENDPOINT_HPP__
 
-#include "../core/common.hpp"
 #include "../core/module.hpp"
 #include "../core/entry_port.hpp"
 
@@ -16,7 +15,6 @@ class endpoint {
   int idx_;
 
   endpoint(PUP::reconstruct) : endpoint(0x0) {}
-  endpoint(void) : endpoint(PUP::reconstruct()) {}
   endpoint(const int& _) : idx_(_), port_(nullptr) {}
   endpoint(entry_port_ptr&& _) : idx_(demux()), port_(_) {}
   endpoint(const entry_port_ptr& _) : idx_(demux()), port_(_) {}
@@ -101,16 +99,6 @@ class endpoint {
     ss << ")";
     return ss.str();
   }
-};
-
-struct endpoint_source : public virtual value_source,
-                         public std::enable_shared_from_this<endpoint_source> {
-  endpoint ep_;
-
-  template <typename... Args>
-  endpoint_source(Args... args) : ep_(std::forward<Args>(args)...) {}
-
-  virtual void take_back(value_ptr&&) override;
 };
 
 struct endpoint_hasher {

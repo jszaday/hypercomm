@@ -75,25 +75,16 @@ message* pack_deferrable_(const entry_port_ptr& port, value_ptr&& uniq) {
 
 // TODO ( it would be good to rename this at some point )
 static message* repack_to_port(const entry_port_ptr& port, value_ptr&& value) {
-  if (value->pupable) {
-    auto flags = value->flags();
+  if (value) {
+    auto flags = value->flags;
     auto* msg = pack_deferrable_(port, std::move(value));
     auto* env = UsrToEnv(msg);
     env->setRef(flags | env->getRef());
     return msg;
   } else {
-    auto msg = value ? static_cast<message*>(value->release())
-                     : message::make_null_message(port);
-    auto msgIdx = UsrToEnv(msg)->getMsgIdx();
-    if (msgIdx == message::index()) {
-      msg->dst = port;
-      return msg;
-    } else {
-      // TODO repack to hypercomm in this case
-      //     (unless HYPERCOMM_NO_COPYING is defined)
-      CkAbort("expected a hypercomm msg, but got %s instead\n",
-              _msgTable[msgIdx]->name);
-    }
+    auto* msg = message::make_null_message(port);
+    CkAssert(port == msg->dst);
+    return msg;
   }
 }
 }  // namespace detail

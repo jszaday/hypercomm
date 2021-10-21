@@ -129,10 +129,24 @@ void CkIndex_locality_base_::value_handler(CkMessage* msg, CkMigratable* mig) {
 }
 
 template <typename... Args>
-void passthru_context_(Args&&... args) {
+inline void passthru_context_(Args&&... args) {
   access_context_()->passthru(std::forward<Args>(args)...);
 }
 
+inline void try_return(value_ptr&& value) {
+  if (value) {
+    access_context_()->receive(deliverable(std::move(value)));
+  } else {
+#if CMK_VERBOSE
+    CkError("warning> unable to return null value!");
+#endif
+  }
+}
+
+template <typename T>
+inline void try_return(typed_value_ptr<T>&& value) {
+  try_return(value_ptr(value.release()));
+}
 }  // namespace hypercomm
 
 #endif

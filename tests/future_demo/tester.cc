@@ -51,7 +51,7 @@ struct main : public CBase_main {
 
       auto start = CkWallTimer();
 
-      localities.run(value->release());
+      localities.run(value->as_message());
 
       CkWaitQD();
 

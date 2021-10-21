@@ -177,25 +177,25 @@ class vil : public detail::base_<Base, Index>, public future_manager_ {
         stamp, fn, ustream.size() + 1, dstream.empty() ? 1 : dstream.size());
 
     for (const auto& up : ustream) {
-      auto ours = std::make_shared<reduction_port<Index>>(stamp, up);
-      this->connect(ours, rdcr, 0);
+      auto remote = std::make_shared<reduction_port<Index>>(stamp, up);
+      this->connect(remote, rdcr, 0);
     }
 
+    auto local = std::make_shared<reduction_port<Index>>(stamp, ident->mine());
     if (dstream.empty()) {
       rdcr->template output_to<0>(cb);
     } else {
-      auto theirs =
-          std::make_shared<reduction_port<Index>>(stamp, ident->mine());
-
       for (const auto& down : dstream) {
         auto downIdx = conv2idx<base_index_type>(down);
-        auto fwd = forward_to(this->thisProxy[downIdx], theirs);
+        auto fwd = forward_to(this->thisProxy[downIdx], local);
         rdcr->template output_to<0>(std::move(fwd));
       }
     }
 
     this->activate_component(rdcr);
     auto contrib = make_typed_value<contribution>(std::move(value), fn, cb);
+    // TODO ( uncertain whether source setting is correct, needs testing )
+    contrib->source = endpoint(std::move(local));
     this->components[rdcr]->accept(0, std::move(contrib));
   }
 };
@@ -332,16 +332,6 @@ void forwarding_callback<CkArrayIndex>::send(callback::value_type&& value) {
       static_cast<const CProxyElement_locality_base_&>(this->proxy->c_proxy());
   value.update_endpoint(this->ep);
   interceptor::send_async(base, std::move(value));
-}
-
-void entry_port::take_back(value_ptr&& value) {
-  access_context_()->receive(
-      deliverable(std::move(value), this->shared_from_this()));
-}
-
-void endpoint_source::take_back(value_ptr&& value) {
-  auto fn = this->ep_.get_handler();
-  fn(access_context_(), deliverable(std::move(value), this->ep_));
 }
 }  // namespace hypercomm
 

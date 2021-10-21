@@ -1,7 +1,7 @@
 #ifndef __HYPERCOMM_CORE_ENTRY_METHODS_HPP__
 #define __HYPERCOMM_CORE_ENTRY_METHODS_HPP__
 
-#include "common.hpp"
+#include "../core/common.hpp"
 #include "../messaging/messaging.hpp"
 #include "../tree_builder/manageable_base.hpp"
 

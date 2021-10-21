@@ -4,7 +4,6 @@
 #include "../core/math.hpp"
 #include "../core/proxy.hpp"
 #include "../core/entry_port.hpp"
-#include "../core/deliverable_value.hpp"
 
 #include "../serialization/pup.hpp"
 
