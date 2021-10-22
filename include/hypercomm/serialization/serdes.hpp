@@ -20,8 +20,8 @@ bool is_uninitialized(std::weak_ptr<T> const& weak) {
 
 using ptr_id_t = std::size_t;
 using polymorph_id_t = std::size_t;
-struct ptr_record;
 
+class serdes;
 class sizer;
 class packer;
 class unpacker;
@@ -42,6 +42,7 @@ struct ptr_record {
   kind_t kind;
   ptr_id_t id;
   polymorph_id_t ty;
+  serdes* progenitor = nullptr;
 
   ptr_record(const ptr_record&) = default;
   ptr_record(const kind_t& _ = INVALID) : kind(_) {}
@@ -101,11 +102,20 @@ class serdes {
  public:
   owner_less_map<std::weak_ptr<void>, ptr_record> records;
 
+  void acquire(serdes& s) {
+    CkAssert(this != &s);
+    for (auto it = std::begin(s.records); it != std::end(s.records);) {
+      this->records.emplace(std::move(it->first), std::move(it->second));
+      it = s.records.erase(it);
+    }
+    CkAssert(s.records.empty());
+  }
+
   enum state_t { SIZING, PACKING, UNPACKING };
   const char* start;
   char* current;
   const state_t state;
-  const bool deferrable;
+  bool deferrable;
 
   serdes(const bool& _0, const std::shared_ptr<void>& _1, const char* _2)
       : deferrable(_0),
@@ -135,6 +145,32 @@ class serdes {
     } else {
       return this->source.lock();
     }
+  }
+
+  template <typename T, typename Fn>
+  inline ptr_record* get_record(const std::shared_ptr<T>& t, const Fn& fn) {
+    auto search = this->records.find(t);
+    if (search == std::end(this->records)) {
+      auto id = this->records.size() + 1;
+      auto pair =
+          this->records.emplace(std::piecewise_construct, std::make_tuple(t),
+                                std::make_tuple(id, fn()));
+      CkEnforceMsg(pair.second, "insertion did not occur!");
+      auto* rec = &((pair.first)->second);
+      rec->progenitor = this;
+      return rec;
+    }
+    auto& rec = search->second;
+    CkEnforce((bool)rec.progenitor);
+    if (this == rec.progenitor) {
+      if (rec.kind == ptr_record::INSTANCE) {
+        rec.kind = ptr_record::REFERENCE;
+      }
+    } else {
+      rec.progenitor = this;
+      rec.kind = ptr_record::INSTANCE;
+    }
+    return &(rec);
   }
 
   template <typename T>
@@ -253,6 +289,11 @@ class packer : public serdes {
  public:
   packer(const char* _1, const bool& deferrable = false)
       : serdes(deferrable, _1) {}
+
+  void reset(char* buf) {
+    CkAssert((this->start == this->current) && (this->start == nullptr));
+    this->start = this->current = buf;
+  }
 };
 
 class unpacker : public serdes {

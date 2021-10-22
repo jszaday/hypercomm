@@ -24,11 +24,13 @@ message* pack_deferrable_(const entry_port_ptr& port, value_ptr&& uniq) {
   std::vector<serdes::deferred_type> deferred;
   // find the size of the value, and extract any
   // buffers to be deferred (and sent via RDMA)
+  packer pkr((char*)nullptr);
   auto pupSize = ([&](void) {
     sizer s(true);
     s.reset_source(value);
     value->pup_buffer(s, true);
     s.get_deferred(deferred);
+    pkr.acquire(s);  // steals records to avoid recreating ptrs!
     return s.size();
   })();
   auto hasDeferred = !deferred.empty();
@@ -66,10 +68,11 @@ message* pack_deferrable_(const entry_port_ptr& port, value_ptr&& uniq) {
   if (hasDeferred) {
     p | buffers;
   }
-  // then PUP the value (with deference)
-  packer s(p.get_current_pointer(), hasDeferred);
-  value->pup_buffer(s, hasDeferred);
-  CkAssertMsg((p.size() + s.size()) == msgSize, "size mismatch!");
+  // then PUP the value (with appropriate deference)
+  pkr.reset(p.get_current_pointer());
+  pkr.deferrable = hasDeferred;
+  value->pup_buffer(pkr, hasDeferred);
+  CkAssertMsg((p.size() + pkr.size()) == msgSize, "size mismatch!");
   return msg;
 }
 

@@ -25,10 +25,19 @@ inline serdes& operator|(serdes& s, T& t) {
 }
 
 template <typename T>
-inline size_t size(const T& t) {
-  sizer s;
+inline size_t pup_size(serdes& s, const T& t) {
   pup(s, const_cast<T&>(t));
   return s.size();
+}
+
+template <typename T>
+inline size_t size(const T& t, serdes* next = nullptr) {
+  sizer s;
+  auto sz = pup_size(s, t);
+  if (next) {
+    next->acquire(s);
+  }
+  return sz;
 }
 
 template <typename T, typename Enable = void>
@@ -238,25 +247,19 @@ struct pack_helper<T, typename std::enable_if<is_polymorph<T>::value>::type> {
   static void pack(serdes& s, T& p) { p.__pup__(s); }
 };
 
+// useful for finding pointer-within-pointer oddities
+// template <typename T>
+// struct pack_helper<std::shared_ptr<T>> {};
+
 template <typename T, typename IdentifyFn>
 inline static void pack_ptr(serdes& s, ptr_record** out, std::shared_ptr<T>& t,
                             const IdentifyFn& fn) {
   if ((bool)t) {
-    auto search = s.records.find(t);
-    if (search == s.records.end()) {
-      auto id = s.records.size() + 1;
-      auto pair =
-          s.records.emplace(std::piecewise_construct, std::make_tuple(t),
-                            std::make_tuple(id, fn()));
-      CkAssertMsg(pair.second, "insertion did not occur!");
-      *out = &(pair.first->second);
+    auto* rec = s.get_record(t, fn);
+    if (rec->is_instance()) {
+      *out = rec;
     } else {
-      auto& other = search->second;
-      ptr_record rec(other);
-      if (other.is_instance()) {
-        rec.kind = ptr_record::REFERENCE;
-      }
-      pup(s, rec);
+      pup(s, *rec);
     }
   } else {
     ptr_record rec(nullptr);
@@ -540,8 +543,8 @@ struct puper<
       } else if (rec.is_instance()) {
         // if it's an instance, go through the fallback routine
         zero_copy_fallback<T>::unpack(s, t);
-        CkAssertMsg(s.put_instance(rec.id, t),
-                    "instance insertion did not occur!");
+        CkEnforceMsg(s.put_instance(rec.id, t),
+                     "instance insertion did not occur!");
       } else {
         // if not, simply unpack the pointer
         default_unpack(s, rec, t);
@@ -581,8 +584,8 @@ struct puper<
       pup(s, rec);
       if (rec.is_instance()) {
         instance_unpack(s, t);
-        CkAssertMsg(s.put_instance(rec.id, t),
-                    "instance insertion did not occur!");
+        CkEnforceMsg(s.put_instance(rec.id, t),
+                     "instance insertion did not occur!");
       } else {
         default_unpack(s, rec, t);
       }
