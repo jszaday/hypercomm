@@ -34,9 +34,10 @@ namespace detail {
 template <typename Target, typename Enable = void>
 struct extract_proxy;
 
-template <typename Proxy>
-struct extract_proxy<CBaseT1<locality_base_, Proxy>> {
-  using type = Proxy;
+template <typename Base>
+struct extract_proxy<Base, typename std::enable_if<std::is_base_of<
+                               locality_base_, Base>::value>::type> {
+  using type = typename std::remove_pointer<decltype(&(Base::thisProxy))>::type;
 };
 
 template <typename Target>
