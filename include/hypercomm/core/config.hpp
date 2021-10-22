@@ -5,9 +5,14 @@
 #define HYPERCOMM_PORT_SIZE 48
 #endif
 
+#ifndef HYPERCOMM_STACK_SIZE
+#define HYPERCOMM_STACK_SIZE 2
+#endif
+
 #include <cstdint>
 
 namespace hypercomm {
+constexpr std::size_t kStackSize = HYPERCOMM_STACK_SIZE;
 constexpr std::size_t kMinPortSize = HYPERCOMM_PORT_SIZE;
 constexpr std::size_t kZeroCopySize = 256 * 1024;
 }  // namespace hypercomm

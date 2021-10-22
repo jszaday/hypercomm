@@ -1,10 +1,10 @@
 #ifndef __HYPERCOMM_COMPONENTS_IDENTIFIERS_HPP__
 #define __HYPERCOMM_COMPONENTS_IDENTIFIERS_HPP__
 
-#include <map>
 #include <memory>
 #include <cstdint>
 #include <utility>
+#include <unordered_map>
 
 namespace hypercomm {
 
@@ -18,7 +18,7 @@ using component_id_t = std::uint64_t;
 using component_port_t = std::uint64_t;
 using reduction_id_t = component_id_t;
 using com_port_pair_t = std::pair<component_id_t, component_port_t>;
-using component_map = std::map<component_id_t, component_ptr>;
+using component_map = std::unordered_map<component_id_t, component_ptr>;
 
 }  // namespace hypercomm
 
