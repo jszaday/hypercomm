@@ -19,18 +19,13 @@ void unpack(CkMessage* msg, Args&... args) {
 }
 
 template <typename... Args>
-std::size_t pack_into(char* buf, const std::tuple<Args&...>& args) {
-  packer s(buf);
-  hypercomm::pup(s, args);
-  return s.size();
-}
-
-template <typename... Args>
 CkMessage* pack(const Args&... _args) {
   auto args = std::forward_as_tuple(const_cast<Args&>(_args)...);
-  auto size = hypercomm::size(args);
-  auto msg = CkAllocateMarshallMsg(size);
-  auto real_size = pack_into(msg->msgBuf, args);
+  packer s((char*)nullptr);
+  auto size = hypercomm::size(args, &s);
+  auto* msg = CkAllocateMarshallMsg(size);
+  s.reset(msg->msgBuf);
+  auto real_size = pup_size(s, args);
   CkAssert(size == real_size);
   return msg;
 }
@@ -38,9 +33,11 @@ CkMessage* pack(const Args&... _args) {
 template <typename... Args>
 message* pack_to_port(const entry_port_ptr& dst, const Args&... _args) {
   auto args = std::forward_as_tuple(const_cast<Args&>(_args)...);
-  auto size = hypercomm::size(args);
-  auto msg = message::make_message(size, dst);
-  auto real_size = pack_into(msg->payload, args);
+  packer s((char*)nullptr);
+  auto size = hypercomm::size(args, &s);
+  auto* msg = message::make_message(size, dst);
+  s.reset(msg->payload);
+  auto real_size = pup_size(s, args);
   CkAssert(size == real_size);
   return msg;
 }

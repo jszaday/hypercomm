@@ -45,7 +45,7 @@ struct use_buffer {
   std::shared_ptr<T> buffer;
 
   template <typename... Args>
-  use_buffer(Args... args) : buffer(std::forward<Args>(args)...) {}
+  use_buffer(Args&&... args) : buffer(std::forward<Args>(args)...) {}
 };
 
 using reconstruct = PUP::reconstruct;
@@ -62,12 +62,12 @@ struct temporary<T, kInline> {
   typename std::aligned_storage<sizeof(T), alignof(T)>::type data;
 
   // used to when there should be no initialization whatsoever
-  temporary(const tags::no_init&) {}
+  temporary(tags::no_init) {}
 
-  temporary(const tags::reconstruct&) { reconstruct(&(this->value())); }
+  temporary(tags::reconstruct) { reconstruct(&(this->value())); }
 
   template <typename... Args>
-  temporary(Args... args) {
+  temporary(Args&&... args) {
     ::new (&this->value()) T(std::forward<Args>(args)...);
   }
 
@@ -83,19 +83,42 @@ struct temporary<T, kBuffer> {
   std::shared_ptr<T> data;
 
   // used to when there should be no initialization whatsoever
-  temporary(const tags::no_init&) {}
-  temporary(const tags::reconstruct&) {}
-  temporary(const tags::allocate&) : data(::operator new(sizeof(T))) {}
+  temporary(tags::no_init) {}
+  temporary(tags::reconstruct) {}
+  temporary(tags::allocate) : data((T*)(::operator new(sizeof(T)))) {}
   temporary(tags::use_buffer<T>&& _) : data(std::move(_.buffer)) {}
 
   template <typename... Args>
-  temporary(Args... args) : temporary(tags::allocate{}) {
+  temporary(Args&&... args) : temporary(tags::allocate{}) {
     ::new (&this->value()) T(std::forward<Args>(args)...);
   }
 
   T& value(void) { return *data; }
 
   const T& value(void) const { return *data; }
+};
+
+// buffers should just be buffers, y'know?
+template <typename T>
+struct temporary<std::shared_ptr<T>, kBuffer> {
+  std::shared_ptr<T> data;
+
+  // used to when there should be no initialization whatsoever
+  temporary(tags::no_init) {}
+  temporary(tags::reconstruct) {}
+  temporary(tags::allocate) : data((T*)(::operator new(sizeof(T)))) {}
+  temporary(tags::use_buffer<T>&& _) : data(std::move(_.buffer)) {}
+
+  template <typename... Args>
+  temporary(Args&&... args) : temporary(tags::allocate{}) {
+    ::new (this->get()) T(std::forward<Args>(args)...);
+  }
+
+  inline T* get(void) { return this->data.get(); }
+
+  inline std::shared_ptr<T>& value(void) { return this->data; }
+
+  inline const std::shared_ptr<T>& value(void) const { return this->data; }
 };
 }  // namespace hypercomm
 

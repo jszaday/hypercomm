@@ -15,7 +15,8 @@ class hyper_value {
   hyper_value(CMK_REFNUM_TYPE flags_)
       : flags(flags_), source(PUP::reconstruct()) {}
 
-  virtual void pup_buffer(serdes& s, const bool& encapsulate) = 0;
+  // returns true if wrapping was performed
+  virtual bool pup_buffer(serdes& s, bool encapsulate) = 0;
 
   virtual message* as_message(void) const = 0;
 };

@@ -65,6 +65,10 @@ class fwd_pool {
       }
     }
   }
+
+  bool operator==(const fwd_pool<T, N>& other) const {
+    return (this == &other);
+  }
 };
 }  // namespace utilities
 }  // namespace hypercomm
