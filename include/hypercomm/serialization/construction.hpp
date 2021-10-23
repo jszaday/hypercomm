@@ -97,6 +97,29 @@ struct temporary<T, kBuffer> {
 
   const T& value(void) const { return *data; }
 };
+
+// buffers should just be buffers, y'know?
+template <typename T>
+struct temporary<std::shared_ptr<T>, kBuffer> {
+  std::shared_ptr<T> data;
+
+  // used to when there should be no initialization whatsoever
+  temporary(tags::no_init) {}
+  temporary(tags::reconstruct) {}
+  temporary(tags::allocate) : data((T*)(::operator new(sizeof(T)))) {}
+  temporary(tags::use_buffer<T>&& _) : data(std::move(_.buffer)) {}
+
+  template <typename... Args>
+  temporary(Args&&... args) : temporary(tags::allocate{}) {
+    ::new (this->get()) T(std::forward<Args>(args)...);
+  }
+
+  inline T* get(void) { return this->data.get(); }
+
+  inline std::shared_ptr<T>& value(void) { return this->data; }
+
+  inline const std::shared_ptr<T>& value(void) const { return this->data; }
+};
 }  // namespace hypercomm
 
 #endif

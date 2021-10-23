@@ -25,20 +25,22 @@ message* pack_deferrable_(const entry_port_ptr& port, value_ptr&& uniq) {
   // find the size of the value, and extract any
   // buffers to be deferred (and sent via RDMA)
   packer pkr((char*)nullptr);
-  auto pupSize = ([&](void) {
+  bool hasDeferred;
+  bool encapsulated;
+  std::size_t msgSize;
+  {
     sizer s(true);
     s.reset_source(value);
-    value->pup_buffer(s, true);
+    encapsulated = value->pup_buffer(s, true);
     s.get_deferred(deferred);
     pkr.acquire(s);  // steals records to avoid recreating ptrs!
-    return s.size();
-  })();
-  auto hasDeferred = !deferred.empty();
-  auto msgSize = pupSize;
+    msgSize = s.size();
+  }
+  hasDeferred = !deferred.empty();
   if (hasDeferred) {
     // add an offset for the std::vector's size
     msgSize += sizeof(std::size_t);
-  } else {
+  } else if (encapsulated) {
     // otherwise, drop the overhead of encapsulation
     msgSize -= ptr_record::instance_size;
   }

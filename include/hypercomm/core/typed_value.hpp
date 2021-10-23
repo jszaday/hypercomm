@@ -98,12 +98,18 @@ class pup_guard<T, typename std::enable_if<!is_pupable<T>::value>::type> {
     exit_();
   }
 };
+
+template <typename T, typename Enable = void>
+struct encapsulate_pup_;
 }  // namespace detail
 
 template <typename T, storage_scheme Scheme = kInline>
 class typed_value_impl_ : public typed_value<T> {
   using guard_t = detail::pup_guard<T>;
   static constexpr auto is_contribution = typed_value<T>::is_contribution;
+
+  template <typename Type, typename Enable>
+  friend class detail::encapsulate_pup_;
 
  public:
   temporary<T, Scheme> tmp;
@@ -112,18 +118,7 @@ class typed_value_impl_ : public typed_value<T> {
   typed_value_impl_(Args... args)
       : typed_value<T>(&tmp, Scheme), tmp(std::forward<Args>(args)...) {}
 
-  virtual void pup_buffer(serdes& s, const bool& encapsulate) override {
-    if (encapsulate) {
-      if (Scheme == kInline) {
-        std::shared_ptr<T> ptr(s.observe_source(), this->get());
-        guard_t::pup(s, ptr);
-      } else {
-        guard_t::pup(s, this->tmp);
-      }
-    } else {
-      guard_t::pup(s, this->value());
-    }
-  }
+  virtual bool pup_buffer(serdes& s, bool encapsulate) override;
 
   // TODO ( deprecate this? )
   virtual message* as_message(void) const override {
@@ -132,6 +127,50 @@ class typed_value_impl_ : public typed_value<T> {
     return msg;
   }
 };
+
+namespace detail {
+
+template <typename T>
+using not_shared_ptr_t = typename std::enable_if<
+    !is_specialization_of<std::shared_ptr, T>::value>::type;
+
+template <typename T>
+struct encapsulate_pup_<typed_value_impl_<T, kInline>, not_shared_ptr_t<T>> {
+  using guard_t = typename typed_value_impl_<T, kInline>::guard_t;
+  inline static void pup(serdes& s, typed_value_impl_<T, kInline>* self) {
+    std::shared_ptr<T> ptr(s.observe_source(), self->get());
+    guard_t::pup(s, ptr);
+  }
+};
+
+template <typename T>
+struct encapsulate_pup_<typed_value_impl_<T, kBuffer>, not_shared_ptr_t<T>> {
+  using guard_t = typename typed_value_impl_<T, kBuffer>::guard_t;
+  inline static void pup(serdes& s, typed_value_impl_<T, kBuffer>* self) {
+    guard_t::pup(s, self->tmp);
+  }
+};
+
+template <typename T, storage_scheme Scheme>
+struct encapsulate_pup_<typed_value_impl_<std::shared_ptr<T>, Scheme>> {
+  using guard_t =
+      typename typed_value_impl_<std::shared_ptr<T>, Scheme>::guard_t;
+  inline static void pup(serdes& s,
+                         typed_value_impl_<std::shared_ptr<T>, Scheme>* self) {
+    guard_t::pup(s, self->value());
+  }
+};
+}  // namespace detail
+
+template <typename T, storage_scheme Scheme>
+bool typed_value_impl_<T, Scheme>::pup_buffer(serdes& s, bool encapsulate) {
+  if (encapsulate) {
+    detail::encapsulate_pup_<typed_value_impl_<T, Scheme>>::pup(s, this);
+  } else {
+    guard_t::pup(s, this->value());
+  }
+  return encapsulate && !(is_specialization_of<std::shared_ptr, T>::value);
+}
 
 template <typename T>
 template <typename... Args>
