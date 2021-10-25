@@ -147,8 +147,7 @@ static inline void prep_array_msg_(CkMessage* msg, const CkArrayID& aid) {
   amsg->array_setIfNotThere(CkArray_IfNotThere_buffer);
 }
 
-static inline CkArray* lookup_or_buffer_(const CkArrayID& aid, envelope* env) {
-  auto gid = (CkGroupID)aid;
+static inline CkArray* lookup_or_buffer_(const CkGroupID& gid, envelope* env) {
   auto* ck = CkpvAccess(_coreState);
   CmiImmediateLock(CkpvAccess(_groupTableImmLock));
   IrrGroup* obj = ck->localBranch(gid);
@@ -157,6 +156,12 @@ static inline CkArray* lookup_or_buffer_(const CkArrayID& aid, envelope* env) {
   }
   CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
   return dynamic_cast<CkArray*>(obj);
+}
+
+inline static bool send_fallback_(CkArray* arr, CkMessage* msg, const CkArrayIndex& idx, int opts = 0) {
+  auto queuing = (opts & CK_MSG_INLINE) ? CkDeliver_inline : CkDeliver_queue;
+  prep_array_msg_(msg, arr->ckGetGroupID());
+  arr->sendMsg((CkArrayMessage*)msg, idx, queuing, opts & (~CK_MSG_INLINE));
 }
 
 bool interceptor::send_fallback(const CkArrayID& aid, const CkArrayIndex& idx,
@@ -168,9 +173,7 @@ bool interceptor::send_fallback(const CkArrayID& aid, const CkArrayIndex& idx,
   if (arr == nullptr) {
     return false;
   } else {
-    auto queuing = (opts & CK_MSG_INLINE) ? CkDeliver_inline : CkDeliver_queue;
-    prep_array_msg_(msg, aid);
-    ((CkArray*)arr)->deliver(msg, idx, queuing, opts & (~CK_MSG_INLINE));
+    send_fallback_(arr, msg, idx, opts);
     return true;
   }
 }
@@ -204,8 +207,9 @@ void interceptor::deliver_handler_(void* raw) {
 
   if (loc == nullptr) {
     if (arr != nullptr) {
-      prep_array_msg_(msg, aid);
-      ((CkArray*)arr)->deliver(msg, idx, CkDeliver_queue);
+      send_fallback_(arr, msg, idx);
+    } else {
+      CkAbort("fatal> unable to deliver msg %p", msg);
     }
   } else {
     loc->deliver(aid, idx, msg);
