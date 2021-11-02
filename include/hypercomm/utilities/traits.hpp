@@ -49,23 +49,23 @@ struct tuplify_<std::tuple<Ts...>, Empty> {
   using type = std::tuple<Ts...>;
 };
 
-template <typename T, template <typename> typename Wrapper,
+template <typename T, template <typename> class Wrapper,
           typename Enable = void>
 struct wrap_;
 
-template <template <typename> typename Wrapper, typename... Ts>
+template <template <typename> class Wrapper, typename... Ts>
 struct wrap_<std::tuple<Ts...>, Wrapper,
              typename std::enable_if<(sizeof...(Ts) == 0)>::type> {
   using type = std::tuple<>;
 };
 
-template <template <typename> typename Wrapper, typename... Ts>
+template <template <typename> class Wrapper, typename... Ts>
 struct wrap_<std::tuple<Ts...>, Wrapper,
              typename std::enable_if<(sizeof...(Ts) == 1)>::type> {
   using type = std::tuple<Wrapper<Ts...>>;
 };
 
-template <template <typename> typename Wrapper, typename T, typename... Ts>
+template <template <typename> class Wrapper, typename T, typename... Ts>
 struct wrap_<std::tuple<T, Ts...>, Wrapper,
              typename std::enable_if<(sizeof...(Ts) >= 1)>::type> {
  private:

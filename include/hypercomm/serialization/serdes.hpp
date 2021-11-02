@@ -89,7 +89,7 @@ class serdes {
   using allocator_type = utilities::fwd_pool<T, kStackSize>;
 
   template <typename K, typename V, typename Compare = std::less<K>>
-  using stacked_map = std::map<K, V, Compare, allocator_type<std::pair<K, V>>>;
+  using stacked_map = std::map<K, V, Compare, allocator_type<std::pair<const K, V>>>;
 
   template <typename K, typename V>
   using owner_less_map = stacked_map<K, V, std::owner_less<K>>;
@@ -245,6 +245,8 @@ class serdes {
       case UNPACKING:
         fast_copy(reinterpret_cast<char*>(data), current, nBytes);
         break;
+      default:
+	break;
     }
     advanceBytes(nBytes);
   }
