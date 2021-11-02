@@ -107,7 +107,7 @@ class vil : public detail::base_<Base, Index>, public future_manager_ {
 
   // NOTE ( generic collective proxy accessor method )
   virtual std::shared_ptr<generic_element_proxy> __element_at__(
-      const Index& idx) const {
+      const Index& idx) const override {
     return make_proxy(CProxyElement_locality_base_(
         this->ckGetArrayID(), conv2idx<base_index_type>(idx)));
   }
@@ -133,7 +133,7 @@ class vil : public detail::base_<Base, Index>, public future_manager_ {
     }
   }
 
-  virtual const Index& __index__(void) const {
+  virtual const Index& __index__(void) const override {
     return reinterpret_index<Index>(this->__base_index__());
   }
 

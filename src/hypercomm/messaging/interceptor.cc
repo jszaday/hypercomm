@@ -158,7 +158,8 @@ static inline CkArray* lookup_or_buffer_(const CkGroupID& gid, envelope* env) {
   return dynamic_cast<CkArray*>(obj);
 }
 
-inline static void send_fallback_(CkArray* arr, CkMessage* msg, const CkArrayIndex& idx, int opts = 0) {
+inline static void send_fallback_(CkArray* arr, CkMessage* msg,
+                                  const CkArrayIndex& idx, int opts = 0) {
   auto queuing = (opts & CK_MSG_INLINE) ? CkDeliver_inline : CkDeliver_queue;
   prep_array_msg_(msg, arr->ckGetGroupID());
   arr->sendMsg((CkArrayMessage*)msg, idx, queuing, opts & (~CK_MSG_INLINE));

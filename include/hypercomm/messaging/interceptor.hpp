@@ -12,7 +12,7 @@ struct interceptor_msg_ {
   char core[CmiMsgHeaderSizeBytes];
 
   struct header_ {
-    std::size_t totalSize;
+    UInt totalSize;
     CMK_REFNUM_TYPE refNum;
     UShort epIdx;
     UChar msgIdx;

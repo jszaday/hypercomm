@@ -133,7 +133,7 @@ struct generic_collective_proxy
     return this->proxy_.ckGetArrayID();
   }
 
-  virtual element_type operator[](const index_type& idx) const;
+  virtual element_type operator[](const index_type& idx) const override;
 
   virtual chare_t type(void) const override {
     return chare_type_for<Proxy>::value;
