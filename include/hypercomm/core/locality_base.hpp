@@ -31,13 +31,17 @@ class locality_base_ : public ArrayElement {
 };
 
 namespace detail {
+
+template <class T, class M>
+M get_member_type(M T:: *);
+
 template <typename Target, typename Enable = void>
 struct extract_proxy;
 
 template <typename Base>
 struct extract_proxy<Base, typename std::enable_if<std::is_base_of<
                                locality_base_, Base>::value>::type> {
-  using type = typename std::remove_pointer<decltype(&(Base::thisProxy))>::type;
+  using type = decltype(get_member_type(&(Base::thisProxy)));
 };
 
 template <typename Target>
