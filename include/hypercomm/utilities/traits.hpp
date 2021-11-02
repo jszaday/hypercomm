@@ -49,8 +49,7 @@ struct tuplify_<std::tuple<Ts...>, Empty> {
   using type = std::tuple<Ts...>;
 };
 
-template <typename T, template <typename> class Wrapper,
-          typename Enable = void>
+template <typename T, template <typename> class Wrapper, typename Enable = void>
 struct wrap_;
 
 template <template <typename> class Wrapper, typename... Ts>

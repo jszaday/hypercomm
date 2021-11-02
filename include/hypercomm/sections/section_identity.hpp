@@ -64,7 +64,8 @@ class section_identity : public identity<Index> {
     return rval;
   }
 
-  virtual std::shared_ptr<imprintable_base_> get_imprintable(void) const {
+  virtual std::shared_ptr<imprintable_base_> get_imprintable(
+      void) const override {
     return std::static_pointer_cast<imprintable_base_>(this->sect_);
   }
 };
