@@ -11,11 +11,11 @@
  */
 
 namespace hypercomm {
-struct bad_destination: public std::runtime_error {
-    deliverable dev;
+struct bad_destination : public std::runtime_error {
+  deliverable dev;
 
-    bad_destination(const char* _,  deliverable&& dev_)
-    : std::runtime_error(_), dev(std::move(dev_)) {}
+  bad_destination(const char* _, deliverable&& dev_)
+      : std::runtime_error(_), dev(std::move(dev_)) {}
 };
 
 class generic_locality_ : public manageable_base_ {

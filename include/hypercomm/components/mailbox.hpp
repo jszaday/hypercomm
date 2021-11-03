@@ -105,7 +105,7 @@ class mailbox : public component<T, std::tuple<>> {
     return {};
   }
 
-protected:
+ protected:
   using buffer_iterator = typename decltype(buffer_)::iterator;
 
   inline buffer_iterator find_in_buffer(const predicate_type& pred) {
