@@ -112,7 +112,7 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
   }
 }
 
-void generic_locality_::passthru(const destination& dst, deliverable&& dev) throw (bad_destination) {
+void generic_locality_::passthru(const destination& dst, deliverable&& dev) {
   switch (dst.kind) {
     case destination::kEndpoint:
       dev.update_endpoint(dst.ep());
@@ -354,7 +354,7 @@ void generic_locality_::activate_component(const component_id_t& id) {
 }
 
 void generic_locality_::passthru(const com_port_pair_t& port,
-                                 deliverable&& dev) throw (bad_destination) {
+                                 deliverable&& dev) {
   auto search = this->components.find(port.first);
   if (search == std::end(this->components)) {
     throw bad_destination("component not found", std::move(dev));
