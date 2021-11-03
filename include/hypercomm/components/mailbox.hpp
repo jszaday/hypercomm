@@ -72,20 +72,12 @@ class mailbox : public component<T, std::tuple<>> {
   inline void put_request_to(const predicate_type& pred,
                              const component_id_t& com,
                              const component_port_t& port) {
-    auto* ctx = access_context_();
     auto search = this->find_in_buffer(pred);
     if (search == std::end(this->buffer_)) {
       this->requests_.emplace_front(pred, com, port);
-      auto req = this->requests_.begin();
-      req->com = com;
-      req->listener =
-          (ctx->components[com])
-              ->add_listener(&on_status_change,
-                             new listener_type(this->weak_, req),
-                             [](void* value) { delete (listener_type*)value; });
     } else {
       QdProcess(1);
-      ctx->components[com]->accept(port, std::move(*search));
+      passthru_context_(std::make_pair(com, port), std::move(*search));
       this->buffer_.erase(search);
     }
   }
@@ -100,19 +92,20 @@ class mailbox : public component<T, std::tuple<>> {
     } else {
       auto req = std::move(*search);
       // cleanup the request before triggering
-      // its action (from our list, and com's!)
+      // the action, precluding infinite loops
       this->requests_.erase(search);
-      if (req.com != 0) {
-        (access_context_()->components[req.com])->remove_listener(req.listener);
+      try {
+        req.action(std::move(value));
+      } catch (bad_destination& ex) {
+        // try redelivering until we find a valid destination
+        ((components::base_*)this)->accept(0, std::move(ex.dev));
       }
-      // this precludes feedback loops
-      req.action(std::move(value));
     }
 
     return {};
   }
 
- protected:
+protected:
   using buffer_iterator = typename decltype(buffer_)::iterator;
 
   inline buffer_iterator find_in_buffer(const predicate_type& pred) {

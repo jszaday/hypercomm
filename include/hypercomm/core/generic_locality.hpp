@@ -11,6 +11,13 @@
  */
 
 namespace hypercomm {
+struct bad_destination: public std::runtime_error {
+    deliverable dev;
+
+    bad_destination(const char* _,  deliverable&& dev_)
+    : std::runtime_error(_), dev(std::move(dev_)) {}
+};
+
 class generic_locality_ : public manageable_base_ {
  public:
   template <typename A, typename Enable>
@@ -42,8 +49,8 @@ class generic_locality_ : public manageable_base_ {
   void update_context(void);
 
   void receive(deliverable&&);
-  void passthru(const destination& dst, deliverable&&);
-  void passthru(const com_port_pair_t& ep, deliverable&&);
+  void passthru(const destination& dst, deliverable&&) throw (bad_destination);
+  void passthru(const com_port_pair_t& ep, deliverable&&) throw (bad_destination);
 
   void loopback(const entry_port_ptr& port, deliverable&& value);
   bool has_value(const entry_port_ptr& port) const;

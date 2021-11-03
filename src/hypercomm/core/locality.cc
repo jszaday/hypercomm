@@ -112,7 +112,7 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
   }
 }
 
-void generic_locality_::passthru(const destination& dst, deliverable&& dev) {
+void generic_locality_::passthru(const destination& dst, deliverable&& dev) throw (bad_destination) {
   switch (dst.kind) {
     case destination::kEndpoint:
       dev.update_endpoint(dst.ep());
@@ -354,20 +354,14 @@ void generic_locality_::activate_component(const component_id_t& id) {
 }
 
 void generic_locality_::passthru(const com_port_pair_t& port,
-                                 deliverable&& dev) {
-  auto search = components.find(port.first);
-#if CMK_ERROR_CHECKING
-  if (search == std::end(components)) {
-    std::stringstream ss;
-    ss << "fatal> recvd msg for invalid destination com" << port.first << ":"
-       << port.second << "!";
-    CkAbort("%s", ss.str().c_str());
+                                 deliverable&& dev) throw (bad_destination) {
+  auto search = this->components.find(port.first);
+  if (search == std::end(this->components)) {
+    throw bad_destination("component not found", std::move(dev));
+  } else {
+    search->second->accept(port.second, std::move(dev));
+    this->try_collect(search->second);
   }
-#endif
-
-  search->second->accept(port.second, std::move(dev));
-
-  this->try_collect(search->second);
 }
 
 reducer::out_set reducer::action(reducer::in_set& set) {
