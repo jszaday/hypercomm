@@ -159,9 +159,10 @@ static inline CkArray* lookup_or_buffer_(const CkGroupID& gid, envelope* env) {
 }
 
 inline static void send_fallback_(CkArray* arr, CkMessage* msg,
-                                  const CkArrayIndex& idx, int opts = 0) {
+                                  const CkArrayID& aid, const CkArrayIndex& idx,
+                                  int opts = 0) {
   auto queuing = (opts & CK_MSG_INLINE) ? CkDeliver_inline : CkDeliver_queue;
-  prep_array_msg_(msg, arr->ckGetGroupID());
+  prep_array_msg_(msg, aid);
   arr->sendMsg((CkArrayMessage*)msg, idx, queuing, opts & (~CK_MSG_INLINE));
 }
 
@@ -174,7 +175,7 @@ bool interceptor::send_fallback(const CkArrayID& aid, const CkArrayIndex& idx,
   if (arr == nullptr) {
     return false;
   } else {
-    send_fallback_(arr, msg, idx, opts);
+    send_fallback_(arr, msg, aid, idx, opts);
     return true;
   }
 }
@@ -208,7 +209,7 @@ void interceptor::deliver_handler_(void* raw) {
 
   if (loc == nullptr) {
     if (arr != nullptr) {
-      send_fallback_(arr, msg, idx);
+      send_fallback_(arr, msg, aid, idx);
     } else {
       // note, in this case, the message has been set to
       // "depend" on the object -- and will be delivered

@@ -130,6 +130,18 @@ void generic_locality_::passthru(const destination& dst, deliverable&& dev) {
   }
 }
 
+inline static void invoke_handler_(generic_locality_* self, const endpoint& ep,
+                                   deliverable& dev) {
+  if (auto fn = ep.get_handler()) {
+    fn(self, std::move(dev));
+  } else {
+    // deliver using conventional call path
+    auto& call = _entryTable[ep.idx_]->call;
+    call(deliverable::to_message(std::move(dev)),
+         static_cast<CkMigratable*>(self));
+  }
+}
+
 void generic_locality_::receive(deliverable&& dev) {
   // check how we should handle it
   auto& ep = dev.endpoint();
@@ -150,8 +162,7 @@ void generic_locality_::receive(deliverable&& dev) {
     ep.export_to(msg);
     this->receive_message(msg);
   } else {
-    auto fn = ep.get_handler();
-    fn(this, std::move(dev));
+    invoke_handler_(this, ep, dev);
   }
 }
 
