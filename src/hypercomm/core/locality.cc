@@ -199,7 +199,13 @@ void generic_locality_::receive_message(CkMessage* msg) {
   auto epIdx = env->getEpIdx();
   auto fn = CkIndex_locality_base_::get_value_handler(epIdx);
   if (fn == nullptr) {
-    _entryTable[epIdx]->call(msg, dynamic_cast<CkMigratable*>(this));
+#if CMK_ERROR_CHECKING
+    if ((env->getMsgIdx() == message::index()) &&
+        ((message*)msg)->is_zero_copy()) {
+      CkAbort("fatal> recv'd a zc msg, but no value handler available!");
+    } else
+#endif
+      _entryTable[epIdx]->call(msg, static_cast<CkMigratable*>(this));
   } else {
     this->receive_value(msg, fn);
   }
