@@ -130,6 +130,18 @@ void generic_locality_::passthru(const destination& dst, deliverable&& dev) {
   }
 }
 
+inline static void invoke_handler_(generic_locality_* self, const endpoint& ep,
+                                   deliverable& dev) {
+  if (auto fn = ep.get_handler()) {
+    fn(self, std::move(dev));
+  } else {
+    // deliver using conventional call path
+    auto& call = _entryTable[ep.idx_]->call;
+    call(deliverable::to_message(std::move(dev)),
+         static_cast<CkMigratable*>(self));
+  }
+}
+
 void generic_locality_::receive(deliverable&& dev) {
   // check how we should handle it
   auto& ep = dev.endpoint();
@@ -150,8 +162,7 @@ void generic_locality_::receive(deliverable&& dev) {
     ep.export_to(msg);
     this->receive_message(msg);
   } else {
-    auto fn = ep.get_handler();
-    fn(this, std::move(dev));
+    invoke_handler_(this, ep, dev);
   }
 }
 
@@ -188,7 +199,13 @@ void generic_locality_::receive_message(CkMessage* msg) {
   auto epIdx = env->getEpIdx();
   auto fn = CkIndex_locality_base_::get_value_handler(epIdx);
   if (fn == nullptr) {
-    _entryTable[epIdx]->call(msg, dynamic_cast<CkMigratable*>(this));
+#if CMK_ERROR_CHECKING
+    if ((env->getMsgIdx() == message::index()) &&
+        ((message*)msg)->is_zero_copy()) {
+      CkAbort("fatal> recv'd a zc msg, but no value handler available!");
+    } else
+#endif
+      _entryTable[epIdx]->call(msg, static_cast<CkMigratable*>(this));
   } else {
     this->receive_value(msg, fn);
   }
