@@ -221,6 +221,9 @@ std::unique_ptr<typed_value<T>> zero_copy_value::to_typed(
     s.reset_deferred(i, std::move(value->values[i]));
   }
 
+  // delete the zc value since it's no longer reqd
+  delete value;
+
   return std::move(result);
 }
 
