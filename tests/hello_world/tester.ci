@@ -1,0 +1,9 @@
+mainmodule tester {
+  mainchare hello_main { entry [nokeep] hello_main(CkArgMsg*); };
+
+  array [Max] hello_chare : hypercomm::locality_base_ {
+    entry hello_chare(int);
+  };
+
+  initproc void enroll_polymorphs(void);
+}
