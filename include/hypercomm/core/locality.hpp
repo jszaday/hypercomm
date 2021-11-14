@@ -75,18 +75,8 @@ class indexed_locality_ : public generic_locality_ {
   }
 };
 
-struct future_manager_ {
-  future_id_t future_authority = 0;
-
-  virtual future make_future(void) = 0;
-
-  virtual void request_future(const future& f, const callback_ptr& cb) = 0;
-
-  virtual bool check_future(const future&) const = 0;
-};
-
 template <typename Base, typename Index>
-class vil : public detail::base_<Base, Index>, public future_manager_ {
+class vil : public detail::base_<Base, Index> {
   using idx_locality_ = indexed_locality_<Index>;
 
  public:
@@ -136,16 +126,6 @@ class vil : public detail::base_<Base, Index>, public future_manager_ {
   virtual const Index& __index__(void) const override {
     return reinterpret_index<Index>(this->__base_index__());
   }
-
-  virtual future make_future(void) override {
-    const auto next = ++this->future_authority;
-    return future{.source = {this->ckGetArrayID(), this->thisIndexMax},
-                  .id = next};
-  }
-
-  virtual void request_future(const future& f, const callback_ptr& cb) override;
-
-  virtual bool check_future(const future&) const override;
 
   template <typename Action>
   inline void receive_action(const Action& ptr) {
@@ -202,8 +182,7 @@ class vil : public detail::base_<Base, Index>, public future_manager_ {
 };
 
 inline bool future::ready(void) const {
-  auto* ctx = dynamic_cast<future_manager_*>(access_context_());
-  return ctx->check_future(*this);
+  return access_context_()->check_future(*this);
 }
 
 template <typename T, typename Enable = void>
@@ -250,10 +229,8 @@ void deliver(const element_proxy<Index>& proxy, message* msg) {
 
 void generic_locality_::loopback(const entry_port_ptr& port,
                                  deliverable&& value) {
-  auto elt = dynamic_cast<ArrayElement*>(this);
-  CkAssert(elt != nullptr);
   value.update_endpoint(port);
-  interceptor::send_async(elt->ckGetArrayID(), elt->ckGetArrayIndex(),
+  interceptor::send_async(this->ckGetArrayID(), this->ckGetArrayIndex(),
                           std::move(value));
 }
 
@@ -301,9 +278,19 @@ void vil<Base, Index>::broadcast(const imprintable_ptr& section, message* msg) {
   interceptor::send_to_root(this->thisProxy, section, pack_action(action));
 }
 
-template <typename Base, typename Index>
-void vil<Base, Index>::request_future(const future& f, const callback_ptr& cb) {
-  auto ourElt = this->thisProxy[this->thisIndexMax];
+inline bool generic_locality_::check_future(const future& f) const {
+  return this->has_value(std::make_shared<future_port>(f));
+}
+
+inline future generic_locality_::make_future(void) {
+  const auto next = ++this->future_authority;
+  return future{.source = {this->ckGetArrayID(), this->thisIndexMax},
+                .id = next};
+}
+
+void generic_locality_::request_future(const future& f,
+                                       const callback_ptr& cb) {
+  CProxyElement_locality_base_ ourElt(this->ckGetArrayID(), this->thisIndexMax);
   auto ourPort = std::make_shared<future_port>(f);
 
   // TODO ( check whether future immediately fulfilled! )
@@ -316,11 +303,6 @@ void vil<Base, Index>::request_future(const future& f, const callback_ptr& cb) {
     auto opener = std::make_shared<port_opener>(ourPort, std::move(fwd));
     interceptor::send_async(theirElt, pack_action(opener));
   }
-}
-
-template <typename Base, typename Index>
-bool vil<Base, Index>::check_future(const future& f) const {
-  return this->has_value(std::make_shared<future_port>(f));
 }
 
 void forwarding_callback<CkArrayIndex>::send(callback::value_type&& value) {

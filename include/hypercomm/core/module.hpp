@@ -66,11 +66,6 @@ struct CProxyElement_locality_base_ : public CProxyElement_ArrayElement {
                         utilities::hash<CkArrayIndex>()(this->ckGetIndex()));
   }
 
-  inline bool operator==(const CProxyElement_locality_base_& other) {
-    return (this->ckGetArrayID() == other.ckGetArrayID()) &&
-           (this->ckGetIndex() == other.ckGetIndex());
-  }
-
   inline operator bool(void) const { return !(this->ckGetArrayID().isZero()); }
 
   inline operator std::string(void) const {

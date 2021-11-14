@@ -2,18 +2,10 @@
 #define __HYPERCOMM_CORE_FUTURE_HPP__
 
 #include "../core/math.hpp"
-#include "../core/proxy.hpp"
 #include "../core/entry_port.hpp"
-
 #include "../serialization/pup.hpp"
 
 namespace hypercomm {
-
-struct future;
-
-void send2future(const future& f, deliverable&& dev);
-
-using future_id_t = std::uint32_t;
 
 struct future {
   CProxyElement_locality_base_ source;

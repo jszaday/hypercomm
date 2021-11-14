@@ -66,6 +66,11 @@ template <typename T>
 inline void try_return(typed_value_ptr<T>&& value);
 
 void try_return(deliverable&& dev);
+
+struct future;
+using future_id_t = std::uint32_t;
+
+void send2future(const future& f, deliverable&& dev);
 }  // namespace hypercomm
 
 #include "../serialization/pup.hpp"
