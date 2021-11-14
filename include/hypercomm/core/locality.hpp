@@ -139,7 +139,8 @@ class vil : public detail::base_<Base, Index>, public future_manager_ {
 
   virtual future make_future(void) override {
     const auto next = ++this->future_authority;
-    return future{.source = this->__element__(), .id = next};
+    return future{.source = {this->ckGetArrayID(), this->thisIndexMax},
+                  .id = next};
   }
 
   virtual void request_future(const future& f, const callback_ptr& cb) override;
@@ -302,29 +303,24 @@ void vil<Base, Index>::broadcast(const imprintable_ptr& section, message* msg) {
 
 template <typename Base, typename Index>
 void vil<Base, Index>::request_future(const future& f, const callback_ptr& cb) {
+  auto ourElt = this->thisProxy[this->thisIndexMax];
   auto ourPort = std::make_shared<future_port>(f);
-  auto ourElement = this->__element__();
 
+  // TODO ( check whether future immediately fulfilled! )
   this->open(ourPort, cb);
 
-  auto home = std::dynamic_pointer_cast<generic_element_proxy>(f.source);
-  if (home && !home->equals(*ourElement)) {
+  auto& theirElt = f.source;
+  if (theirElt && !(ourElt == theirElt)) {
     // open a remote port that forwards to this locality
-    auto fwd = forward_to(std::move(ourElement), ourPort);
+    auto fwd = forward_to(std::move(ourElt), ourPort);
     auto opener = std::make_shared<port_opener>(ourPort, std::move(fwd));
-    interceptor::send_async(home, pack_action(opener));
+    interceptor::send_async(theirElt, pack_action(opener));
   }
 }
 
 template <typename Base, typename Index>
 bool vil<Base, Index>::check_future(const future& f) const {
-  auto home = std::dynamic_pointer_cast<generic_element_proxy>(f.source);
-  auto elt = this->__element__();
-  if (home && home->equals(*elt)) {
-    return this->has_value(std::make_shared<future_port>(f));
-  } else {
-    return false;
-  }
+  return this->has_value(std::make_shared<future_port>(f));
 }
 
 void forwarding_callback<CkArrayIndex>::send(callback::value_type&& value) {

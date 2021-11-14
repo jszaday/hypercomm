@@ -29,13 +29,10 @@ void try_return(deliverable&& dev) {
 // TODO ( send immediately looking forward! )
 void send2future(const future& f, deliverable&& dev) {
   auto& src = f.source;
-  auto& proxy =
-      (dynamic_cast<element_proxy<CkArrayIndex>*>(src.get()))->c_proxy();
-  auto& base = static_cast<const CProxyElement_ArrayElement&>(proxy);
   auto port = std::make_shared<future_port>(f);
   auto* ctx = access_context_();
   dev.update_endpoint(std::move(port));
-  interceptor::send_async(base, std::move(dev));
+  interceptor::send_async(src, std::move(dev));
 }
 
 /* access the pointer of the currently executing locality

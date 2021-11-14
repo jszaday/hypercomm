@@ -458,7 +458,7 @@ class puper<std::unique_ptr<T>,
 
     if (!is_null) {
       if (s.unpacking()) {
-        t.reset((T*)(::operator new(sizeof(T))));
+        t.reset((T*)(::operator new (sizeof(T))));
       }
 
       s | *t;

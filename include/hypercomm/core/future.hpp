@@ -16,14 +16,14 @@ void send2future(const future& f, deliverable&& dev);
 using future_id_t = std::uint32_t;
 
 struct future {
-  std::shared_ptr<proxy> source;
+  CProxyElement_locality_base_ source;
   future_id_t id;
 
   inline std::string to_string(void) const {
     std::stringstream ss;
     ss << "future(id=" << id << ",src=";
     if (source)
-      ss << source->to_string() << ")";
+      ss << source << ")";
     else
       ss << "(nil))";
     return ss.str();
@@ -34,11 +34,11 @@ struct future {
   inline bool ready(void) const;
 
   inline hash_code hash(void) const {
-    return hash_combine(source->hash(), hash_code(id));
+    return hash_combine(source.hash(), hash_code(id));
   }
 
   inline bool equals(const future& other) const {
-    return this->id == other.id && this->source->equals(*other.source);
+    return (this->id == other.id) && (this->source == other.source);
   }
 };
 
