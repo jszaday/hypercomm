@@ -61,10 +61,8 @@ struct CProxyElement_locality_base_ : public CProxyElement_ArrayElement {
       : CProxyElement_locality_base_(other.ckGetArrayID(), other.ckGetIndex()) {
   }
 
-  template <typename T>
-  typename std::enable_if<std::is_base_of<CProxyElement_ArrayBase, T>::value,
-                          CProxyElement_locality_base_&>::type
-  operator=(const T& other) {
+  CProxyElement_locality_base_& operator=(
+      const CProxyElement_locality_base_& other) {
     if (&other != this) {
       new (this) CProxyElement_locality_base_(other.ckGetArrayID(),
                                               other.ckGetIndex());
