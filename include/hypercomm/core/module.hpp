@@ -61,6 +61,17 @@ struct CProxyElement_locality_base_ : public CProxyElement_ArrayElement {
       : CProxyElement_locality_base_(other.ckGetArrayID(), other.ckGetIndex()) {
   }
 
+  template <typename T>
+  typename std::enable_if<std::is_base_of<CProxyElement_ArrayBase, T>::value,
+                          CProxyElement_locality_base_&>::type
+  operator=(const T& other) {
+    if (&other != this) {
+      new (this) CProxyElement_locality_base_(other.ckGetArrayID(),
+                                              other.ckGetIndex());
+    }
+    return *this;
+  }
+
   inline hash_code hash(void) const {
     return hash_combine(utilities::hash<CkGroupID>()(this->ckGetArrayID()),
                         utilities::hash<CkArrayIndex>()(this->ckGetIndex()));
