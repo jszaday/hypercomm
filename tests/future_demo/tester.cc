@@ -93,9 +93,9 @@ struct locality : public vil<CBase_locality, int> {
   static void run_(locality* &self, CkMessage* msg) {
     const auto numIters = typed_value<int>::from_message(msg)->value();
     const auto& mine = self->__index__();
-    const auto right =
-        (*self->__proxy__())[conv2idx<CkArrayIndex>((mine + 1) % self->n)];
-
+    hypercomm::CProxyElement_locality_base_ right{
+      self->ckGetArrayID(), conv2idx<CkArrayIndex>((mine + 1) % self->n)
+    };
     // update the context at the outset
     self->update_context();
 

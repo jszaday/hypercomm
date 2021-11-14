@@ -36,7 +36,7 @@ struct wait_any_callback : public core::callback {
 template <typename InputIter>
 inline std::pair<deliverable, InputIter> wait_any(const InputIter& first,
                                                   const InputIter& last) {
-  auto* ctx = dynamic_cast<future_manager_*>(access_context_());
+  auto* ctx = access_context_();
   auto cb = std::make_shared<typename resumer_type::element_type>();
   // for all the futures (unless a ready one is found first)
   for (auto it = first; it != last; it++) {

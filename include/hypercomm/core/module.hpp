@@ -41,8 +41,51 @@ class CkIndex_locality_base_ {
 
 // NOTE ( hypercomm claims absolute control over these )
 using CProxy_locality_base_ = CProxy_ArrayBase;
-using CProxyElement_locality_base_ = CProxyElement_ArrayElement;
 using CProxySection_locality_base_ = CProxySection_ArrayElement;
+
+struct CProxyElement_locality_base_ : public CProxyElement_ArrayElement {
+  explicit CProxyElement_locality_base_(void) : CProxyElement_ArrayElement() {}
+
+  explicit CProxyElement_locality_base_(const ArrayElement* elt)
+      : CProxyElement_ArrayElement(elt) {}
+
+  explicit CProxyElement_locality_base_(const CkArrayID& aid,
+                                        const CkArrayIndex& idx,
+                                        CK_DELCTOR_PARAM)
+      : CProxyElement_ArrayElement(aid, idx, CK_DELCTOR_ARGS) {}
+
+  CProxyElement_locality_base_(const CkArrayID& aid, const CkArrayIndex& idx)
+      : CProxyElement_ArrayElement(aid, idx) {}
+
+  CProxyElement_locality_base_(const CProxyElement_locality_base_& other)
+      : CProxyElement_locality_base_(other.ckGetArrayID(), other.ckGetIndex()) {
+  }
+
+  CProxyElement_locality_base_& operator=(
+      const CProxyElement_locality_base_& other) {
+    if (&other != this) {
+      new (this) CProxyElement_locality_base_(other.ckGetArrayID(),
+                                              other.ckGetIndex());
+    }
+    return *this;
+  }
+
+  inline hash_code hash(void) const {
+    return hash_combine(utilities::hash<CkGroupID>()(this->ckGetArrayID()),
+                        utilities::hash<CkArrayIndex>()(this->ckGetIndex()));
+  }
+
+  inline operator bool(void) const { return !(this->ckGetArrayID().isZero()); }
+
+  inline operator std::string(void) const {
+    std::stringstream ss;
+    ss << "vil(";
+    ss << "aid=" << ((CkGroupID)this->ckGetArrayID()).idx << ",";
+    ss << "idx=" << utilities::idx2str(this->ckGetIndex());
+    ss << ")";
+    return ss.str();
+  }
+};
 
 namespace core {
 void initialize(void);

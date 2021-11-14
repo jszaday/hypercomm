@@ -30,6 +30,8 @@ class generic_locality_ : public manageable_base_ {
 
   mapped_queue<deliverable> port_queue;
   std::vector<component_id_t> invalidations;
+
+  future_id_t future_authority = 0;
   component_id_t component_authority = 0;
 
   using component_type = typename decltype(components)::mapped_type;
@@ -92,6 +94,12 @@ class generic_locality_ : public manageable_base_ {
         [](void* value) { delete (entry_port_ptr*)value; });
     this->open(srcPort, std::make_pair(dst, dstPort));
   }
+
+  future make_future(void);
+
+  bool check_future(const future&) const;
+
+  void request_future(const future& f, const callback_ptr& cb);
 
  protected:
   void receive_message(CkMessage* msg);
