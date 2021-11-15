@@ -76,6 +76,9 @@ jobs:
         echo "<!-- pingpong --!>"
         cd ../pingpong
         TESTOPTS="++local" make test
+        echo "<!-- cps_demo --!>"
+        cd ../cps_demo
+        TESTOPTS="++local" make test
         echo "<!-- tree_demo --!>"
         cd ../tree_demo
         TESTOPTS="++local" make test

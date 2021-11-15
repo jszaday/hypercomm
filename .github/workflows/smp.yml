@@ -86,6 +86,9 @@ jobs:
         echo "<!-- pingpong --!>"
         cd ../pingpong
         TESTOPTS="++local" make test
+        echo "<!-- cps_demo --!>"
+        cd ../cps_demo
+        TESTOPTS="++local" make test
         echo "<!-- avalanche --!>"
         cd ../avalanche
         TESTOPTS="++local 65" DEBUG=1 make test
