@@ -13,7 +13,7 @@ struct pseudo_stack {
     std::size_t curr = 0;
 
     for (auto& entry : this->entries) {
-      if (pos <= (entry.second + curr)) {
+      if (pos < (entry.second + curr)) {
         return entry.first.get() + (pos - curr);
       } else {
         curr += entry.second;

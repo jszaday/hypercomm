@@ -93,7 +93,9 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
       // when receive_msg(int sum) =>
       // set value of i in child's stack
       auto clone = clone_stack(top);
-      clone->value().at<int>(iOff) = i;
+      auto& stk = clone->value();
+      stk.allocate(sizeof(int));
+      stk.at<int>(iOff) = i;
       // pass the continuation to component
       this->passthru(std::make_pair(com->id, 0), std::move(clone));
       // make a remote request to it
