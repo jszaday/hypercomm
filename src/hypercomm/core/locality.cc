@@ -99,7 +99,8 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
   if (search != port_queue.end()) {
     auto& buffer = search->second;
     while (port->alive && !buffer.empty()) {
-      this->passthru(it->second, std::move(buffer.front()));
+      CkAssertMsg(this->passthru(it->second, buffer.front()),
+                  "local delivery failed!");
       buffer.pop_front();
       QdProcess(1);
     }
@@ -109,19 +110,18 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
   }
 }
 
-void generic_locality_::passthru(const destination& dst, deliverable&& dev) {
+bool generic_locality_::passthru(const destination& dst, deliverable& dev) {
   switch (dst.kind) {
     case destination::kEndpoint:
       dev.update_endpoint(dst.ep());
       this->receive(std::move(dev));
-      break;
+      return true;
     case destination::kComponent:
-      this->passthru(dst.com_port(), std::move(dev));
-      break;
+      return this->passthru(dst.com_port(), dev);
     case destination::kCallback:
       // TODO set source of value?
       dst.cb()->send(std::move(dev));
-      break;
+      return true;
     default:
       unreachable("invalid destination");
   }
@@ -152,7 +152,8 @@ void generic_locality_::receive(deliverable&& dev) {
       this->port_queue[port].push_back(std::move(dev));
       QdCreate(1);
     } else {
-      this->passthru(search->second, std::move(dev));
+      CkAssertMsg(this->passthru(search->second, dev),
+                  "local delivery failed!");
     }
   } else if (dev.kind == deliverable::kMessage) {
     auto* msg = dev.release<CkMessage>();
@@ -367,21 +368,16 @@ void generic_locality_::activate_component(const component_id_t& id) {
   }
 }
 
-void generic_locality_::passthru(const com_port_pair_t& port,
-                                 deliverable&& dev) {
+bool generic_locality_::passthru(const com_port_pair_t& port,
+                                 deliverable& dev) {
   auto search = components.find(port.first);
-#if CMK_ERROR_CHECKING
   if (search == std::end(components)) {
-    std::stringstream ss;
-    ss << "fatal> recvd msg for invalid destination com" << port.first << ":"
-       << port.second << "!";
-    CkAbort("%s", ss.str().c_str());
+    return false;
+  } else {
+    search->second->accept(port.second, std::move(dev));
+    this->try_collect(search->second);
+    return true;
   }
-#endif
-
-  search->second->accept(port.second, std::move(dev));
-
-  this->try_collect(search->second);
 }
 
 reducer::out_set reducer::action(reducer::in_set& set) {

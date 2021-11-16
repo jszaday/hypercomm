@@ -44,8 +44,9 @@ class generic_locality_ : public manageable_base_ {
   void update_context(void);
 
   void receive(deliverable&&);
-  void passthru(const destination& dst, deliverable&&);
-  void passthru(const com_port_pair_t& ep, deliverable&&);
+
+  bool passthru(const destination& dst, deliverable&);
+  bool passthru(const com_port_pair_t& ep, deliverable&);
 
   void loopback(const entry_port_ptr& port, deliverable&& value);
   bool has_value(const entry_port_ptr& port) const;
@@ -136,9 +137,8 @@ void CkIndex_locality_base_::value_handler(CkMessage* msg, CkMigratable* mig) {
   self->receive_value(msg, fn);
 }
 
-template <typename... Args>
-inline void passthru_context_(Args&&... args) {
-  access_context_()->passthru(std::forward<Args>(args)...);
+inline bool passthru_context_(const destination& dst, deliverable& dev) {
+  return access_context_()->passthru(dst, dev);
 }
 
 inline void try_return(value_ptr&& value) {

@@ -45,17 +45,31 @@ class connector_ {
     }
   }
 
-  inline void relay(T&& value) const {
-    passthru_context_(*(this->dst_), std::move(value));
+  // assumes T is a variant of unique_ptr
+  inline bool relay(T& value) const {
+    deliverable dev(std::move(value));
+    if (passthru_context_(*(this->dst_), dev)) {
+      return true;
+    } else {
+      using element_type = typename T::element_type;
+      value.reset(static_cast<element_type*>(dev.release<hyper_value>()));
+      return false;
+    }
   }
 
   inline bool ready(void) const { return this->dst_ != nullptr; }
 
   inline void implode(void) {
-    this->relay(detail::inv_<T>::get());
+    auto inv = detail::inv_<T>::get();
+    this->relay(inv);
     this->~connector_();
   }
 };
+
+template <>
+inline bool connector_<deliverable>::relay(deliverable& dev) const {
+  return passthru_context_(*(this->dst_), dev);
+}
 }  // namespace components
 }  // namespace hypercomm
 

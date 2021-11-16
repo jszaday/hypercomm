@@ -112,7 +112,8 @@ struct locality : public vil<CBase_locality, int> {
     this->activate_component(com0);
 
     // kickoff the sequence
-    this->passthru(std::make_pair(com0->id, 0), make_unit_value());
+    deliverable dev(make_unit_value());
+    CkEnforce(this->passthru(std::make_pair(com0->id, 0), dev));
   }
 };
 

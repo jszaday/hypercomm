@@ -97,7 +97,8 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
       stk.allocate(sizeof(int));
       stk.at<int>(iOff) = i;
       // pass the continuation to component
-      this->passthru(std::make_pair(com->id, 0), std::move(clone));
+      hypercomm::deliverable dev(std::move(clone));
+      CkEnforce(this->passthru(std::make_pair(com->id, 0), dev));
       // make a remote request to it
       this->mbox->put_request_to({}, com->id, 1);
     }
