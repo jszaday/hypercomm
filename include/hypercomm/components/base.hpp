@@ -28,7 +28,7 @@ class base_ {
   const std::size_t n_inputs;
   const std::size_t n_outputs;
 
-  using accept_fn_t = void (*)(base_*, deliverable&&);
+  using accept_fn_t = bool (*)(base_*, component_port_t, deliverable&);
   using status_listener_fn_t = void (*)(const base_*, status_, void*);
 
  protected:
@@ -88,7 +88,7 @@ class base_ {
   inline bool is_active(void) const { return this->active; }
 
   // we need a way to accept arbitrary messages
-  inline void accept(std::size_t port, deliverable&& dev);
+  inline bool accept(std::size_t port, deliverable& dev);
 
 #if HYPERCOMM_ERROR_CHECKING
   // checks whether a given port can accept a value with the type

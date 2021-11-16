@@ -182,9 +182,8 @@ struct locality : public vil<CBase_locality, int> {
 };
 
 void receive_value(generic_locality_* self, deliverable&& dev) {
-  using namespace components;
   auto& com = *((locality*)self)->mb;
-  ((base_&)com).accept(0, std::move(dev));
+  CkAssert(com.accept(0, dev));
 }
 
 #define CK_TEMPLATES_ONLY

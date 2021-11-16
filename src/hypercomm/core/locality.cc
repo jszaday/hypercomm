@@ -371,12 +371,12 @@ void generic_locality_::activate_component(const component_id_t& id) {
 bool generic_locality_::passthru(const com_port_pair_t& port,
                                  deliverable& dev) {
   auto search = components.find(port.first);
-  if (search == std::end(components)) {
-    return false;
-  } else {
-    search->second->accept(port.second, std::move(dev));
+  if ((search != std::end(components)) &&
+      search->second->accept(port.second, dev)) {
     this->try_collect(search->second);
     return true;
+  } else {
+    return false;
   }
 }
 
