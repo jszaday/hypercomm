@@ -88,8 +88,8 @@ class component : public base_ {
 
  protected:
   template <std::size_t I>
-  inline static void accept(component<Inputs, Outputs>* self,
-                            in_elt_t<I>&& val) {
+  inline static void accept_(component<Inputs, Outputs>* self,
+                             in_elt_t<I>&& val) {
     if (!(val || self->permissive)) {
       self->on_invalidation_<I>();
     } else if (n_inputs_ == 1) {
@@ -115,10 +115,13 @@ class component : public base_ {
     }
   }
 
+  // TODO ( reject values after we've been deactivated! )
   template <std::size_t I>
-  static void accept(base_* base, deliverable&& dev) {
+  static bool accept_(base_* base, component_port_t port, deliverable& dev) {
+    CkAssertMsg(port < n_inputs_, "port out of range!");
     auto* self = static_cast<component<Inputs, Outputs>*>(base);
-    accept<I>(self, dev_conv_<in_elt_t<I>>::convert(std::move(dev)));
+    accept_<I>(self, dev_conv_<in_elt_t<I>>::convert(std::move(dev)));
+    return true;
   }
 
  public:
@@ -324,14 +327,14 @@ class component : public base_ {
   inline static typename std::enable_if<(I == 0)>::type make_acceptors_(
       Array& arr) {
     using elt_t = typename Array::value_type;
-    new (&arr[I]) elt_t(accept<I>);
+    new (&arr[I]) elt_t(accept_<I>);
   }
 
   template <std::size_t I, typename Array>
   inline static typename std::enable_if<(I >= 1)>::type make_acceptors_(
       Array& arr) {
     using elt_t = typename Array::value_type;
-    new (&arr[I]) elt_t(accept<I>);
+    new (&arr[I]) elt_t(accept_<I>);
     make_acceptors_<(I - 1), Array>(arr);
   }
 
@@ -360,12 +363,11 @@ typename component<Inputs, Outputs>::accept_array_t
     component<Inputs, Outputs>::acceptors =
         component<Inputs, Outputs>::make_acceptors_<accept_array_t>();
 
-inline void components::base_::accept(std::size_t port, deliverable&& dev) {
-  CkAssertMsg(port < this->n_inputs, "port out of range!");
+inline bool components::base_::accept(std::size_t port, deliverable& dev) {
 #if HYPERCOMM_STRICT_MODE
   CkAssertMsg((bool)dev.endpoint(), "received unreturnable value!");
 #endif
-  (this->acceptors[port])(this, std::move(dev));
+  return (this->acceptors[(port % this->n_inputs)])(this, port, dev);
 }
 }  // namespace components
 template <typename Input, typename Output>

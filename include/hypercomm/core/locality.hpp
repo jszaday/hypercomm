@@ -177,7 +177,9 @@ class vil : public detail::base_<Base, Index> {
     auto contrib = make_typed_value<contribution>(std::move(value), fn, cb);
     // TODO ( uncertain whether source setting is correct, needs testing )
     contrib->source = endpoint(std::move(local));
-    this->components[rdcr]->accept(0, std::move(contrib));
+    // package the value and send it off
+    deliverable dev(std::move(contrib));
+    CkAssert(this->components[rdcr]->accept(0, dev));
   }
 };
 
