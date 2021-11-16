@@ -1,0 +1,9 @@
+mainmodule tester {
+  mainchare tester_main { entry [nokeep] tester_main(CkArgMsg*); };
+
+  array [Max] accumulator_chare : hypercomm::locality_base_ {
+    entry accumulator_chare(int);
+  };
+
+  initproc void enroll_polymorphs(void);
+}
