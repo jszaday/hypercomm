@@ -59,8 +59,7 @@ class typed_value;
 template <typename T>
 using typed_value_ptr = std::unique_ptr<typed_value<T>>;
 
-template <typename... Args>
-inline void passthru_context_(Args&&... args);
+inline bool passthru_context_(const destination&, deliverable&);
 
 template <typename T>
 inline void try_return(typed_value_ptr<T>&& value);

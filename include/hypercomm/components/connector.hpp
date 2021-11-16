@@ -45,8 +45,10 @@ class connector_ {
     }
   }
 
-  inline void relay(T&& value) const {
-    passthru_context_(*(this->dst_), std::move(value));
+  inline bool relay(T&& value) const {
+    deliverable dev(std::move(value));
+    CkEnforce(passthru_context_(*(this->dst_), dev));
+    return true;
   }
 
   inline bool ready(void) const { return this->dst_ != nullptr; }

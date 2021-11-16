@@ -25,19 +25,12 @@ class mailbox : public component<T, std::tuple<>> {
     predicate_type pred;
     destination dst;
 
-    component_id_t com;
-    components::base_::listener_type listener;
-
     template <typename... Args>
     request(const predicate_type& pred_, Args&&... args)
-        : pred(pred_), dst(std::forward<Args>(args)...), com(0) {}
+        : pred(pred_), dst(std::forward<Args>(args)...) {}
 
     inline bool matches(const value_type& t) {
       return !pred || pred->action(t);
-    }
-
-    inline void action(value_type&& value) {
-      passthru_context_(dst, std::move(value));
     }
   };
 
@@ -46,7 +39,7 @@ class mailbox : public component<T, std::tuple<>> {
   std::deque<value_type> buffer_;
   std::shared_ptr<weak_ref_t> weak_;
 
-  using reqiter_t = typename decltype(requests_)::iterator;
+  using request_iterator = typename decltype(requests_)::iterator;
 
  public:
   mailbox(const id_t& _1) : parent_t(_1), weak_(new weak_ref_t(this)) {
@@ -55,8 +48,8 @@ class mailbox : public component<T, std::tuple<>> {
 
   ~mailbox() { weak_->reset(nullptr); }
 
-  inline reqiter_t put_request(const predicate_type& pred,
-                               const callback_ptr& cb) {
+  inline request_iterator put_request(const predicate_type& pred,
+                                      const callback_ptr& cb) {
     auto search = this->find_in_buffer(pred);
     if (search == std::end(this->buffer_)) {
       this->requests_.emplace_front(pred, cb);
@@ -69,24 +62,19 @@ class mailbox : public component<T, std::tuple<>> {
     }
   }
 
-  inline void put_request_to(const predicate_type& pred,
-                             const component_id_t& com,
-                             const component_port_t& port) {
+  inline request_iterator put_request_to(const predicate_type& pred,
+                                         const component_id_t& com,
+                                         const component_port_t& port) {
     auto* ctx = access_context_();
     auto search = this->find_in_buffer(pred);
     if (search == std::end(this->buffer_)) {
       this->requests_.emplace_front(pred, com, port);
-      auto req = this->requests_.begin();
-      req->com = com;
-      req->listener =
-          (ctx->components[com])
-              ->add_listener(&on_status_change,
-                             new listener_type(this->weak_, req),
-                             [](void* value) { delete (listener_type*)value; });
+      return this->requests_.begin();
     } else {
       QdProcess(1);
       ctx->components[com]->accept(port, std::move(*search));
       this->buffer_.erase(search);
+      return std::end(this->requests_);
     }
   }
 
@@ -100,13 +88,15 @@ class mailbox : public component<T, std::tuple<>> {
     } else {
       auto req = std::move(*search);
       // cleanup the request before triggering
-      // its action (from our list, and com's!)
+      // its action to prevent feedback loops
       this->requests_.erase(search);
-      if (req.com != 0) {
-        (access_context_()->components[req.com])->remove_listener(req.listener);
+      // package the value for delivery
+      deliverable dev(std::move(value));
+      // if delivery fails...
+      if (!passthru_context_(req.dst, dev)) {
+        // try again (via redelivery)!
+        ((components::base_*)this)->accept(0, std::move(dev));
       }
-      // this precludes feedback loops
-      req.action(std::move(value));
     }
 
     return {};
@@ -125,9 +115,7 @@ class mailbox : public component<T, std::tuple<>> {
     return search;
   }
 
-  using request_iterator = typename decltype(requests_)::iterator;
-
-  inline reqiter_t find_matching(const value_type& value) {
+  inline request_iterator find_matching(const value_type& value) {
     for (auto it = (this->requests_).rbegin(); it != (this->requests_).rend();
          it++) {
       if (it->matches(value)) {
@@ -135,22 +123,6 @@ class mailbox : public component<T, std::tuple<>> {
       }
     }
     return std::end(this->requests_);
-  }
-
- private:
-  using listener_type = std::pair<std::shared_ptr<weak_ref_t>, reqiter_t>;
-
-  static void on_status_change(const components::base_*,
-                               components::status_ status, void* arg) {
-    auto* listener = (listener_type*)arg;
-    auto& self = *(listener->first);
-    if (self) {
-      auto& req = listener->second;
-      if (req != std::end(self->requests_)) {
-        self->requests_.erase(req);
-      }
-    }
-    delete listener;
   }
 };
 }  // namespace hypercomm
