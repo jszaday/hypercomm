@@ -181,7 +181,7 @@ struct locality : public vil<CBase_locality, int> {
   }
 };
 
-void receive_value(generic_locality_* self, deliverable& dev) {
+void receive_value(generic_locality_* self, deliverable&& dev) {
   auto& com = *((locality*)self)->mb;
   CkAssert(com.accept(0, dev));
 }
