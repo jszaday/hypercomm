@@ -74,7 +74,8 @@ class mailbox : public component<T, std::tuple<>> {
       QdProcess(1);
       deliverable dev(std::move(*search));
       this->buffer_.erase(search);
-      CkAssert(ctx->components[com]->accept(port, dev));
+      auto status = ctx->components[com]->accept(port, dev);
+      CkAssert(status);
       return std::end(this->requests_);
     }
   }
@@ -96,7 +97,8 @@ class mailbox : public component<T, std::tuple<>> {
       // if delivery fails...
       if (!passthru_context_(req.dst, dev)) {
         // try again (via redelivery)!
-        CkAssert(this->accept(0, dev));
+        auto status = this->accept(0, dev);
+        CkAssert(status);
       }
     }
 
