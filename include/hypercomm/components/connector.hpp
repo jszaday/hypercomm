@@ -45,19 +45,29 @@ class connector_ {
     }
   }
 
-  inline bool relay(T&& value) const {
+  inline bool relay(T& value) const {
     deliverable dev(std::move(value));
-    CkEnforce(passthru_context_(*(this->dst_), dev));
-    return true;
+    if (passthru_context_(*(this->dst_), dev)) {
+      return true;
+    } else {
+      value.reset(static_cast<T*>(dev.release<hyper_value>()));
+      return false;
+    }
   }
 
   inline bool ready(void) const { return this->dst_ != nullptr; }
 
   inline void implode(void) {
-    this->relay(detail::inv_<T>::get());
+    auto inv = detail::inv_<T>::get();
+    this->relay(inv);
     this->~connector_();
   }
 };
+
+template <>
+inline bool connector_<deliverable>::relay(deliverable& dev) const {
+  return passthru_context_(*(this->dst_), dev);
+}
 }  // namespace components
 }  // namespace hypercomm
 

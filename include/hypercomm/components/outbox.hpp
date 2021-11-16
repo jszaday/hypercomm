@@ -45,10 +45,11 @@ struct outbox_<std::tuple<Ts...>> {
   template <std::size_t I>
   inline void deliver_(tuple_type& tuple) {
     auto& con = std::get<I>(this->connectors_);
+    auto& val = std::get<I>(tuple);
     // if we fail to deliver the value...
-    if (!(con.ready() && con.relay(std::move(std::get<I>(tuple))))) {
+    if (!(con.ready() && con.relay(val))) {
       // buffer it?
-      (std::get<I>(this->buffer_)).emplace_back(std::move(std::get<I>(tuple)));
+      (std::get<I>(this->buffer_)).emplace_back(std::move(val));
     }
   }
 
@@ -83,7 +84,7 @@ struct outbox_<std::tuple<Ts...>> {
     // for each of the values we have...
     while (!buf.empty()) {
       // if we successfully deliver the value:
-      if (con.relay(std::move(buf.front()))) {
+      if (con.relay(buf.front())) {
         // consume it!
         buf.pop_front();
       } else {
