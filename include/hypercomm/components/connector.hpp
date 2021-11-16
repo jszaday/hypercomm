@@ -45,12 +45,14 @@ class connector_ {
     }
   }
 
+  // assumes T is a variant of unique_ptr
   inline bool relay(T& value) const {
     deliverable dev(std::move(value));
     if (passthru_context_(*(this->dst_), dev)) {
       return true;
     } else {
-      value.reset(static_cast<T*>(dev.release<hyper_value>()));
+      using element_type = typename T::element_type;
+      value.reset(static_cast<element_type*>(dev.release<hyper_value>()));
       return false;
     }
   }
