@@ -99,8 +99,8 @@ void generic_locality_::resync_port_queue(entry_port_iterator& it) {
   if (search != port_queue.end()) {
     auto& buffer = search->second;
     while (port->alive && !buffer.empty()) {
-      CkAssertMsg(this->passthru(it->second, buffer.front()),
-                  "local delivery failed!");
+      auto status = this->passthru(it->second, buffer.front());
+      CkAssertMsg(status, "local delivery failed!");
       buffer.pop_front();
       QdProcess(1);
     }
@@ -152,8 +152,8 @@ void generic_locality_::receive(deliverable&& dev) {
       this->port_queue[port].push_back(std::move(dev));
       QdCreate(1);
     } else {
-      CkAssertMsg(this->passthru(search->second, dev),
-                  "local delivery failed!");
+      auto status = this->passthru(search->second, dev);
+      CkAssertMsg(status, "local delivery failed!");
     }
   } else if (dev.kind == deliverable::kMessage) {
     auto* msg = dev.release<CkMessage>();

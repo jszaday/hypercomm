@@ -108,6 +108,27 @@ struct deliverable {
 
   static CkMessage* to_message(deliverable&& dev);
 
+  inline std::string to_string(void) const {
+    std::stringstream ss;
+    ss << "deliverable(";
+    switch (this->kind) {
+      case kDeferred:
+        ss << "zc=";
+        break;
+      case kMessage:
+        ss << "msg=";
+        break;
+      case kValue:
+        ss << "val=";
+        break;
+      default:
+        ss << "???";
+        break;
+    }
+    ss << this->storage_ << ")";
+    return ss.str();
+  }
+
  private:
   inline void invalidate_(void) {
     this->kind = kInvalid;
