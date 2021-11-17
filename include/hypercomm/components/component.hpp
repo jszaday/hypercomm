@@ -130,7 +130,7 @@ class component : public base_ {
     incoming_iterator search;
     while (this->active && (search = this->incoming_.find_ready()) !=
                                std::end(this->incoming_)) {
-      this->stage_action(search);
+      acceptor_type::stage_action(this, search);
     }
   }
 
@@ -187,10 +187,6 @@ class component : public base_ {
   inline static typename std::enable_if<(I >= 0) && (n_inputs_ > 1)>::type
   direct_stage(component<Inputs, Outputs, Acceptor>* self, in_elt_t<I>&& val) {
     CkAbort("-- unreachable --");
-  }
-
-  inline void stage_action(const incoming_iterator& search) {
-    this->stage_action(*search, [&](void) { this->incoming_.erase(search); });
   }
 
   // returns true if the set was consumed
@@ -277,7 +273,7 @@ struct default_acceptor_ {
       std::get<I>(*search) = std::move(val);
       // check whether it's ready, and stage it if so!
       if (!gapless && incoming_type::is_ready(*search)) {
-        self->stage_action(search);
+        stage_action(self, search);
       }
     }
   }
@@ -290,6 +286,11 @@ struct default_acceptor_ {
     auto* self = static_cast<component_type*>(base);
     accept_<I>(self, dev_conv_<in_elt_t<I>>::convert(std::move(dev)));
     return true;
+  }
+
+  inline static void stage_action(
+      component_type* self, const typename incoming_type::iterator& search) {
+    self->stage_action(*search, [&](void) { self->incoming_.erase(search); });
   }
 };
 
