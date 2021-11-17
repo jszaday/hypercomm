@@ -249,12 +249,14 @@ struct default_acceptor_ {
   using component_type = component<Inputs, Outputs, default_acceptor_>;
   using incoming_type = inbox_<typename component_type::in_set>;
 
+  template <std::size_t I>
+  using in_elt_t = typename component_type::template in_elt_t<I>;
+
   static constexpr auto n_inputs_ = component_type::n_inputs_;
 
  private:
   template <std::size_t I>
-  inline static void accept_(component_type* self,
-                             typename component_type::in_elt_t<I>&& val) {
+  inline static void accept_(component_type* self, in_elt_t<I>&& val) {
     if (!(val || self->permissive)) {
       self->template on_invalidation_<I>();
     } else if (n_inputs_ == 1) {
@@ -286,8 +288,7 @@ struct default_acceptor_ {
   static bool accept(base_* base, component_port_t port, deliverable& dev) {
     CkAssertMsg(port < n_inputs_, "port out of range!");
     auto* self = static_cast<component_type*>(base);
-    accept_<I>(self, dev_conv_<typename component_type::in_elt_t<I>>::convert(
-                         std::move(dev)));
+    accept_<I>(self, dev_conv_<in_elt_t<I>>::convert(std::move(dev)));
     return true;
   }
 };
