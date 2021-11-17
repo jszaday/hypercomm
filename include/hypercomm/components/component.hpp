@@ -261,7 +261,7 @@ struct default_acceptor_ {
       self->template on_invalidation_<I>();
     } else if (n_inputs_ == 1) {
       // bypass seeking a partial set for single-input coms
-      component_type::direct_stage<I>(self, std::move(val));
+      component_type::template direct_stage<I>(self, std::move(val));
     } else {
       // look for a set missing this value
       auto search = self->incoming_.template find_gap<I>();
