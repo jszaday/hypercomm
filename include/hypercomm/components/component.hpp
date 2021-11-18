@@ -171,25 +171,8 @@ class component : public base_ {
     this->deactivate(kInvalidation);
   }
 
-  template <std::size_t I>
-  inline static typename std::enable_if<(I == 0) && (n_inputs_ == 1)>::type
-  direct_stage(component<Inputs, Outputs, Acceptor>* self, in_elt_t<I>&& val) {
-    CkAssertMsg((bool)val, "not equipped for invalidations!");
-    in_set set(std::move(val));
-    if (!self->stage_action(set, nullptr)) {
-      // this should be consistent with "find_ready"
-      // and the opposite of "find_gap"
-      self->incoming_.emplace_front(std::move(set));
-    }
-  }
-
-  template <std::size_t I>
-  inline static typename std::enable_if<(I >= 0) && (n_inputs_ > 1)>::type
-  direct_stage(component<Inputs, Outputs, Acceptor>* self, in_elt_t<I>&& val) {
-    CkAbort("-- unreachable --");
-  }
-
   // returns true if the set was consumed
+  // NOTE ( cleanup WILL be called before deactivation check )
   template <typename Fn>
   inline bool stage_action(in_set& set, const Fn& cleanup) {
     if (this->active) {
@@ -252,12 +235,30 @@ struct default_acceptor_ {
 
  private:
   template <std::size_t I>
+  inline static typename std::enable_if<(I == 0) && (n_inputs_ == 1)>::type
+  direct_stage(component_type* self, in_elt_t<I>&& val) {
+    CkAssertMsg((bool)val, "not equipped for invalidations!");
+    typename component_type::in_set set(std::move(val));
+    if (!self->stage_action(set, nullptr)) {
+      // this should be consistent with "find_ready"
+      // and the opposite of "find_gap"
+      self->incoming_.emplace_front(std::move(set));
+    }
+  }
+
+  template <std::size_t I>
+  inline static typename std::enable_if<(I >= 0) && (n_inputs_ > 1)>::type
+  direct_stage(component_type* self, in_elt_t<I>&& val) {
+    CkAbort("-- unreachable --");
+  }
+
+  template <std::size_t I>
   inline static void accept_(component_type* self, in_elt_t<I>&& val) {
     if (!(val || self->permissive)) {
       self->template on_invalidation_<I>();
     } else if (n_inputs_ == 1) {
       // bypass seeking a partial set for single-input coms
-      component_type::template direct_stage<I>(self, std::move(val));
+      direct_stage<I>(self, std::move(val));
     } else {
       // look for a set missing this value
       auto search = self->incoming_.template find_gap<I>();

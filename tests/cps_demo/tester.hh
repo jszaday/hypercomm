@@ -8,5 +8,6 @@
 
 #include "tester.decl.h"
 #include "pseudo_stack.hpp"
+#include "tagged_component.hpp"
 
 #endif

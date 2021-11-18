@@ -26,41 +26,39 @@ struct tester_main : public CBase_tester_main {
   }
 };
 
-static constexpr auto nLeftOff = 0;
-static constexpr auto sumOff = nLeftOff + sizeof(int);
+static constexpr auto sumOff = 0;
 static constexpr auto iOff = sumOff + sizeof(int);
+using server_type = state_server_<std::unique_ptr<pseudo_stack>>;
 
 // 1 input port (string) and 0 outputs
 struct accumulator_com
-    : public hypercomm::component<std::tuple<pseudo_stack, int>, std::tuple<>> {
+    : public hypercomm::tagged_component<int, std::tuple<>> {
   using parent_t =
-      hypercomm::component<std::tuple<pseudo_stack, int>, std::tuple<>>;
+      hypercomm::tagged_component<int, std::tuple<>>;
   using in_set_t = typename parent_t::in_set;
 
-  accumulator_com(hypercomm::component_id_t id) : parent_t(id) {
-    this->persistent = true;
+  accumulator_com(hypercomm::component_id_t id,
+                  const std::shared_ptr<server_type>& server) : parent_t(id) {
+    this->set_server(server);
   }
 
   virtual std::tuple<> action(in_set_t& in_set) override {
     auto* ctx = hypercomm::access_context_();
+    auto& val = std::get<0>(in_set)->value();
+    auto& stk = this->get_state();
+
     auto idx = hypercomm::utilities::idx2str(ctx->ckGetArrayIndex());
-    auto& stk = std::get<0>(in_set)->value();
-    auto& val = std::get<1>(in_set)->value();
-
     CkPrintf("com%d@vil%s> received value %d in iteration %d.\n", this->id,
-             idx.c_str(), val, stk.at<int>(iOff));
+             idx.c_str(), val, stk->at<int>(iOff));
 
-    stk.at<int>(sumOff) += val;
-
-    // component expires after N iterations
-    this->persistent = --stk.at<int>(nLeftOff) > 0;
+    stk->at<int>(sumOff) += val;
 
     return {};
   };
 };
 
-hypercomm::typed_value_ptr<pseudo_stack> clone_stack(const pseudo_stack& stk) {
-  return hypercomm::make_typed_value<pseudo_stack>(stk);
+std::unique_ptr<pseudo_stack> clone_stack(const pseudo_stack& stk) {
+  return std::unique_ptr<pseudo_stack>(new pseudo_stack(stk));
 }
 
 struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
@@ -80,10 +78,11 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto topVal = hypercomm::make_typed_value<pseudo_stack>();
     auto& top = topVal->value();
     // set up initial stack state
-    top.allocate(sizeof(int) * 2);
-    top.at<int>(nLeftOff) = nExpected;
+    top.allocate(sizeof(int));
     top.at<int>(sumOff) = mine + 1;
-    auto com = this->emplace_component<accumulator_com>();
+    // create a server for managing state
+    auto srv = std::make_shared<server_type>();
+    auto com = this->emplace_component<accumulator_com>(srv);
     // setup a listener to propagate sum after all iters finish
     com->add_listener(listener_fn_, topVal.release());
     // bring component online to start handling iters
@@ -92,16 +91,15 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     for (auto i = 0; i < nExpected; i++) {
       // when receive_msg(int sum) =>
       // set value of i in child's stack
-      auto clone = clone_stack(top);
-      auto& stk = clone->value();
-      stk.allocate(sizeof(int));
-      stk.at<int>(iOff) = i;
-      // pass the continuation to component
-      hypercomm::deliverable dev(std::move(clone));
-      CkEnforce(this->passthru(std::make_pair(com->id, 0), dev));
+      auto stk = clone_stack(top);
+      stk->allocate(sizeof(int));
+      stk->at<int>(iOff) = i;
+      srv->put_state(i, std::move(stk));
       // make a remote request to it
-      this->mbox->put_request_to({}, com->id, 1);
+      this->mbox->put_request_to({}, com->id, i);
     }
+    // indicate that no more states will be added
+    srv->done_inserting();
   }
 
   static void listener_fn_(const hypercomm::components::base_*,
@@ -119,8 +117,8 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
       // send a message to all the remaining chares
       for (auto i = (mine + 1); i < self->nElts; i++) {
         auto idx = hypercomm::conv2idx<CkArrayIndex>(i);
-        hypercomm::interceptor::send_async(self->ckGetArrayID(), idx, mbox_port,
-                                           val->as_message());
+        hypercomm::deliverable dev(val->as_message());
+        hypercomm::interceptor::send_async(self->ckGetArrayID(), idx, mbox_port, std::move(dev));
       }
     }
 

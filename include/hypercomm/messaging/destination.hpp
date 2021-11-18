@@ -87,6 +87,29 @@ class destination {
     CkAssert(this->kind == kComponent);
     return this->storage_.com;
   }
+
+  inline std::string to_string(void) const {
+    std::stringstream ss;
+    ss << "destination(";
+    switch (this->kind) {
+      case kCallback:
+        ss << "cb";
+        break;
+      case kEndpoint:
+        ss << this->ep().to_string();
+        break;
+      case kComponent: {
+        auto& dst = this->com_port();
+        ss << "com=(" << dst.first << "," << dst.second << ")";
+        break;
+      }
+      default:
+        ss << "???";
+        break;
+    }
+    ss << ")";
+    return ss.str();
+  }
 };
 
 template <>
