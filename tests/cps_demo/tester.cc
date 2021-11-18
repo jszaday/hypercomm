@@ -16,6 +16,8 @@ struct tester_main : public CBase_tester_main {
     auto val = hypercomm::make_typed_value<int>(0);
     auto idx = hypercomm::conv2idx<CkArrayIndex>(0);
     auto nElts = CkNumPes() * 8;
+    auto max = sizeof(int) * 8 - 1;
+    if (nElts > max) nElts = max;
     auto arr =
         (CProxy_accumulator_chare)CProxy_accumulator_chare::ckNew(nElts, nElts);
 
@@ -28,13 +30,13 @@ struct tester_main : public CBase_tester_main {
 
 static constexpr auto sumOff = 0;
 static constexpr auto iOff = sumOff + sizeof(int);
-using server_type = state_server_<std::unique_ptr<pseudo_stack>>;
+using server_type = state_server_<pseudo_stack>;
 
 // 1 input port (string) and 0 outputs
 struct accumulator_com
-    : public hypercomm::tagged_component<int, std::tuple<>> {
+    : public hypercomm::multistate_component<int, std::tuple<>> {
   using parent_t =
-      hypercomm::tagged_component<int, std::tuple<>>;
+      hypercomm::multistate_component<int, std::tuple<>>;
   using in_set_t = typename parent_t::in_set;
 
   accumulator_com(hypercomm::component_id_t id,
@@ -113,6 +115,7 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
 
     if (mine == (self->nElts - 1)) {
       CkPrintf("vil%d> all done, total sum is %d.\n", mine, sum);
+      CkEnforceMsg(sum == ((1L << self->nElts) - 1));
     } else {
       // send a message to all the remaining chares
       for (auto i = (mine + 1); i < self->nElts; i++) {
