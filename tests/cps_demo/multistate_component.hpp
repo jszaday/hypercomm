@@ -1,9 +1,9 @@
-#ifndef __HYPERCOMM_COMPONENTS_multistate_COMPONENT_HPP__
-#define __HYPERCOMM_COMPONENTS_multistate_COMPONENT_HPP__
+#ifndef __HYPERCOMM_COMPONENTS_MULTISTATE_COMPONENT_HPP__
+#define __HYPERCOMM_COMPONENTS_MULTISTATE_COMPONENT_HPP__
 
 #include <hypercomm/components/component.hpp>
 
-#include "pseudo_stack.hpp"
+#include "varstack.hpp"
 #include "state_server.hpp"
 
 namespace hypercomm {
