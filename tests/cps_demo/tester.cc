@@ -77,23 +77,22 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
   void accumulate(void) {
     auto mine = this->__index__();
     auto nExpected = mine ? mine : 1;
-    auto topVal = hypercomm::make_typed_value<pseudo_stack>();
-    auto& top = topVal->value();
+    auto* top = new pseudo_stack();
     // set up initial stack state
-    top.allocate(sizeof(int));
-    top.at<int>(sumOff) = mine + 1;
+    top->allocate(sizeof(int));
+    top->at<int>(sumOff) = mine + 1;
     // create a server for managing state
     auto srv = std::make_shared<server_type>();
     auto com = this->emplace_component<accumulator_com>(srv);
     // setup a listener to propagate sum after all iters finish
-    com->add_listener(listener_fn_, topVal.release());
+    com->add_listener(listener_fn_, top);
     // bring component online to start handling iters
     this->activate_component(com);
     // forall [i] (0:(nExpected - 1),1)
     for (auto i = 0; i < nExpected; i++) {
       // when receive_msg(int sum) =>
       // set value of i in child's stack
-      auto stk = clone_stack(top);
+      auto stk = clone_stack(*top);
       stk->allocate(sizeof(int));
       stk->at<int>(iOff) = i;
       srv->put_state(i, std::move(stk));
@@ -109,8 +108,8 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto* self = (accumulator_chare*)hypercomm::access_context_();
     auto mine = self->__index__();
 
-    auto* stk = (hypercomm::typed_value<pseudo_stack>*)arg;
-    auto& sum = stk->value().at<int>(sumOff);
+    auto* stk = (pseudo_stack*)arg;
+    auto& sum = stk->at<int>(sumOff);
     auto val = hypercomm::make_typed_value<int>(sum);
 
     if (mine == (self->nElts - 1)) {
