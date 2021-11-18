@@ -15,7 +15,8 @@ struct multistate_inbox_ {
 
   inbox_t inbox_;
 
-  void empty_buffers(void) { /* TODO */ }
+  void empty_buffers(void) { /* TODO */
+  }
 
   inline iterator find_ready(void) {
     for (auto it = this->begin(); it != this->end(); it++) {
@@ -58,7 +59,7 @@ class multistate_component
   using acceptor_type = typename parent_t::acceptor_type;
 
  protected:
-  using state_t = pseudo_stack;
+  using state_t = varstack;
   using server_t = state_server_<state_t>;
   using in_set = typename parent_t::in_set;
 

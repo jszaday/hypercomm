@@ -30,7 +30,7 @@ struct tester_main : public CBase_tester_main {
 
 static constexpr auto sumOff = 0;
 static constexpr auto iOff = sumOff + sizeof(int);
-using server_type = state_server_<pseudo_stack>;
+using server_type = state_server_<varstack>;
 
 // 1 input port (string) and 0 outputs
 struct accumulator_com
@@ -59,10 +59,6 @@ struct accumulator_com
   };
 };
 
-std::unique_ptr<pseudo_stack> clone_stack(const pseudo_stack& stk) {
-  return std::unique_ptr<pseudo_stack>(new pseudo_stack(stk));
-}
-
 struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
   hypercomm::comproxy<hypercomm::mailbox<int>> mbox;
   int nElts;
@@ -77,25 +73,27 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
   void accumulate(void) {
     auto mine = this->__index__();
     auto nExpected = mine ? mine : 1;
-    auto* top = new pseudo_stack();
+    std::shared_ptr<varstack> top(
+      varstack::make_stack(sizeof(int))
+    );
     // set up initial stack state
-    top->allocate(sizeof(int));
     top->at<int>(sumOff) = mine + 1;
     // create a server for managing state
     auto srv = std::make_shared<server_type>();
     auto com = this->emplace_component<accumulator_com>(srv);
     // setup a listener to propagate sum after all iters finish
-    com->add_listener(listener_fn_, top);
+    com->add_listener(listener_fn_, 
+      new std::shared_ptr<varstack>(top)
+    );
     // bring component online to start handling iters
     this->activate_component(com);
     // forall [i] (0:(nExpected - 1),1)
     for (auto i = 0; i < nExpected; i++) {
       // when receive_msg(int sum) =>
       // set value of i in child's stack
-      auto stk = clone_stack(*top);
-      stk->allocate(sizeof(int));
+      auto* stk = varstack::make_stack(top, sizeof(int));
       stk->at<int>(iOff) = i;
-      srv->put_state(i, std::move(stk));
+      srv->put_state(i, stk);
       // make a remote request to it
       this->mbox->put_request_to({}, com->id, i);
     }
@@ -108,8 +106,8 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto* self = (accumulator_chare*)hypercomm::access_context_();
     auto mine = self->__index__();
 
-    auto* stk = (pseudo_stack*)arg;
-    auto& sum = stk->at<int>(sumOff);
+    auto* stk = (std::shared_ptr<varstack>*)arg;
+    auto& sum = (*stk)->at<int>(sumOff);
     auto val = hypercomm::make_typed_value<int>(sum);
 
     if (mine == (self->nElts - 1)) {
