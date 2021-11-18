@@ -26,9 +26,9 @@ struct tester_main : public CBase_tester_main {
   }
 };
 
-static constexpr auto nLeftOff = 0;
-static constexpr auto sumOff = nLeftOff + sizeof(int);
+static constexpr auto sumOff = 0;
 static constexpr auto iOff = sumOff + sizeof(int);
+using server_type = state_server_<std::unique_ptr<pseudo_stack>>;
 
 // 1 input port (string) and 0 outputs
 struct accumulator_com
@@ -37,24 +37,21 @@ struct accumulator_com
       hypercomm::tagged_component<int, std::tuple<>>;
   using in_set_t = typename parent_t::in_set;
 
-  accumulator_com(hypercomm::component_id_t id) : parent_t(id) {
-    this->persistent = true;
-    this->shared_ = std::make_shared<state_server_<typename parent_t::state_t>>();
+  accumulator_com(hypercomm::component_id_t id,
+                  const std::shared_ptr<server_type>& server) : parent_t(id) {
+    this->set_server(server);
   }
 
   virtual std::tuple<> action(in_set_t& in_set) override {
     auto* ctx = hypercomm::access_context_();
-    auto idx = hypercomm::utilities::idx2str(ctx->ckGetArrayIndex());
-    auto& stk = this->state_.second;
     auto& val = std::get<0>(in_set)->value();
+    auto& stk = this->get_state();
 
+    auto idx = hypercomm::utilities::idx2str(ctx->ckGetArrayIndex());
     CkPrintf("com%d@vil%s> received value %d in iteration %d.\n", this->id,
              idx.c_str(), val, stk->at<int>(iOff));
 
     stk->at<int>(sumOff) += val;
-
-    // component expires after N iterations
-    this->persistent = --stk->at<int>(nLeftOff) > 0;
 
     return {};
   };
@@ -81,10 +78,11 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto topVal = hypercomm::make_typed_value<pseudo_stack>();
     auto& top = topVal->value();
     // set up initial stack state
-    top.allocate(sizeof(int) * 2);
-    top.at<int>(nLeftOff) = nExpected;
+    top.allocate(sizeof(int));
     top.at<int>(sumOff) = mine + 1;
-    auto com = this->emplace_component<accumulator_com>();
+    // create a server for managing state
+    auto srv = std::make_shared<server_type>();
+    auto com = this->emplace_component<accumulator_com>(srv);
     // setup a listener to propagate sum after all iters finish
     com->add_listener(listener_fn_, topVal.release());
     // bring component online to start handling iters
@@ -96,10 +94,12 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
       auto stk = clone_stack(top);
       stk->allocate(sizeof(int));
       stk->at<int>(iOff) = i;
-      com->shared_->put_state(i, std::move(stk));
+      srv->put_state(i, std::move(stk));
       // make a remote request to it
       this->mbox->put_request_to({}, com->id, i);
     }
+    // indicate that no more states will be added
+    srv->done_inserting();
   }
 
   static void listener_fn_(const hypercomm::components::base_*,

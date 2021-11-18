@@ -98,10 +98,11 @@ class destination {
       case kEndpoint:
         ss << this->ep().to_string();
         break;
-      case kComponent:
+      case kComponent: {
         auto& dst = this->com_port();
-        ss << "com=(" << dst.first << "," << dst.second <<")";
+        ss << "com=(" << dst.first << "," << dst.second << ")";
         break;
+      }
       default:
         ss << "???";
         break;

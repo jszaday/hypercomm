@@ -172,6 +172,7 @@ class component : public base_ {
   }
 
   // returns true if the set was consumed
+  // NOTE ( cleanup WILL be called before deactivation check )
   template <typename Fn>
   inline bool stage_action(in_set& set, const Fn& cleanup) {
     if (this->active) {

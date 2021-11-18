@@ -7,18 +7,27 @@
 template <typename T>
 class state_server_ {
   using avail_t = std::map<std::size_t, T>;
+
   avail_t avail_;
+  bool is_inserting_;
 
  public:
   using state_type = std::pair<std::size_t, T>;
   using iterator = typename avail_t::iterator;
 
-  inline bool empty(void) const { return this->avail_.empty(); }
+  state_server_(void) : is_inserting_(false) {}
+
+  inline bool done(void) const {
+    return this->avail_.empty() && !this->is_inserting_;
+  }
+
+  inline void done_inserting(void) { this->is_inserting_ = false; }
 
   template <typename... Args>
   inline iterator put_state(Args&&... args) {
     auto ins = this->avail_.emplace(std::forward<Args>(args)...);
-    CkAssertMsg(ins.second, "insertion did not occur!");
+    this->is_inserting_ = ins.second;
+    CkAssertMsg(this->is_inserting_, "insertion did not occur!");
     return ins.first;
   }
 

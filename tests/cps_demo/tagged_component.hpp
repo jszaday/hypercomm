@@ -15,7 +15,8 @@ struct tagged_inbox_ {
 
   inbox_t inbox_;
 
-  void empty_buffers(void) { /* TODO */ }
+  void empty_buffers(void) { /* TODO */
+  }
 
   inline iterator find_ready(void) {
     for (auto it = this->begin(); it != this->end(); it++) {
@@ -52,43 +53,58 @@ template <typename Inputs, typename Outputs>
 struct tagged_acceptor_;
 
 template <typename Inputs, typename Outputs>
-struct tagged_component
+class tagged_component
     : public components::component<Inputs, Outputs, tagged_acceptor_> {
   using parent_t = components::component<Inputs, Outputs, tagged_acceptor_>;
-
-  using in_set = typename parent_t::in_set;
+  using acceptor_type = typename parent_t::acceptor_type;
   using state_t = std::unique_ptr<pseudo_stack>;
 
   shared_state_<state_t> shared_;
   std::pair<std::size_t, state_t> state_;
 
+ protected:
+  using in_set = typename parent_t::in_set;
+
   tagged_component(std::size_t id) : parent_t(id) {}
+
+  const state_t& get_state(void) { return (this->state_).second; }
+
+ public:
+  friend acceptor_type;
+
+  void set_server(const shared_state_<state_t>& server) {
+    this->shared_ = server;
+  }
 };
 
 template <typename Inputs, typename Outputs>
-struct tagged_acceptor_ {
+class tagged_acceptor_ {
   using component_type =
       components::component<Inputs, Outputs, tagged_acceptor_>;
   using tagged_component_type = tagged_component<Inputs, Outputs>;
   using in_set = typename component_type::in_set;
-  using incoming_type = tagged_inbox_<in_set>;
 
   template <std::size_t I>
   using in_elt_t = typename component_type::template in_elt_t<I>;
 
   static constexpr auto n_inputs_ = component_type::n_inputs_;
 
+  static void update_server_(tagged_component_type* self) {
+    // we persist until the server is done!
+    self->persistent = !self->shared_->done();
+    self->shared_->release_state(std::move(self->state_));
+  }
+
   template <std::size_t I>
   inline static typename std::enable_if<(I == 0) && (n_inputs_ == 1)>::type
   direct_stage(tagged_component_type* self, in_elt_t<I>&& val) {
     CkAssertMsg((bool)val, "not equipped for invalidations!");
+    auto& tag = self->state_.first;
     in_set set(std::move(val));
-    if (!self->stage_action(set, nullptr)) {
+    if (!self->stage_action(set, [&](void) { update_server_(self); })) {
       // this should be consistent with "find_ready"
       // and the opposite of "find_gap"
-      self->incoming_.emplace(self->state_.first, std::move(set));
-      // acquiesce state
-      self->shared_->release_state(std::move(self->state_));
+      self->incoming_.emplace(tag, std::move(set));
     }
   }
 
@@ -98,8 +114,10 @@ struct tagged_acceptor_ {
     CkAbort("-- unreachable --");
   }
 
-  // TODO add support for invalidations?
+ public:
+  using incoming_type = tagged_inbox_<in_set>;
 
+  // TODO add support for invalidations?
   template <std::size_t I>
   static bool accept(components::base_* base, component_port_t port,
                      deliverable& dev) {
@@ -137,8 +155,7 @@ struct tagged_acceptor_ {
     base->stage_action(search->second, [&](void) {
       auto* self = static_cast<tagged_component_type*>(base);
       self->incoming_.erase(search);
-      // acquiesce state
-      self->shared_->release_state(std::move(self->state_));
+      update_server_(self);
     });
   }
 };
