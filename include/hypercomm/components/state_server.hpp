@@ -4,18 +4,20 @@
 #include <map>
 #include <memory>
 
+namespace hypercomm {
 template <typename T>
-class state_server_ {
-  using avail_t = std::map<std::size_t, T>;
+class state_server {
+  using ptr_type = std::unique_ptr<T>;
+  using map_type = std::map<std::size_t, ptr_type>;
 
-  avail_t avail_;
+  map_type avail_;
   bool is_inserting_;
 
  public:
-  using state_type = std::pair<std::size_t, T>;
-  using iterator = typename avail_t::iterator;
+  using iterator = typename map_type::iterator;
+  using state_type = std::pair<std::size_t, ptr_type>;
 
-  state_server_(void) : is_inserting_(false) {}
+  state_server(void) : is_inserting_(false) {}
 
   inline bool done(void) const {
     return this->avail_.empty() && !this->is_inserting_;
@@ -45,8 +47,6 @@ class state_server_ {
 
   inline void release_state(state_type&& val) {}
 };
-
-template <typename T>
-using shared_state_ = std::shared_ptr<state_server_<T>>;
+}  // namespace hypercomm
 
 #endif

@@ -22,6 +22,10 @@ struct inbox_<std::tuple<Ts...>> {
     return is_ready_<(sizeof...(Ts) - 1)>(set);
   }
 
+  inline static void empty_buffer(in_set& set) {
+    empty_buffer_<(sizeof...(Ts) - 1)>(set);
+  }
+
   inline iterator find_ready(void) {
     if (!this->incoming_.empty()) {
       for (auto it = std::begin(this->incoming_);
@@ -54,7 +58,7 @@ struct inbox_<std::tuple<Ts...>> {
     } else {
       // try to return all unused values and
       for (auto& set : this->incoming_) {
-        empty_buffer_<(sizeof...(Ts) - 1)>(set);
+        empty_buffer(set);
       }
       // clear values so they're not used again
       this->incoming_.clear();
@@ -92,13 +96,15 @@ struct inbox_<std::tuple<Ts...>> {
   }
 
   template <std::size_t I>
-  inline typename std::enable_if<(I == 0)>::type empty_buffer_(in_set& set) {
+  inline static typename std::enable_if<(I == 0)>::type empty_buffer_(
+      in_set& set) {
     return_<I>(set);
   }
 
   template <std::size_t I>
-  inline typename std::enable_if<(I >= 1)>::type empty_buffer_(in_set& set) {
-    this->empty_buffer_<(I - 1)>(set);
+  inline static typename std::enable_if<(I >= 1)>::type empty_buffer_(
+      in_set& set) {
+    empty_buffer_<(I - 1)>(set);
     return_<I>(set);
   }
 };

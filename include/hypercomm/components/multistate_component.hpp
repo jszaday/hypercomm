@@ -1,21 +1,25 @@
-#ifndef __HYPERCOMM_COMPONENTS_TAGGED_COMPONENT_HPP__
-#define __HYPERCOMM_COMPONENTS_TAGGED_COMPONENT_HPP__
+#ifndef __HYPERCOMM_COMPONENTS_MULTISTATE_COMPONENT_HPP__
+#define __HYPERCOMM_COMPONENTS_MULTISTATE_COMPONENT_HPP__
 
-#include <hypercomm/components/component.hpp>
-
-#include "pseudo_stack.hpp"
+#include "component.hpp"
+#include "varstack.hpp"
 #include "state_server.hpp"
 
 namespace hypercomm {
 
 template <typename T>
-struct tagged_inbox_ {
+struct multistate_inbox_ {
   using inbox_t = std::map<std::size_t, T>;
   using iterator = typename inbox_t::iterator;
 
   inbox_t inbox_;
 
-  void empty_buffers(void) { /* TODO */
+  void empty_buffers(void) {
+    auto it = std::begin(this->inbox_);
+    while (it != std::end(this->inbox_)) {
+      components::inbox_<T>::empty_buffer(it->second);
+      it = this->inbox_.erase(it);
+    }
   }
 
   inline iterator find_ready(void) {
@@ -50,38 +54,42 @@ struct tagged_inbox_ {
 };
 
 template <typename Inputs, typename Outputs>
-struct tagged_acceptor_;
+struct multistate_acceptor_;
 
 template <typename Inputs, typename Outputs>
-class tagged_component
-    : public components::component<Inputs, Outputs, tagged_acceptor_> {
-  using parent_t = components::component<Inputs, Outputs, tagged_acceptor_>;
+class multistate_component
+    : public components::component<Inputs, Outputs, multistate_acceptor_> {
+  using parent_t = components::component<Inputs, Outputs, multistate_acceptor_>;
   using acceptor_type = typename parent_t::acceptor_type;
-  using state_t = std::unique_ptr<pseudo_stack>;
-
-  shared_state_<state_t> shared_;
-  std::pair<std::size_t, state_t> state_;
 
  protected:
+  using state_t = varstack;
+  using server_t = state_server<state_t>;
   using in_set = typename parent_t::in_set;
 
-  tagged_component(std::size_t id) : parent_t(id) {}
+  multistate_component(std::size_t id) : parent_t(id) {}
 
-  const state_t& get_state(void) { return (this->state_).second; }
+  const std::unique_ptr<state_t>& get_state(void) {
+    return (this->state_).second;
+  }
 
  public:
   friend acceptor_type;
 
-  void set_server(const shared_state_<state_t>& server) {
+  void set_server(const std::shared_ptr<server_t>& server) {
     this->shared_ = server;
   }
+
+ private:
+  std::shared_ptr<server_t> shared_;
+  typename server_t::state_type state_;
 };
 
 template <typename Inputs, typename Outputs>
-class tagged_acceptor_ {
+class multistate_acceptor_ {
   using component_type =
-      components::component<Inputs, Outputs, tagged_acceptor_>;
-  using tagged_component_type = tagged_component<Inputs, Outputs>;
+      components::component<Inputs, Outputs, multistate_acceptor_>;
+  using multistate_component_type = multistate_component<Inputs, Outputs>;
   using in_set = typename component_type::in_set;
 
   template <std::size_t I>
@@ -89,7 +97,7 @@ class tagged_acceptor_ {
 
   static constexpr auto n_inputs_ = component_type::n_inputs_;
 
-  static void update_server_(tagged_component_type* self) {
+  static void update_server_(multistate_component_type* self) {
     // we persist until the server is done!
     self->persistent = !self->shared_->done();
     self->shared_->release_state(std::move(self->state_));
@@ -97,8 +105,7 @@ class tagged_acceptor_ {
 
   template <std::size_t I>
   inline static typename std::enable_if<(I == 0) && (n_inputs_ == 1)>::type
-  direct_stage(tagged_component_type* self, in_elt_t<I>&& val) {
-    CkAssertMsg((bool)val, "not equipped for invalidations!");
+  direct_stage(multistate_component_type* self, in_elt_t<I>&& val) {
     auto& tag = self->state_.first;
     in_set set(std::move(val));
     if (!self->stage_action(set, [&](void) { update_server_(self); })) {
@@ -110,24 +117,26 @@ class tagged_acceptor_ {
 
   template <std::size_t I>
   inline static typename std::enable_if<(I >= 0) && (n_inputs_ > 1)>::type
-  direct_stage(tagged_component_type* self, in_elt_t<I>&& val) {
+  direct_stage(multistate_component_type* self, in_elt_t<I>&& val) {
     CkAbort("-- unreachable --");
   }
 
  public:
-  using incoming_type = tagged_inbox_<in_set>;
+  using incoming_type = multistate_inbox_<in_set>;
 
   // TODO add support for invalidations?
   template <std::size_t I>
   static bool accept(components::base_* base, component_port_t port,
                      deliverable& dev) {
     auto tag = port / n_inputs_;
-    auto* self = static_cast<tagged_component_type*>(base);
+    auto* self = static_cast<multistate_component_type*>(base);
     auto sseek = self->shared_->find_state(tag);
     if (self->shared_->valid_state(sseek)) {
       auto val = dev_conv_<in_elt_t<I>>::convert(std::move(dev));
 
-      if (n_inputs_ == 1) {
+      if (!(val || self->permissive)) {
+        CkError("warning> multi-stage component invalidation unsupported\n");
+      } else if (n_inputs_ == 1) {
         // capture the state
         self->state_ = self->shared_->acquire_state(sseek);
         direct_stage<I>(self, std::move(val));
@@ -153,7 +162,7 @@ class tagged_acceptor_ {
   inline static void stage_action(
       component_type* base, const typename incoming_type::iterator& search) {
     base->stage_action(search->second, [&](void) {
-      auto* self = static_cast<tagged_component_type*>(base);
+      auto* self = static_cast<multistate_component_type*>(base);
       self->incoming_.erase(search);
       update_server_(self);
     });
