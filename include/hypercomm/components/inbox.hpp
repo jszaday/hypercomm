@@ -104,7 +104,7 @@ struct inbox_<std::tuple<Ts...>> {
   template <std::size_t I>
   inline static typename std::enable_if<(I >= 1)>::type empty_buffer_(
       in_set& set) {
-    this->empty_buffer_<(I - 1)>(set);
+    empty_buffer_<(I - 1)>(set);
     return_<I>(set);
   }
 };
