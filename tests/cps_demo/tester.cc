@@ -63,7 +63,7 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
       std::pair<hypercomm::component_id_t, std::shared_ptr<server_type>>;
 
   hypercomm::comproxy<hypercomm::mailbox<int>> mbox;
-  std::shared_ptr<screener<int>> right_screener;
+  std::shared_ptr<screener<int>> rfilt;
 
   int nElts;
   bool inv;
@@ -143,7 +143,7 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto mine = this->__index__();
     auto left = (mine + nElts - 1) % nElts;
     auto right = (mine + 1) % nElts;
-    this->right_screener = std::make_shared<screener<int>>(right);
+    this->rfilt = std::make_shared<screener<int>>(right);
     // create two multistate components and a server
     auto srv1 = std::make_shared<server_type>();
     auto com1 = this->emplace_component<accumulator_two_com>(srv1);
@@ -158,17 +158,21 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     // ensure the component is invalidated
     auto* arg = &(this->inv);
     com2->add_listener(on_invalidation_, arg);
-    // then activate components
-    this->activate_component(com1);
-    this->activate_component(com2);
-    // make a remote request to it
-    this->mbox->put_request_to(std::make_shared<screener<int>>(left), com1->id,
-                               0);
-    this->mbox->put_request_to(this->right_screener, com2->id, 0);
+    auto lfilt = std::make_shared<screener<int>>(left);
     // create a secondary server to receive continuations
+    // ( create the continuation BEFORE its state can be consumed! )
+    // ( otherwise, there will be no trace of it! )
     auto srv2 = std::make_shared<server_type>();
     auto com3 = this->emplace_component<accumulator_two_com>(srv2);
     srv1->put_continuation(0, on_continuation_, new pair_type(com3->id, srv2));
+    // THEN activate the components ( no possibility of consumption 'til now )
+    this->activate_component(com1);
+    this->activate_component(com2);
+    // the request to rfilt goes first since
+    // there's a SLIM chance that it'll get inv'd
+    // if the mbox has a value ready for com1
+    this->mbox->put_request_to(this->rfilt, com2->id, 0);
+    this->mbox->put_request_to(lfilt, com1->id, 0);
     // kickoff the sequence
     if (mine == 0) {
       auto val = hypercomm::make_typed_value<int>(mine);
@@ -188,7 +192,7 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     // then activate the component
     self->activate_component(pair->first);
     // then make a value request
-    self->mbox->put_request_to(std::move(self->right_screener), pair->first, 0);
+    self->mbox->put_request_to(std::move(self->rfilt), pair->first, 0);
     delete pair;
   }
 
