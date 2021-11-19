@@ -69,6 +69,12 @@ class multistate_component
 
   multistate_component(std::size_t id) : parent_t(id) {}
 
+  ~multistate_component() {
+    if (this->shared_) {
+      this->shared_->erase_subscriber(this->id);
+    }
+  }
+
   const std::unique_ptr<state_t>& get_state(void) {
     return (this->state_).second;
   }
@@ -78,6 +84,7 @@ class multistate_component
 
   void set_server(const std::shared_ptr<server_t>& server) {
     this->shared_ = server;
+    this->shared_->emplace_subscriber(this->id);
   }
 
  private:
@@ -138,7 +145,7 @@ class multistate_acceptor_ {
         CkError("warning> multi-stage component invalidation unsupported\n");
       } else if (n_inputs_ == 1) {
         // capture the state
-        self->state_ = self->shared_->acquire_state(sseek);
+        self->state_ = self->shared_->acquire_state(self->id, sseek);
         direct_stage<I>(self, std::move(val));
       } else {
         auto iseek = self->incoming_.template find_gap<I>(port);
@@ -148,7 +155,7 @@ class multistate_acceptor_ {
         }
         std::get<I>(iseek->second) = std::move(val);
         if (!created && components::inbox_<in_set>::is_ready(iseek->second)) {
-          self->state_ = self->shared_->acquire_state(sseek);
+          self->state_ = self->shared_->acquire_state(self->id, sseek);
           stage_action(self, iseek);
         }
       }
