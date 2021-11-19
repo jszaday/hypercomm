@@ -7,7 +7,6 @@
 #include <hypercomm/core/persistent_port.hpp>
 
 #include "tester.decl.h"
-#include "pseudo_stack.hpp"
 #include "multistate_component.hpp"
 
 #endif
