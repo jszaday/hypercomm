@@ -93,22 +93,27 @@ class state_server {
 
   template <typename... Args>
   inline void put_continuation(std::size_t tag, Args&&... args) {
-    auto ins = this->continuations_.emplace(tag, args);
+    auto ins = this->continuations_.emplace(
+        std::piecewise_construct, std::forward_as_tuple(tag),
+        std::forward_as_tuple(std::forward<Args>(args)...));
     CkAssert(ins.second);
   }
 
  private:
-  // check if we exhausted all state
   inline void check_status_(component_id_t exclude = 0) {
+    // if we exhausted all state:
     if (this->done()) {
       auto it = std::begin(this->subscribers_);
+      // invalidate all downstream components...
+      // (except the excluded one...)
       while (it != std::end(this->subscribers_)) {
-        // invalidate all downstream components if so
-        // (except the excluded one...)
-        if (exclude != *it) {
-          access_context_()->invalidate_component(*it);
-        }
+        auto com = *it;
+        // we erase first because...
         it = this->subscribers_.erase(it);
+        if (exclude != com) {
+          // invalidating the component would erase it
+          access_context_()->invalidate_component(com);
+        }
       }
     }
   }
