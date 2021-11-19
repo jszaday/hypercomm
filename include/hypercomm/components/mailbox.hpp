@@ -65,7 +65,6 @@ class mailbox : public component<T, std::tuple<>> {
   inline request_iterator put_request_to(const predicate_type& pred,
                                          const component_id_t& com,
                                          const component_port_t& port) {
-    auto* ctx = access_context_();
     auto search = this->find_in_buffer(pred);
     if (search == std::end(this->buffer_)) {
       this->requests_.emplace_front(pred, com, port);
@@ -74,7 +73,9 @@ class mailbox : public component<T, std::tuple<>> {
       QdProcess(1);
       deliverable dev(std::move(*search));
       this->buffer_.erase(search);
-      auto status = ctx->components[com]->accept(port, dev);
+      auto* ctx = access_context_();
+      CkAssert(dev && (ctx->magic == CHARE_MAGIC));
+      auto status = ctx->passthru(std::make_pair(com, port), dev);
       CkAssert(status);
       return std::end(this->requests_);
     }

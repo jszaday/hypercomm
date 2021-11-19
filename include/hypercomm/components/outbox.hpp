@@ -16,7 +16,7 @@ template <>
 struct outbox_<std::tuple<>> {
   inline void unspool(std::tuple<>&) {}
 
-  inline bool empty(void) const { return false; }
+  inline bool empty(void) const { return true; }
 };
 
 template <typename... Ts>
