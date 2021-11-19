@@ -22,6 +22,13 @@ class state_server {
   using iterator = typename avail_map_t::iterator;
   using state_type = std::pair<std::size_t, ptr_type>;
 
+ private:
+  using continuation_fn_t = detail::fn_pointer_t<void, void*, state_type&&>;
+  using continuation_t = detail::continuation<continuation_fn_t>;
+  using continuation_map_t = std::map<std::size_t, continuation_t>;
+  continuation_map_t continuations_;
+
+ public:
   state_server(void) : is_inserting_(false) {}
 
   template <typename... Args>
@@ -62,6 +69,8 @@ class state_server {
   inline state_type acquire_state(component_id_t com, const iterator& it) {
     auto val = std::move(*it);
     this->avail_.erase(it);
+    // component will check if it's done
+    // so exclude it from notification
     this->check_status_(com);
     return std::move(val);
   }
@@ -70,13 +79,32 @@ class state_server {
     return it != std::end(this->avail_);
   }
 
-  inline void release_state(state_type&& val) {}
+  inline void release_state(state_type&& val) {
+    // seek a continuation for this tag
+    auto search = this->continuations_.find(val.first);
+    // if one was found...
+    if (search != std::end(this->continuations_)) {
+      // pass it along
+      (search->second)(std::move(val));
+      // then erase the continuation
+      this->continuations_.erase(search);
+    }
+  }
+
+  template <typename... Args>
+  inline void put_continuation(std::size_t tag, Args&&... args) {
+    auto ins = this->continuations_.emplace(tag, args);
+    CkAssert(ins.second);
+  }
 
  private:
+  // check if we exhausted all state
   inline void check_status_(component_id_t exclude = 0) {
     if (this->done()) {
       auto it = std::begin(this->subscribers_);
       while (it != std::end(this->subscribers_)) {
+        // invalidate all downstream components if so
+        // (except the excluded one...)
         if (exclude != *it) {
           access_context_()->invalidate_component(*it);
         }
