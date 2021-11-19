@@ -15,7 +15,12 @@ struct multistate_inbox_ {
 
   inbox_t inbox_;
 
-  void empty_buffers(void) { /* TODO */
+  void empty_buffers(void) {
+    auto it = std::begin(this->inbox_);
+    while (it != std::end(this->inbox_)) {
+      components::inbox_<T>::empty_buffer(it->second);
+      it = this->inbox_.erase(it);
+    }
   }
 
   inline iterator find_ready(void) {
