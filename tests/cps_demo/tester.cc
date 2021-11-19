@@ -49,7 +49,7 @@ struct accumulator_com
     auto& stk = this->get_state();
 
     auto idx = hypercomm::utilities::idx2str(ctx->ckGetArrayIndex());
-    CkPrintf("com%d@vil%s> received value %d in iteration %d.\n", this->id,
+    CkPrintf("com%lu@vil%s> received value %d in iteration %d.\n", this->id,
              idx.c_str(), val, stk->at<int>(iOff));
 
     stk->at<int>(sumOff) += val;
@@ -240,7 +240,7 @@ std::tuple<> accumulator_two_com::action(
   auto left = (mine + nElts - 1) % nElts;
   auto right = (mine + 1) % nElts;
 
-  CkPrintf("com%d@vil%d> received value: %d\n", this->id, mine, val);
+  CkPrintf("com%lu@vil%d> received value: %d\n", this->id, mine, val);
 
   int dst;
   if (init) {
