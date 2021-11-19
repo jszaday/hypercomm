@@ -1,8 +1,7 @@
 #ifndef __HYPERCOMM_COMPONENTS_MULTISTATE_COMPONENT_HPP__
 #define __HYPERCOMM_COMPONENTS_MULTISTATE_COMPONENT_HPP__
 
-#include <hypercomm/components/component.hpp>
-
+#include "component.hpp"
 #include "varstack.hpp"
 #include "state_server.hpp"
 
@@ -65,7 +64,7 @@ class multistate_component
 
  protected:
   using state_t = varstack;
-  using server_t = state_server_<state_t>;
+  using server_t = state_server<state_t>;
   using in_set = typename parent_t::in_set;
 
   multistate_component(std::size_t id) : parent_t(id) {}
@@ -107,7 +106,6 @@ class multistate_acceptor_ {
   template <std::size_t I>
   inline static typename std::enable_if<(I == 0) && (n_inputs_ == 1)>::type
   direct_stage(multistate_component_type* self, in_elt_t<I>&& val) {
-    CkAssertMsg((bool)val, "not equipped for invalidations!");
     auto& tag = self->state_.first;
     in_set set(std::move(val));
     if (!self->stage_action(set, [&](void) { update_server_(self); })) {
@@ -136,7 +134,9 @@ class multistate_acceptor_ {
     if (self->shared_->valid_state(sseek)) {
       auto val = dev_conv_<in_elt_t<I>>::convert(std::move(dev));
 
-      if (n_inputs_ == 1) {
+      if (!(val || self->permissive)) {
+        CkError("warning> multi-stage component invalidation unsupported\n");
+      } else if (n_inputs_ == 1) {
         // capture the state
         self->state_ = self->shared_->acquire_state(sseek);
         direct_stage<I>(self, std::move(val));

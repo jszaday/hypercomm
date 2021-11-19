@@ -30,7 +30,7 @@ struct tester_main : public CBase_tester_main {
 
 static constexpr auto sumOff = 0;
 static constexpr auto iOff = sumOff + sizeof(int);
-using server_type = state_server_<varstack>;
+using server_type = hypercomm::state_server<hypercomm::varstack>;
 
 // 1 input port (string) and 0 outputs
 struct accumulator_com
@@ -73,8 +73,8 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
   void accumulate(void) {
     auto mine = this->__index__();
     auto nExpected = mine ? mine : 1;
-    std::shared_ptr<varstack> top(
-      varstack::make_stack(sizeof(int))
+    std::shared_ptr<hypercomm::varstack> top(
+      hypercomm::varstack::make_stack(sizeof(int))
     );
     // set up initial stack state
     top->at<int>(sumOff) = mine + 1;
@@ -83,7 +83,7 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto com = this->emplace_component<accumulator_com>(srv);
     // setup a listener to propagate sum after all iters finish
     com->add_listener(listener_fn_, 
-      new std::shared_ptr<varstack>(top)
+      new std::shared_ptr<hypercomm::varstack>(top)
     );
     // bring component online to start handling iters
     this->activate_component(com);
@@ -91,7 +91,7 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     for (auto i = 0; i < nExpected; i++) {
       // when receive_msg(int sum) =>
       // set value of i in child's stack
-      auto* stk = varstack::make_stack(top, sizeof(int));
+      auto* stk = hypercomm::varstack::make_stack(top, sizeof(int));
       stk->at<int>(iOff) = i;
       srv->put_state(i, stk);
       // make a remote request to it
@@ -106,7 +106,7 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto* self = (accumulator_chare*)hypercomm::access_context_();
     auto mine = self->__index__();
 
-    auto* stk = (std::shared_ptr<varstack>*)arg;
+    auto* stk = (std::shared_ptr<hypercomm::varstack>*)arg;
     auto& sum = (*stk)->at<int>(sumOff);
     auto val = hypercomm::make_typed_value<int>(sum);
 
