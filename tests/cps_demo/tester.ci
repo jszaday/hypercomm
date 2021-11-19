@@ -3,7 +3,7 @@ mainmodule tester {
 
   array [Max] accumulator_chare : hypercomm::locality_base_ {
     entry accumulator_chare(int);
-    entry void accumulate_two();
+    entry void accumulate_two(void);
   };
 
   initproc void enroll_polymorphs(void);

@@ -117,6 +117,25 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     srv->done_inserting();
   }
 
+  /* loosely speaking... this implements
+   * an sdag-like flow:
+   *
+   *    val init = true;
+   *    await any {
+   *        when receive(_ == left) => {
+   *            init = false;
+   *            send to left;
+   *        }
+   *        when receive(_ == right) => {
+   *            ck::abort(...);
+   *        }
+   *    }
+   *    when receive(_ == right) => {
+   *        ck::assert(!init);
+   *        send to right;
+   *    }
+   */
+
   void accumulate_two(void) {
     // update context on entering EP
     this->update_context();
@@ -135,7 +154,7 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     stk->at<int>(sizeof(int)) = nElts;
     stk->at<bool>(sizeof(int) * 2) = true;
     srv1->put_state(0, stk);
-    srv1->done_inserting(); // IMPORTANT!
+    srv1->done_inserting();  // IMPORTANT!
     // ensure the component is invalidated
     auto* arg = &(this->inv);
     com2->add_listener(on_invalidation_, arg);

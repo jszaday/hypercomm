@@ -25,7 +25,10 @@ struct continuation<fn_pointer_t<Ret, void*, Args...>> {
       : fn(fn_), arg(arg_), deleter(deleter_) {}
 
   ~continuation() {
-    if (this->arg) this->deleter(this->arg);
+    // TODO ( print warning if no deleter? )
+    if (this->arg && this->deleter) {
+      this->deleter(this->arg);
+    }
   }
 
   inline void operator()(Args&&... args) {
