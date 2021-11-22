@@ -2,7 +2,7 @@
 #define __HYPERCOMM_COMPONENTS_MULTISTATE_COMPONENT_HPP__
 
 #include "component.hpp"
-#include "varstack.hpp"
+#include "microstack.hpp"
 #include "state_server.hpp"
 
 namespace hypercomm {
@@ -63,7 +63,7 @@ class multistate_component
   using acceptor_type = typename parent_t::acceptor_type;
 
  protected:
-  using state_t = varstack;
+  using state_t = microstack;
   using server_t = state_server<state_t>;
   using in_set = typename parent_t::in_set;
 

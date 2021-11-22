@@ -73,9 +73,11 @@ struct temporary<T, kInline> {
 
   ~temporary() { value().~T(); }
 
-  const T& value(void) const { return *(reinterpret_cast<const T*>(&data)); }
+  inline T& value(void) { return *(reinterpret_cast<T*>(&data)); }
 
-  T& value(void) { return *(reinterpret_cast<T*>(&data)); }
+  inline const T& value(void) const {
+    return *(reinterpret_cast<const T*>(&data));
+  }
 };
 
 template <typename T>

@@ -9,7 +9,7 @@
 
 #include "tester.decl.h"
 
-using server_type = hypercomm::state_server<hypercomm::varstack>;
+using server_type = hypercomm::state_server<hypercomm::microstack>;
 
 // 1 input port (int) and 0 outputs
 struct accumulator_two_com

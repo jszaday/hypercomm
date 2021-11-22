@@ -91,24 +91,21 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
   void accumulate(void) {
     auto mine = this->__index__();
     auto nExpected = mine ? mine : 1;
-    std::shared_ptr<hypercomm::varstack> top(
-        hypercomm::varstack::make_stack(sizeof(int)));
     // set up initial stack state
-    top->at<int>(sumOff) = mine + 1;
+    auto top = std::make_shared<hypercomm::typed_microstack<int>>(nullptr, mine + 1);
     // create a server for managing state
     auto srv = std::make_shared<server_type>();
     auto com = this->emplace_component<accumulator_com>(srv);
     // setup a listener to propagate sum after all iters finish
     com->add_listener(listener_fn_,
-                      new std::shared_ptr<hypercomm::varstack>(top));
+                      new std::shared_ptr<hypercomm::microstack>(top));
     // bring component online to start handling iters
     this->activate_component(com);
     // forall [i] (0:(nExpected - 1),1)
     for (auto i = 0; i < nExpected; i++) {
       // when receive_msg(int sum) =>
       // set value of i in child's stack
-      auto* stk = hypercomm::varstack::make_stack(top, sizeof(int));
-      stk->at<int>(iOff) = i;
+      auto* stk = new hypercomm::typed_microstack<int>(top, i);
       srv->put_state(i, stk);
       // make a remote request to it
       this->mbox->put_request_to({}, com->id, i);
@@ -149,10 +146,10 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto com1 = this->emplace_component<accumulator_two_com>(srv1);
     auto com2 = this->emplace_component<accumulator_two_com>(srv1);
     // create a stack for receiving values
-    auto* stk = hypercomm::varstack::make_stack(sizeof(int) * 2 + sizeof(bool));
-    stk->at<int>(0) = mine;
-    stk->at<int>(sizeof(int)) = nElts;
-    stk->at<bool>(sizeof(int) * 2) = true;
+    auto* stk = new hypercomm::typed_microstack<int, int, bool>(nullptr, mine, nElts, true);
+    CkEnforce(stk->at<int>(0) == mine);
+    CkEnforce(stk->at<int>(sizeof(int)) == nElts);
+    CkEnforce(stk->at<bool>(sizeof(int) * 2) == true);
     srv1->put_state(0, stk);
     srv1->done_inserting();  // IMPORTANT!
     // ensure the component is invalidated
@@ -208,7 +205,7 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto* self = (accumulator_chare*)hypercomm::access_context_();
     auto mine = self->__index__();
 
-    auto* stk = (std::shared_ptr<hypercomm::varstack>*)arg;
+    auto* stk = (std::shared_ptr<hypercomm::microstack>*)arg;
     auto& sum = (*stk)->at<int>(sumOff);
     auto val = hypercomm::make_typed_value<int>(sum);
 
