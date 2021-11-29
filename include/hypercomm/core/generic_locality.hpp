@@ -21,6 +21,10 @@ class generic_locality_ : public manageable_base_ {
   entry_port_map entry_ports;
   component_map components;
 
+ private:
+  std::vector<component_id_t> callstack;
+
+ public:
   template <typename T>
   using endpoint_queue = endpoint_map<std::deque<T>>;
   endpoint_queue<std::pair<zero_copy_value*, CkNcpyBuffer*>> outstanding;
@@ -62,6 +66,12 @@ class generic_locality_ : public manageable_base_ {
 
   void activate_component(const component_id_t& id);
   void invalidate_component(const component_id_t& id);
+
+  inline bool is_idle(component_id_t id) const {
+    auto search =
+        std::find(std::begin(this->callstack), std::end(this->callstack), id);
+    return search == std::end(this->callstack);
+  }
 
   template <typename T>
   inline is_valid_endpoint_t<T> manual_mode(const T& ep) {

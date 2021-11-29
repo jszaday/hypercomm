@@ -370,13 +370,18 @@ void generic_locality_::activate_component(const component_id_t& id) {
 
 bool generic_locality_::passthru(const com_port_pair_t& port,
                                  deliverable& dev) {
-  auto search = components.find(port.first);
-  if ((search != std::end(components)) &&
-      search->second->accept(port.second, dev)) {
-    this->try_collect(search->second);
-    return true;
-  } else {
+  auto& com = port.first;
+  auto search = this->components.find(com);
+  if (search == std::end(this->components)) {
     return false;
+  } else {
+    this->callstack.push_back(com);
+    auto status = search->second->accept(port.second, dev);
+    this->callstack.pop_back();
+    if (status) {
+      this->try_collect(search->second);
+    }
+    return status;
   }
 }
 
