@@ -17,15 +17,17 @@ struct microstack {
   microstack(char* storage, std::size_t size)
       : microstack(nullptr, storage, size) {}
 
-  microstack(const std::shared_ptr<microstack>& prev, char* storage,
-             std::size_t size)
+  template <typename T>
+  microstack(T&& prev, char* storage, std::size_t size)
       : storage_(storage),
-        prev_(prev),
+        prev_(std::forward<T>(prev)),
         start_(prev ? prev_->end_ : 0),
         size_(size),
         end_(start_ + size) {}
 
  public:
+  std::shared_ptr<microstack>& unwind(void) { return this->prev_; }
+
   inline char* operator[](std::size_t pos) {
     if ((this->start_ <= pos) && (pos < this->end_)) {
       return this->storage_ + (pos - this->start_);
@@ -55,6 +57,12 @@ struct typed_microstack : public microstack {
 
   template <typename... Args>
   typed_microstack(const std::shared_ptr<microstack>& prev, Args&&... args)
+      : microstack(prev, reinterpret_cast<char*>(&storage_),
+                   sizeof(storage_type)),
+        storage_(std::forward<Args>(args)...) {}
+
+  template <typename... Args>
+  typed_microstack(microstack* prev, Args&&... args)
       : microstack(prev, reinterpret_cast<char*>(&storage_),
                    sizeof(storage_type)),
         storage_(std::forward<Args>(args)...) {}

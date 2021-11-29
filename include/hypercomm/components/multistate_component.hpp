@@ -75,7 +75,7 @@ class multistate_component
     }
   }
 
-  const std::unique_ptr<state_t>& get_state(void) {
+  const utilities::unshared_ptr<state_t>& get_state(void) {
     return (this->state_).second;
   }
 
