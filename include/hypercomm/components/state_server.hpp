@@ -5,12 +5,13 @@
 #include <memory>
 
 #include "base.hpp"
+#include "../utilities/unshared.hpp"
 #include "../utilities/continuation.hpp"
 
 namespace hypercomm {
 template <typename T>
 class state_server {
-  using ptr_type = std::unique_ptr<T>;
+  using ptr_type = utilities::unshared_ptr<T>;
   using avail_map_t = std::map<std::size_t, ptr_type>;
   using subscriber_map_t = std::vector<component_id_t>;
 

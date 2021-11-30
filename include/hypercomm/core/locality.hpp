@@ -179,7 +179,7 @@ class vil : public detail::base_<Base, Index> {
     contrib->source = endpoint(std::move(local));
     // package the value and send it off
     deliverable dev(std::move(contrib));
-    auto status = this->components[rdcr]->accept(0, dev);
+    auto status = this->passthru(std::make_pair(rdcr, 0), dev);
     CkAssert(status);
   }
 };

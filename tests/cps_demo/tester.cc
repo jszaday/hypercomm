@@ -29,7 +29,7 @@ struct tester_main : public CBase_tester_main {
 };
 
 static constexpr auto sumOff = 0;
-static constexpr auto iOff = sumOff + sizeof(int);
+static constexpr auto iOff = sumOff + 1;
 
 // 1 input port (int) and 0 outputs
 struct accumulator_com
@@ -148,8 +148,8 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     // create a stack for receiving values
     auto* stk = new hypercomm::typed_microstack<int, int, bool>(nullptr, mine, nElts, true);
     CkEnforce(stk->at<int>(0) == mine);
-    CkEnforce(stk->at<int>(sizeof(int)) == nElts);
-    CkEnforce(stk->at<bool>(sizeof(int) * 2) == true);
+    CkEnforce(stk->at<int>(1) == nElts);
+    CkEnforce(stk->at<bool>(2) == true);
     srv1->put_state(0, stk);
     srv1->done_inserting();  // IMPORTANT!
     // ensure the component is invalidated
@@ -235,8 +235,8 @@ std::tuple<> accumulator_two_com::action(
   auto& val = tru->value();
   auto& stk = this->get_state();
   auto& mine = stk->at<int>(0);
-  auto& nElts = stk->at<int>(sizeof(int));
-  auto& init = stk->at<bool>(sizeof(int) * 2);
+  auto& nElts = stk->at<int>(1);
+  auto& init = stk->at<bool>(2);
 
   auto left = (mine + nElts - 1) % nElts;
   auto right = (mine + 1) % nElts;
