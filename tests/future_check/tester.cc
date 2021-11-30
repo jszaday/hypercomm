@@ -1,5 +1,6 @@
 #include <hypercomm/core/locality.hpp>
 #include <hypercomm/core/resuming_callback.hpp>
+#include <hypercomm/components/microstack.hpp>
 
 #include "tester.decl.h"
 
@@ -36,6 +37,20 @@ struct main : public CBase_main {
 struct locality : public vil<CBase_locality, int> {
   locality(void) = default;
 
+  void microcheck(void) {
+    auto* top = new typed_microstack<int>(nullptr, 63);
+    auto* src = new typed_microstack<int, double>(top, 42, 21.0);
+    auto* dst = src->clone();
+
+    CkEnforce((*top)[0] == (*dst)[0]);
+    CkEnforce(dst->at<int>(0) == 63);
+    CkEnforce(dst->at<int>(1) == 42);
+    CkEnforce(dst->at<double>(2) == 21.0);
+
+    delete src;
+    delete dst;
+  }
+
   void run(void) {
     auto f = this->make_future();
     auto g = this->make_future();
@@ -58,6 +73,8 @@ struct locality : public vil<CBase_locality, int> {
     CkEnforce((bool)value);
     CkEnforce(t != std::get<0>(value->value()));
     CkEnforce(std::get<0>(value->value()) == std::get<1>(value->value()));
+
+    this->microcheck();
 
     this->contribute(CkCallback(CkCallback::ckExit));
   }

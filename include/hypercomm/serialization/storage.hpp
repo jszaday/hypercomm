@@ -29,6 +29,16 @@ struct tuple_storage_impl_ {
   }
 };
 
+template <std::size_t I, typename... Ts>
+inline typename std::tuple_element<I, std::tuple<Ts...>>::type& element_at(
+    tuple_storage<Ts...>& ts);
+
+template <std::size_t I, typename... Ts>
+inline typename std::tuple_element<I, std::tuple<Ts...>>::type& element_at(
+    const tuple_storage<Ts...>& ts) {
+  return element_at<I>(const_cast<tuple_storage<Ts...>&>(ts));
+}
+
 template <typename T, typename... Ts>
 struct tuple_storage<T, Ts...> : public tuple_storage_impl_<T, sizeof...(Ts)>,
                                  public tuple_storage<Ts...> {
@@ -36,6 +46,10 @@ struct tuple_storage<T, Ts...> : public tuple_storage_impl_<T, sizeof...(Ts)>,
   tuple_storage(Arg&& head, Args&&... tail)
       : tuple_storage_impl_<T, sizeof...(Ts)>(std::forward<Arg>(head)),
         tuple_storage<Ts...>(std::forward<Args>(tail)...) {}
+
+  tuple_storage(const tuple_storage<T, Ts...>& other)
+      : tuple_storage_impl_<T, sizeof...(Ts)>(element_at<0>(other)),
+        tuple_storage<Ts...>((const tuple_storage<Ts...>&)other) {}
 };
 
 template <std::size_t I, typename... Ts>
