@@ -37,6 +37,8 @@ struct microstack {
         end_(start_ + size) {}
 
  public:
+  virtual ~microstack() {}
+
   std::shared_ptr<microstack>& unwind(void) { return this->prev_; }
 
   inline void* operator[](std::size_t pos) {
@@ -55,6 +57,8 @@ struct microstack {
   }
 
   inline std::size_t size(void) const { return this->size_; }
+
+  virtual microstack* clone(void) const = 0;
 };
 
 template <typename... Ts>
@@ -84,6 +88,10 @@ struct typed_microstack : public microstack {
       : microstack(prev, items_.data(), n_items_),
         storage_(std::forward<Args>(args)...) {
     this->template initialize_address_<(n_items_ - 1)>();
+  }
+
+  virtual microstack* clone(void) const override {
+    return new typed_microstack<Ts...>(this->prev_, this->storage_);
   }
 
  private:
