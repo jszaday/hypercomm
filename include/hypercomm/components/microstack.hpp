@@ -37,7 +37,7 @@ struct microstack {
         end_(start_ + size) {}
 
  public:
-  virtual ~microstack() {}
+  virtual ~microstack() = default;
 
   std::shared_ptr<microstack>& unwind(void) { return this->prev_; }
 
@@ -75,6 +75,8 @@ struct typed_microstack : public microstack {
 
  public:
   friend puper<typed_microstack<Ts...>>;
+
+  virtual ~typed_microstack() = default;
 
   template <typename... Args>
   typed_microstack(const std::shared_ptr<microstack>& prev, Args&&... args)

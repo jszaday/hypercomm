@@ -27,6 +27,8 @@ struct tuple_storage_impl_ {
   tuple_storage_impl_(Args&&... args) {
     new (&(**this)) T(std::forward<Args>(args)...);
   }
+
+  ~tuple_storage_impl_() { (**this).~T(); }
 };
 
 template <std::size_t I, typename... Ts>
