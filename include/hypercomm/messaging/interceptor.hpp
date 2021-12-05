@@ -49,12 +49,11 @@ static_assert(sizeof(interceptor_msg_) <= sizeof(envelope),
 
 class interceptor : public CBase_interceptor {
   using queue_type =
-      std::unordered_map<CkArrayIndex, std::vector<CkMessage*>, IndexHasher>;
-  using req_map_type =
-      std::unordered_map<CkArrayIndex, CkArrayIndex, IndexHasher>;
+      hash_map<CkArrayIndex, std::vector<CkMessage*>, IndexHasher>;
+  using req_map_type = hash_map<CkArrayIndex, CkArrayIndex, IndexHasher>;
 
-  std::unordered_map<CkArrayID, req_map_type, ArrayIDHasher> fwdReqs_;
-  std::unordered_map<CkArrayID, queue_type, ArrayIDHasher> queued_;
+  hash_map<CkArrayID, req_map_type, ArrayIDHasher> fwdReqs_;
+  hash_map<CkArrayID, queue_type, ArrayIDHasher> queued_;
 
   static void deliver_handler_(void*);
 

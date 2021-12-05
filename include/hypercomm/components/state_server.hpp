@@ -12,7 +12,7 @@ namespace hypercomm {
 template <typename T>
 class state_server {
   using ptr_type = utilities::unshared_ptr<T>;
-  using avail_map_t = std::unordered_map<std::size_t, ptr_type>;
+  using avail_map_t = hash_map<std::size_t, ptr_type>;
   using subscriber_map_t = std::vector<component_id_t>;
 
   subscriber_map_t subscribers_;

@@ -53,11 +53,10 @@ class tree_builder : public CBase_tree_builder, public array_listener {
 #endif
 
   using record_type = std::pair<element_type, int>;
-  using elements_type =
-      std::unordered_map<index_type, record_type, array_index_hasher>;
+  using elements_type = hash_map<index_type, record_type, array_index_hasher>;
 
   template <typename Value>
-  using array_id_map = std::unordered_map<CkArrayID, Value, array_id_hasher>;
+  using array_id_map = hash_map<CkArrayID, Value, array_id_hasher>;
 
   // tracks the quiscence status of each array (produce/consume counts)
   using qd_count_t = std::int64_t;

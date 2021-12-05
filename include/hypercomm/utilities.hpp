@@ -68,7 +68,7 @@ struct is_safely_castable : std::false_type {};
 
 template <typename T, typename U>
 struct is_safely_castable<T, U,
-                          void_t<decltype(static_cast<U>(std::declval<T>()))>>
+                          void_t<decltype(static_cast<U*>(std::declval<T*>()))>>
     : std::true_type {};
 
 template <typename U, typename T>
