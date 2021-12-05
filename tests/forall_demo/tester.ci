@@ -25,7 +25,7 @@ mainmodule tester {
       }
       serial {
         CkPrintf(
-          "main> average time per %s rep: %g ms\n",
+          "main> average time for %s: %g ms\n",
           this->current_phase(),
           (1e3 * totalTime) / nReps
         );

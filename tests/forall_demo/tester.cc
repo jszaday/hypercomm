@@ -24,7 +24,8 @@ struct test_main : public CBase_test_main {
 
   CProxy_test_chare testProxy;
 
-  int rep, nReps, nSkip;
+  int rep;
+  int nElts, nReps, nSkip;
   double startTime, totalTime;
 
   test_phase_ phase;
@@ -32,7 +33,7 @@ struct test_main : public CBase_test_main {
   test_main(CkArgMsg* msg) {
     auto val = hypercomm::make_typed_value<int>(0);
     auto idx = hypercomm::conv2idx<CkArrayIndex>(0);
-    auto nElts = CkNumPes() * 8;
+    nElts = CkNumPes() * 8;
     nReps = (msg->argc >= 2) ? atoi(msg->argv[1]) : 513;
     nSkip = nReps / 10 + 1;
     mainProxy = thisProxy;
@@ -67,11 +68,11 @@ struct test_main : public CBase_test_main {
       case kSdag:
         return "sdag";
       case kConventional:
-        return "conventional";
+        return "component-per-iter";
       case kMultistate:
-        return "multistate";
+        return "multistate-component";
       default:
-        break;
+        return "???";
     }
   }
 
@@ -79,7 +80,12 @@ struct test_main : public CBase_test_main {
     reinterpret_cast<std::size_t&>(this->phase)++;
 
     if (this->phase == kDone) {
-      CkExit();
+      for (auto i = 0; i < nElts; i++) {
+        auto idx = hypercomm::conv2idx<CkArrayIndex>(i);
+        testProxy[idx].ckDestroy();
+      }
+
+      CkExitAfterQuiescence();
     } else {
       thisProxy.run();
     }
@@ -101,6 +107,8 @@ struct test_chare : public hypercomm::vil<CBase_test_chare, int> {
         cb(CkIndex_test_main::on_completion(nullptr), mainProxy) {
     this->activate_component(mbox);
   }
+
+  ~test_chare() { CkAssert(this->components.size() == 1); }
 
   void run_multistate(void) {
     this->update_context();
