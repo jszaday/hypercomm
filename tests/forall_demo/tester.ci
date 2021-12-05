@@ -1,0 +1,63 @@
+mainmodule tester {
+  initproc void enroll_polymorphs(void);
+
+  mainchare test_main {
+    entry [nokeep] test_main(CkArgMsg*);
+    entry void on_completion(void);
+
+    entry void run_conventional(void) {
+      serial {
+        totalTime = 0;
+      }
+      for (rep = 0; rep < (nReps + nSkip); rep++) {
+        serial {
+          startTime = CkWallTimer(); 
+          testProxy.run_conventional();
+        }
+        when on_completion(void) serial {
+          if (rep >= nSkip) {
+            auto time = CkWallTimer() - startTime;
+            totalTime += time;
+          }
+        }
+      }
+      serial {
+        // CkPrintf("main> total time to run %d reps of conventional: %g s\n", nReps, totalTime);
+        CkPrintf("main> average time per conventional rep: %g ms\n", (1e3 * totalTime) / nReps);
+        thisProxy.run_multistate();
+      }
+    }
+
+    entry void run_multistate(void) {
+      serial {
+        totalTime = 0;
+      }
+      for (rep = 0; rep < (nReps + nSkip); rep++) {
+        serial {
+          startTime = CkWallTimer(); 
+          testProxy.run_multistate();
+        }
+        when on_completion(void) serial {
+          if (rep >= nSkip) {
+            auto time = CkWallTimer() - startTime;
+            totalTime += time;
+          }
+        }
+      }
+      serial {
+        // CkPrintf("main> total time to run %d reps of multistate: %g s\n", nReps, totalTime);
+        CkPrintf("main> average time per multistate rep: %g ms\n", (1e3 * totalTime) / nReps);
+        CkExit();
+      }
+    }
+  };
+
+  readonly CProxy_test_main mainProxy;
+
+  array [Max] test_chare : hypercomm::locality_base_ {
+    entry test_chare(int);
+    entry void recv_value(int);
+    entry void run_multistate(void);
+    entry void run_conventional(void);
+  };
+}

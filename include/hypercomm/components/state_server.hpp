@@ -12,7 +12,7 @@ namespace hypercomm {
 template <typename T>
 class state_server {
   using ptr_type = utilities::unshared_ptr<T>;
-  using avail_map_t = std::map<std::size_t, ptr_type>;
+  using avail_map_t = std::unordered_map<std::size_t, ptr_type>;
   using subscriber_map_t = std::vector<component_id_t>;
 
   subscriber_map_t subscribers_;
@@ -75,6 +75,8 @@ class state_server {
     this->check_status_(com);
     return std::move(val);
   }
+
+  inline void reserve_states(std::size_t count) { this->avail_.reserve(count); }
 
   inline bool valid_state(const iterator& it) {
     return it != std::end(this->avail_);
