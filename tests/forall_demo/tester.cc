@@ -12,6 +12,13 @@ void enroll_polymorphs(void) {
   }
 }
 
+enum test_phase_ : std::size_t {
+  kSdag = 0,
+  kConventional = 1,
+  kMultistate = 2,
+  kDone = 3
+};
+
 struct test_main : public CBase_test_main {
   test_main_SDAG_CODE;
 
@@ -19,6 +26,8 @@ struct test_main : public CBase_test_main {
 
   int rep, nReps, nSkip;
   double startTime, totalTime;
+
+  test_phase_ phase;
 
   test_main(CkArgMsg* msg) {
     auto val = hypercomm::make_typed_value<int>(0);
@@ -30,25 +39,66 @@ struct test_main : public CBase_test_main {
     testProxy = CProxy_test_chare::ckNew(nElts, nElts);
     std::string mode(msg->argv[std::min(msg->argc - 1, 2)]);
     if (mode == "multi") {
-      thisProxy.run_multistate(); 
+      this->phase = kMultistate;
     } else {
-      thisProxy.run_conventional();
+      this->phase = kSdag;
+    }
+    thisProxy.run();
+  }
+
+  inline void action(void) {
+    switch (this->phase) {
+      case kSdag:
+        testProxy.run_sdag();
+        break;
+      case kConventional:
+        testProxy.run_conventional();
+        break;
+      case kMultistate:
+        testProxy.run_multistate();
+        break;
+      default:
+        break;
+    }
+  }
+
+  inline const char* current_phase(void) {
+    switch (this->phase) {
+      case kSdag:
+        return "sdag";
+      case kConventional:
+        return "conventional";
+      case kMultistate:
+        return "multistate";
+      default:
+        break;
+    }
+  }
+
+  inline void next_phase(void) {
+    reinterpret_cast<std::size_t&>(this->phase)++;
+
+    if (this->phase == kDone) {
+      CkExit();
+    } else {
+      thisProxy.run();
     }
   }
 };
-
-enum test_phase_ : std::size_t { kMultistate, kConventional };
 
 struct test_chare : public hypercomm::vil<CBase_test_chare, int> {
   test_chare_SDAG_CODE;
 
   hypercomm::comproxy<hypercomm::mailbox<int>> mbox;
-  
+
   int i, j;
   int n, nRecvd;
+  CkCallback cb;
 
   test_chare(int n_)
-      : n(n_), mbox(this->emplace_component<hypercomm::mailbox<int>>()) {
+      : n(n_),
+        mbox(this->emplace_component<hypercomm::mailbox<int>>()),
+        cb(CkIndex_test_main::on_completion(nullptr), mainProxy) {
     this->activate_component(mbox);
   }
 
@@ -64,7 +114,7 @@ struct test_chare : public hypercomm::vil<CBase_test_chare, int> {
     this->activate_component(com);
 
     for (auto i = 0; i < n; i++) {
-      thisProxy.recv_value(i);
+      thisProxy.recv_value(pack_value(i));
 
       for (auto j = 0; j < n; j++) {
         auto* stk = new hypercomm::typed_microstack<int, int>(nullptr, i, j);
@@ -82,7 +132,7 @@ struct test_chare : public hypercomm::vil<CBase_test_chare, int> {
     this->nRecvd = 0;
 
     for (auto i = 0; i < n; i++) {
-      thisProxy.recv_value(i);
+      thisProxy.recv_value(pack_value(i));
 
       for (auto j = 0; j < n; j++) {
         auto com = this->emplace_component<test_component>();
@@ -98,18 +148,18 @@ struct test_chare : public hypercomm::vil<CBase_test_chare, int> {
     auto* self = (test_chare*)hypercomm::access_context_();
     auto multi = arg == (void*)kMultistate;
     if (multi || (++(self->nRecvd) == (self->n * self->n))) {
-      CkCallback cb(CkIndex_test_main::on_completion(), mainProxy);
-      self->contribute(cb);
+      self->contribute(self->cb);
     }
   }
 
-  void recv_value(int i) {
+  void recv_value(CkMessage* msg) {
     this->update_context();
-    auto val = hypercomm::make_typed_value<int>(i);
-    hypercomm::deliverable dev(std::move(val));
+    hypercomm::deliverable dev(msg);
     auto status = mbox->accept(0, dev);
     CkEnforce(status);
   }
+
+  inline CkMessage* pack_value(int i) { return hypercomm::pack(i); }
 };
 
 #define CK_TEMPLATES_ONLY

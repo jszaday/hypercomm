@@ -3,74 +3,33 @@ mainmodule tester {
 
   mainchare test_main {
     entry [nokeep] test_main(CkArgMsg*);
-    entry void on_completion(void);
+    entry void on_completion(CkMessage*);
 
-    entry void run_conventional(void) {
+    entry void run(void) {
       serial {
         totalTime = 0;
       }
       for (rep = 0; rep < (nReps + nSkip); rep++) {
         serial {
           startTime = CkWallTimer(); 
-          testProxy.run_conventional();
+          this->action();
         }
-        when on_completion(void) serial {
+        when on_completion(CkMessage* msg) serial {
           if (rep >= nSkip) {
             auto time = CkWallTimer() - startTime;
             totalTime += time;
           }
-        }
-      }
-      serial {
-        // CkPrintf("main> total time to run %d reps of conventional: %g s\n", nReps, totalTime);
-        CkPrintf("main> average time per conventional rep: %g ms\n", (1e3 * totalTime) / nReps);
-        thisProxy.run_sdag();
-      }
-    }
 
-    entry void run_sdag(void) {
-      serial {
-        totalTime = 0;
-      }
-      for (rep = 0; rep < (nReps + nSkip); rep++) {
-        serial {
-          startTime = CkWallTimer(); 
-          testProxy.run_sdag();
-        }
-        when on_completion(void) serial {
-          if (rep >= nSkip) {
-            auto time = CkWallTimer() - startTime;
-            totalTime += time;
-          }
+          CkFreeMsg(msg);
         }
       }
       serial {
-        // CkPrintf("main> total time to run %d reps of conventional: %g s\n", nReps, totalTime);
-        CkPrintf("main> average time per sdag rep: %g ms\n", (1e3 * totalTime) / nReps);
-        thisProxy.run_multistate();
-      }
-    }
-
-    entry void run_multistate(void) {
-      serial {
-        totalTime = 0;
-      }
-      for (rep = 0; rep < (nReps + nSkip); rep++) {
-        serial {
-          startTime = CkWallTimer(); 
-          testProxy.run_multistate();
-        }
-        when on_completion(void) serial {
-          if (rep >= nSkip) {
-            auto time = CkWallTimer() - startTime;
-            totalTime += time;
-          }
-        }
-      }
-      serial {
-        // CkPrintf("main> total time to run %d reps of multistate: %g s\n", nReps, totalTime);
-        CkPrintf("main> average time per multistate rep: %g ms\n", (1e3 * totalTime) / nReps);
-        CkExit();
+        CkPrintf(
+          "main> average time per %s rep: %g ms\n",
+          this->current_phase(),
+          (1e3 * totalTime) / nReps
+        );
+        this->next_phase();
       }
     }
   };
@@ -80,8 +39,8 @@ mainmodule tester {
   array [Max] test_chare : hypercomm::locality_base_ {
     entry test_chare(int);
 
-    entry void recv_sdag(int);
-    entry void recv_value(int);
+    entry void recv_sdag(CkMessage*);
+    entry void recv_value(CkMessage*);
 
     entry void run_multistate(void);
     entry void run_conventional(void);
@@ -89,14 +48,15 @@ mainmodule tester {
     entry void run_sdag(void) {
       forall [i] (0:(n - 1),1) {
         serial {
-          thisProxy.recv_sdag(i);
+          thisProxy.recv_sdag(this->pack_value(i));
         }
         forall [j] (0:(n - 1),1) {
-          when recv_sdag(int _) serial {}
+          when recv_sdag(CkMessage* msg) serial {
+            CkFreeMsg(msg);
+          }
         }
       }
       serial {
-        CkCallback cb(CkIndex_test_main::on_completion(), mainProxy);
         this->contribute(cb);
       }
     }
