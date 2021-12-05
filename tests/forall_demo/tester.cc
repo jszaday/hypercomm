@@ -40,7 +40,11 @@ struct test_main : public CBase_test_main {
 enum test_phase_ : std::size_t { kMultistate, kConventional };
 
 struct test_chare : public hypercomm::vil<CBase_test_chare, int> {
+  test_chare_SDAG_CODE;
+
   hypercomm::comproxy<hypercomm::mailbox<int>> mbox;
+  
+  int i, j;
   int n, nRecvd;
 
   test_chare(int n_)
