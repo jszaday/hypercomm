@@ -294,12 +294,19 @@ inline future generic_locality_::make_future(void) {
 void generic_locality_::request_future(const future& f,
                                        const callback_ptr& cb) {
   CProxyElement_locality_base_ ourElt(this->ckGetArrayID(), this->thisIndexMax);
-  auto ourPort = std::make_shared<future_port>(f);
+  auto& theirElt = f.source;
 
   // TODO ( check whether future immediately fulfilled! )
+  auto ourPort = std::make_shared<future_port>(f);
   this->open(ourPort, cb);
 
-  auto& theirElt = f.source;
+#if CMK_VERBOSE
+  CkPrintf("info> will route value from %s (%s) to %s\n",
+           (utilities::idx2str(theirElt.ckGetIndex())).c_str(),
+           ourPort->to_string().c_str(),
+           (utilities::idx2str(this->thisIndexMax)).c_str());
+#endif
+
   if (theirElt && !(ourElt == theirElt)) {
     // open a remote port that forwards to this locality
     auto fwd = forward_to(std::move(ourElt), ourPort);

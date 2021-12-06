@@ -4,6 +4,7 @@
 #include "../core/math.hpp"
 #include "../core/entry_port.hpp"
 #include "../serialization/pup.hpp"
+#include "module.hpp"
 
 namespace hypercomm {
 
@@ -14,10 +15,11 @@ struct future {
   inline std::string to_string(void) const {
     std::stringstream ss;
     ss << "future(id=" << id << ",src=";
-    if (source)
-      ss << source << ")";
-    else
+    if (source) {
+      ss << this->source.operator std::string() << ")";
+    } else {
       ss << "(nil))";
+    }
     return ss.str();
   }
 
@@ -46,7 +48,7 @@ struct future_port : public entry_port {
   future f;
 
   future_port(PUP::reconstruct) {}
-  future_port(const future& _1) : f(_1) {}
+  future_port(const future& _) : f(std::forward<const future&>(_)) {}
 
   virtual bool keep_alive(void) const override { return false; }
 

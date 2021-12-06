@@ -113,7 +113,7 @@ struct locality : public vil<CBase_locality, int> {
 // NOTE ( this is effectively the body for the say_hello entry method )
 typename std::tuple<> say_hello::action(std::tuple<deliverable>& accepted) {
   if (kVerbose) {
-    CkPrintf("com%lu> hi, hi!\n", id);
+    CkPrintf("com%lu> hi, hi!\n", this->id);
   }
 
   return {};
@@ -134,7 +134,7 @@ std::tuple<> my_redn_com::action(my_redn_com::in_set& accepted) {
   // then do numIters reductions, each with empty messages
   for (auto it = 0; it < numIters; it++) {
 #if CMK_VERBOSE
-    CkPrintf("com%lu@%d> contributing a value\n", this->id, self->__index__());
+    CkPrintf("com%llu@%d> contributing a value\n", this->id, self->__index__());
 #endif
     auto val = hypercomm::make_unit_value();
     // NOTE ( this is equivalent to Charm++'s contribute but, sadly, we cannot overload it )

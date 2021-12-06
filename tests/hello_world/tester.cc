@@ -28,7 +28,7 @@ struct hello_com : public hypercomm::component<std::string, std::tuple<>> {
     auto val = std::move(std::get<0>(in_set));
     std::string& msg = val->value();
 
-    CkPrintf("com%lu> got message: %s\n", this->id, msg.c_str());
+    CkPrintf("com%llu> got message: %s\n", this->id, msg.c_str());
 
     return {};
   };
