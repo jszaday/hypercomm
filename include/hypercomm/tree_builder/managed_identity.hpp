@@ -29,17 +29,18 @@ class managed_identity : public identity<Index> {
   }
 
   // TODO make the naming here more consistent!
-  virtual std::vector<Index> downstream(void) const {
+  virtual std::vector<Index> downstream(void) const override {
     CkAssert(inst_->association_ && inst_->association_->valid_upstream_);
     return reinterpret_vector(inst_->association_->upstream_);
   }
 
-  virtual std::vector<Index> upstream(void) const {
+  virtual std::vector<Index> upstream(void) const override {
     CkAssert(inst_->association_);
     return reinterpret_vector(inst_->association_->downstream_);
   }
 
-  virtual std::shared_ptr<imprintable_base_> get_imprintable(void) const;
+  virtual std::shared_ptr<imprintable_base_> get_imprintable(
+      void) const override;
 };
 }  // namespace hypercomm
 
