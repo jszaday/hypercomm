@@ -59,6 +59,7 @@ struct ptr_record {
 
 struct deferred_base_ {
   std::size_t size;
+  virtual ~deferred_base_() = default;
   virtual std::shared_ptr<void> get(void) = 0;
   virtual void reset(std::shared_ptr<void>&&) = 0;
 };

@@ -24,7 +24,15 @@ struct microstack {
   std::size_t start_, size_, end_;
   void** storage_;
 
-  microstack(void** storage, std::size_t size);
+  microstack(void** storage, std::size_t size)
+      : microstack(nullptr, storage, size) {}
+
+  microstack(std::nullptr_t&&, void** storage, std::size_t size)
+      : depth(1),
+        storage_(storage),
+        start_(0),
+        size_(size),
+        end_(start_ + size) {}
 
   template <typename T>
   microstack(T&& prev, void** storage, std::size_t size)
@@ -60,18 +68,6 @@ struct microstack {
   virtual microstack* clone(void) const = 0;
 };
 
-template <>
-inline microstack::microstack<std::nullptr_t>(std::nullptr_t&&, void** storage,
-                                              std::size_t size)
-    : depth(1),
-      storage_(storage),
-      start_(0),
-      size_(size),
-      end_(start_ + size) {}
-
-inline microstack::microstack(void** storage, std::size_t size)
-    : microstack(nullptr, storage, size) {}
-
 template <typename... Ts>
 struct typed_microstack : public microstack {
  private:
@@ -82,7 +78,7 @@ struct typed_microstack : public microstack {
   using storage_type = tuple_storage<Ts...>;
 
   storage_type storage_;
-  std::array<void*, n_items_> items_;
+  void* items_[n_items_];
 
  public:
   friend puper<typed_microstack<Ts...>>;
@@ -91,14 +87,14 @@ struct typed_microstack : public microstack {
 
   template <typename... Args>
   typed_microstack(const std::shared_ptr<microstack>& prev, Args&&... args)
-      : microstack(prev, items_.data(), n_items_),
+      : microstack(prev, items_, n_items_),
         storage_(std::forward<Args>(args)...) {
     this->template initialize_address_<(n_items_ - 1)>();
   }
 
   template <typename T, typename... Args>
   typed_microstack(T* prev, Args&&... args)
-      : microstack(prev, items_.data(), n_items_),
+      : microstack(prev, items_, n_items_),
         storage_(std::forward<Args>(args)...) {
     this->template initialize_address_<(n_items_ - 1)>();
   }

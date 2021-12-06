@@ -19,7 +19,7 @@ struct test_component : public component<std::tuple<Ts...>, std::tuple<>> {
 
   virtual std::tuple<> action(in_set& set) override {
 #if CMK_VERBOSE
-    CkPrintf("com%lu> i was invoked\n", this->id);
+    CkPrintf("com%llu> i was invoked\n", this->id);
 #endif
     return {};
   }

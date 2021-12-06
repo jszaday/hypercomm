@@ -163,7 +163,9 @@ class tree_builder : public CBase_tree_builder, public array_listener {
    * arrays assume their listeners are conventionally pup'able, which a
    * node/group chare is not
    */
-  virtual const PUP::able::PUP_ID &get_PUP_ID(void) const { NOT_IMPLEMENTED; }
+  virtual const PUP::able::PUP_ID &get_PUP_ID(void) const override {
+    NOT_IMPLEMENTED;
+  }
 
   // this is not implemented because arrays do not permit removing listeners
   void unreg_array(const CkArrayID &, const CkCallback &) { NOT_IMPLEMENTED; }

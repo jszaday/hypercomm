@@ -129,7 +129,8 @@ class manageable : public T {
         auto port =
             std::make_shared<reduction_port<index_type_>>(rdcr->stamp(), down);
         // open another input port in the reducer (via increment)
-        access_context_()->connect(port, rdcr->id, rdcr->n_ustream++);
+        rdcr->n_ustream++;
+        access_context_()->connect(port, rdcr->id, 0);
       }
     }
   }

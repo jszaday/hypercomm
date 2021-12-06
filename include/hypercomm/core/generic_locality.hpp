@@ -57,9 +57,10 @@ class generic_locality_ : public manageable_base_ {
   bool has_value(const entry_port_ptr& port) const;
 
   void open(const entry_port_ptr& ours, destination&& theirs);
+
   template <typename... Args>
   void open(const entry_port_ptr& ours, Args... args) {
-    this->open(ours, std::move(destination(std::forward<Args>(args)...)));
+    this->open(ours, destination(std::forward<Args>(args)...));
   }
 
   void resync_port_queue(entry_port_iterator& it);

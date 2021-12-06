@@ -77,6 +77,13 @@ struct CProxyElement_locality_base_ : public CProxyElement_ArrayElement {
 
   inline operator bool(void) const { return !(this->ckGetArrayID().isZero()); }
 
+  // even though this is redundant with the definition in
+  // CProxyElement_ArrayElement -- it proved to be necessary for M1 Macs!
+  inline bool operator==(const CProxyElement_locality_base_& other) const {
+    return (this->ckGetArrayID() == other.ckGetArrayID()) &&
+           (this->ckGetIndex() == other.ckGetIndex());
+  }
+
   inline operator std::string(void) const {
     std::stringstream ss;
     ss << "vil(";

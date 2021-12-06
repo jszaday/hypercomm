@@ -105,7 +105,7 @@ struct locality : public vil<CBase_locality, int> {
       auto f = self->make_future();
       // get the handle to its remote counterpart (at our right neighbor)
       // NOTE in the future, we can do something fancier here (i.e., iteration-based offset)
-      auto g = future{.source = right, .id = f.id};
+      future g{.source = right, .id = f.id};
       // prepare and send a message
       f.set(message::make_message(0, {}));
       // request the remote value -> our callback

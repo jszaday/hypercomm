@@ -367,7 +367,7 @@ void generic_locality_::activate_component(const component_id_t& id) {
 #endif
     }
   } else {
-    CkAbort("fatal> unable to find com%lu.\n", id);
+    CkAbort("fatal> unable to find com%llu.\n", id);
   }
 }
 
@@ -448,26 +448,25 @@ reducer::out_set reducer::action(reducer::in_set& set) {
 
 void generic_locality_::open(const entry_port_ptr& ours, destination&& theirs) {
   ours->alive = true;
-  auto pair = this->entry_ports.emplace(ours, std::move(theirs));
+  auto ins = this->entry_ports.emplace(ours, std::move(theirs));
 #if CMK_ERROR_CHECKING
-  if (!pair.second) {
+  if (!ins.second) {
     std::stringstream ss;
-    ss << "[";
-    for (const auto& epp : this->entry_ports) {
-      const auto& other_port = epp.first;
-      if (comparable_comparator<entry_port_ptr>()(ours, other_port)) {
-        ss << "{" << other_port->to_string() << "}, ";
+    ss << "vil" << utilities::idx2str(this->thisIndexMax) << "> ";
+    ss << "port " << ours->to_string() << " already exists among:\n\t[ ";
+    for (const auto& pair : this->entry_ports) {
+      const auto& port = pair.first;
+      if (comparable_comparator<entry_port_ptr>()(ours, port)) {
+        ss << "{" << port->to_string() << "}, ";
       } else {
-        ss << other_port->to_string() << ", ";
+        ss << port->to_string() << ", ";
       }
     }
     ss << "]";
-
-    CkAbort("fatal> adding non-unique port %s to:\n\t%s\n",
-            ours->to_string().c_str(), ss.str().c_str());
+    CkAbort("%s", ss.str().c_str());
   }
 #endif
-  this->resync_port_queue(pair.first);
+  this->resync_port_queue(ins.first);
 }
 
 }  // namespace hypercomm
