@@ -110,7 +110,7 @@ using is_valid_endpoint_t =
     typename std::enable_if<endpoint::constructible_from<T>()>::type;
 
 template <typename T>
-using endpoint_map = std::unordered_map<endpoint, T, endpoint_hasher>;
+using endpoint_map = hash_map<endpoint, T, endpoint_hasher>;
 }  // namespace hypercomm
 
 #endif
