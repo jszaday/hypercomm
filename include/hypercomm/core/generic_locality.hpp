@@ -39,6 +39,7 @@ class generic_locality_ : public manageable_base_ {
   component_id_t component_authority = 0;
 
   using component_type = typename decltype(components)::mapped_type;
+  using component_iterator = typename decltype(components)::iterator;
   using entry_port_iterator = typename decltype(entry_ports)::iterator;
   using outstanding_iterator = typename decltype(outstanding)::iterator;
 
@@ -89,12 +90,16 @@ class generic_locality_ : public manageable_base_ {
                    const std::size_t& size, const CkNcpyBufferPost& mode);
 
   inline void try_collect(const component_id_t& which) {
-    this->try_collect(this->components[which]);
+    auto search = this->components.find(which);
+    if (search != std::end(this->components)) {
+      this->try_collect(search);
+    }
   }
 
-  inline void try_collect(const component_type& com) {
+  inline void try_collect(const component_iterator& it) {
+    auto& com = it->second;
     if (com && com->collectible()) {
-      this->components.erase(com->id);
+      this->components.erase(it);
     }
   }
 

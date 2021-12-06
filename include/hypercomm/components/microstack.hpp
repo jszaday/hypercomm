@@ -24,8 +24,7 @@ struct microstack {
   std::size_t start_, size_, end_;
   void** storage_;
 
-  microstack(void** storage, std::size_t size)
-      : microstack(nullptr, storage, size) {}
+  microstack(void** storage, std::size_t size);
 
   template <typename T>
   microstack(T&& prev, void** storage, std::size_t size)
@@ -61,6 +60,18 @@ struct microstack {
   virtual microstack* clone(void) const = 0;
 };
 
+template <>
+inline microstack::microstack<std::nullptr_t>(std::nullptr_t&&, void** storage,
+                                              std::size_t size)
+    : depth(1),
+      storage_(storage),
+      start_(0),
+      size_(size),
+      end_(start_ + size) {}
+
+inline microstack::microstack(void** storage, std::size_t size)
+    : microstack(nullptr, storage, size) {}
+
 template <typename... Ts>
 struct typed_microstack : public microstack {
  private:
@@ -85,8 +96,8 @@ struct typed_microstack : public microstack {
     this->template initialize_address_<(n_items_ - 1)>();
   }
 
-  template <typename... Args>
-  typed_microstack(microstack* prev, Args&&... args)
+  template <typename T, typename... Args>
+  typed_microstack(T* prev, Args&&... args)
       : microstack(prev, items_.data(), n_items_),
         storage_(std::forward<Args>(args)...) {
     this->template initialize_address_<(n_items_ - 1)>();

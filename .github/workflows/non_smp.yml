@@ -22,10 +22,14 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
 
+    - name: prepare-deps
+      run: |
+        git clone https://github.com/greg7mdp/parallel-hashmap.git
+        git clone https://github.com/UIUC-PPL/charm.git
+
     # Build Charm++
     - name: build-charm++
       run: |
-        git clone https://github.com/UIUC-PPL/charm.git
         cd charm
         ./build charm++ netlrts-linux-x86_64 -g3 -j2 --with-production --enable-error-checking
 
@@ -78,6 +82,9 @@ jobs:
         TESTOPTS="++local" make test
         echo "<!-- cps_demo --!>"
         cd ../cps_demo
+        TESTOPTS="++local" make test
+        echo "<!-- forall_demo --!>"
+        cd ../forall_demo
         TESTOPTS="++local" make test
         echo "<!-- tree_demo --!>"
         cd ../tree_demo

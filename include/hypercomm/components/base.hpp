@@ -1,9 +1,6 @@
 #ifndef __HYPERCOMM_COMPONENTS_BASE_HPP__
 #define __HYPERCOMM_COMPONENTS_BASE_HPP__
 
-#define HYPERCOMM_STRICT_MODE 0
-#define HYPERCOMM_ERROR_CHECKING 1
-
 #include <typeindex>
 
 #include "identifiers.hpp"

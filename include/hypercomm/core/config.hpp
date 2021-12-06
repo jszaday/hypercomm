@@ -9,6 +9,13 @@
 #define HYPERCOMM_STACK_SIZE 2
 #endif
 
+#ifndef HYPERCOMM_USE_PHMAP
+#define HYPERCOMM_USE_PHMAP 0
+#endif
+
+#define HYPERCOMM_STRICT_MODE 0
+#define HYPERCOMM_ERROR_CHECKING 1
+
 #include <cstdint>
 
 namespace hypercomm {

@@ -23,6 +23,15 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/hypercomm/core)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/hypercomm/messaging)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/hypercomm/tree_builder)
 
+if(EXISTS ${CMAKE_SOURCE_DIR}/parallel-hashmap)
+    set(HYPERCOMM_USE_PHMAP yes)
+    add_compile_definitions(HYPERCOMM_USE_PHMAP=1)
+    include_directories(${CMAKE_SOURCE_DIR}/parallel-hashmap)
+    message(STATUS "Hypercomm detected parallel-hashmap")
+else()
+    set(HYPERCOMM_USE_PHMAP no)
+endif()
+
 add_subdirectory(src)
 
 # Generate template for tests

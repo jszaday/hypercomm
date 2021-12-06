@@ -1,0 +1,64 @@
+mainmodule tester {
+  initproc void enroll_polymorphs(void);
+
+  mainchare test_main {
+    entry [nokeep] test_main(CkArgMsg*);
+    entry void on_completion(CkMessage*);
+
+    entry void run(void) {
+      serial {
+        totalTime = 0;
+      }
+      for (rep = 0; rep < (nReps + nSkip); rep++) {
+        serial {
+          startTime = CkWallTimer(); 
+          this->action();
+        }
+        when on_completion(CkMessage* msg) serial {
+          if (rep >= nSkip) {
+            auto time = CkWallTimer() - startTime;
+            totalTime += time;
+          }
+
+          CkFreeMsg(msg);
+        }
+      }
+      serial {
+        CkPrintf(
+          "main> average time for %s: %g ms\n",
+          this->current_phase(),
+          (1e3 * totalTime) / nReps
+        );
+        this->next_phase();
+      }
+    }
+  };
+
+  readonly CProxy_test_main mainProxy;
+
+  array [Max] test_chare : hypercomm::locality_base_ {
+    entry test_chare(int);
+
+    entry void recv_sdag(CkMessage*);
+    entry void recv_value(CkMessage*);
+
+    entry void run_multistate(void);
+    entry void run_conventional(void);
+
+    entry void run_sdag(void) {
+      forall [i] (0:(n - 1),1) {
+        serial {
+          thisProxy.recv_sdag(this->pack_value(i));
+        }
+        forall [j] (0:(n - 1),1) {
+          when recv_sdag(CkMessage* msg) serial {
+            CkFreeMsg(msg);
+          }
+        }
+      }
+      serial {
+        this->contribute(cb);
+      }
+    }
+  };
+}

@@ -1,9 +1,9 @@
 #ifndef __HYPERCOMM_COMPARABLE_HPP__
 #define __HYPERCOMM_COMPARABLE_HPP__
 
-#include <unordered_map>
-
 #include "math.hpp"
+#include "../components/identifiers.hpp"
+
 #include "../serialization/polymorph.hpp"
 
 namespace hypercomm {
@@ -29,8 +29,8 @@ struct comparable_comparator {
 };
 
 template <typename Key, typename Value>
-using comparable_map = std::unordered_map<Key, Value, utilities::hash<Key>,
-                                          comparable_comparator<Key>>;
+using comparable_map =
+    hash_map<Key, Value, utilities::hash<Key>, comparable_comparator<Key>>;
 }  // namespace hypercomm
 
 #endif

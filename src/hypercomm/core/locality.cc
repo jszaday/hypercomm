@@ -359,9 +359,12 @@ void generic_locality_::activate_component(const component_id_t& id) {
     if (this->invalidated(id)) {
       this->components.erase(search);
     } else {
-      auto& com = search->second;
-      com->activate();
-      this->try_collect(com);
+      search->second->activate();
+#if HYPERCOMM_USE_PHMAP
+      this->try_collect(id);
+#else
+      this->try_collect(search);
+#endif
     }
   } else {
     CkAbort("fatal> unable to find com%lu.\n", id);
@@ -370,16 +373,21 @@ void generic_locality_::activate_component(const component_id_t& id) {
 
 bool generic_locality_::passthru(const com_port_pair_t& port,
                                  deliverable& dev) {
-  auto& com = port.first;
-  auto search = this->components.find(com);
+  auto& id = port.first;
+  auto search = this->components.find(id);
   if (search == std::end(this->components)) {
     return false;
   } else {
-    this->callstack.push_back(com);
+    this->callstack.push_back(id);
     auto status = search->second->accept(port.second, dev);
     this->callstack.pop_back();
     if (status) {
-      this->try_collect(search->second);
+#if HYPERCOMM_USE_PHMAP
+      // phmap may invalidate the iterator (on rehash)
+      this->try_collect(id);
+#else
+      this->try_collect(search);
+#endif
     }
     return status;
   }
