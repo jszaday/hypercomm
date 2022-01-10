@@ -12,6 +12,11 @@ struct is_bytes {
   enum { value = (std::is_trivial<T>::value && !std::is_pointer<T>::value) };
 };
 
+template <typename... Ts>
+struct is_bytes<std::tuple<Ts...>> {
+  enum { value = false };
+};
+
 template <typename T, typename Enable = void>
 struct is_zero_copyable : public is_bytes<T> {};
 
