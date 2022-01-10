@@ -14,7 +14,7 @@ class endpoint {
   entry_port_ptr port_;
   int idx_;
 
-  endpoint(PUP::reconstruct) : endpoint(0x0) {}
+  endpoint(tags::reconstruct) : endpoint(0x0) {}
   endpoint(const int& _) : idx_(_), port_(nullptr) {}
   endpoint(entry_port_ptr&& _) : idx_(demux()), port_(_) {}
   endpoint(const entry_port_ptr& _) : idx_(demux()), port_(_) {}

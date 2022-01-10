@@ -14,7 +14,7 @@ class reduction_port : public entry_port {
   reduction_id_t count;
   Index index;
 
-  reduction_port(PUP::reconstruct) {}
+  reduction_port(tags::reconstruct) {}
 
   reduction_port(const reducer::pair_type& _1, const Index& _2)
       : identity(utilities::hash<imprintable_ptr>()(_1.first)),

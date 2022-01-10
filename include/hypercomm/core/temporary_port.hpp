@@ -11,7 +11,7 @@ struct temporary_port : public entry_port {
 
   tuple_type tag;
 
-  temporary_port(PUP::reconstruct) {}
+  temporary_port(tags::reconstruct) {}
   temporary_port(const std::tuple<Ts...>& ts) : tag(ts) {}
   temporary_port(Ts... ts) : tag(std::forward<Ts>(ts)...) {}
 

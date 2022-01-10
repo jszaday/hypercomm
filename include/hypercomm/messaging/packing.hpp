@@ -3,7 +3,7 @@
 
 #include "messaging.hpp"
 #include "../utilities.hpp"
-#include "../serialization/pup.hpp"
+#include "../serialization/special.hpp"
 
 namespace hypercomm {
 template <typename... Args>

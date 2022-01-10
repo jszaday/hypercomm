@@ -10,7 +10,7 @@ const auto setup_environment = core::initialize;
 
 struct plus: public immediate_action<void(int, int)> {
   plus(void) {}
-  plus(PUP::reconstruct) {}
+  plus(tags::reconstruct) {}
 
   virtual void action(int i, int j) override {
     CkPrintf("%d + %d = %d\n", i, j, i + j);

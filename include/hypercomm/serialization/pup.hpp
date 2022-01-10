@@ -44,7 +44,7 @@ template <typename T, typename Enable = void>
 struct quick_sizer;
 
 template <typename T>
-struct quick_sizer<T, typename std::enable_if<is_bytes<T>()>::type> {
+struct quick_sizer<T, typename std::enable_if<is_bytes<T>::value>::type> {
   inline static std::size_t impl(const T& t) { return sizeof(T); }
 };
 
@@ -53,43 +53,8 @@ inline std::size_t quick_size(const T& t) {
   return quick_sizer<T>::impl(t);
 }
 
-template <typename T>
-void interpup(PUP::er& p, T& t) {
-  if (typeid(p) == typeid(PUP::fromMem)) {
-    auto& mem = *static_cast<PUP::fromMem*>(&p);
-    unpacker s(nullptr, mem.get_current_pointer());
-    pup(s, t);
-    mem.advance(s.size());
-  } else if (typeid(p) == typeid(PUP::toMem)) {
-    auto& mem = *static_cast<PUP::toMem*>(&p);
-    packer s(mem.get_current_pointer());
-    pup(s, t);
-    mem.advance(s.size());
-  } else if (typeid(p) == typeid(PUP::sizer)) {
-    p(static_cast<char*>(nullptr), size(t));
-  } else {
-    CkAbort("unsure how to convert an %s into a serdes", typeid(p).name());
-  }
-}
-
 template <typename T, typename Enable = void>
 struct puper;
-
-template <>
-struct puper<chare_t> {
-  using impl_type = std::underlying_type<chare_t>::type;
-
-  inline static void impl(serdes& s, chare_t& t) {
-    auto& impl = reinterpret_cast<impl_type&>(t);
-    auto smol = (std::uint8_t)impl;  // shrink the enum
-
-    s | smol;
-
-    if (s.unpacking()) {
-      impl = (impl_type)smol;
-    }
-  }
-};
 
 template <typename T>
 struct puper<T, typename std::enable_if<is_list_or_deque<T>::value>::type> {
@@ -116,7 +81,7 @@ struct puper<T, typename std::enable_if<is_list_or_deque<T>::value>::type> {
 };
 
 template <typename T>
-struct puper<T, typename std::enable_if<PUP::as_bytes<T>::value>::type> {
+struct puper<T, typename std::enable_if<is_bytes<T>::value>::type> {
   inline static void impl(serdes& s, T& t) { s.copy(&t); }
 };
 
@@ -134,104 +99,9 @@ struct puper<temporary<T, kInline>> {
 
 template <typename T, std::size_t N>
 struct puper<std::array<T, N>,
-             typename std::enable_if<PUP::as_bytes<T>::value>::type> {
+             typename std::enable_if<is_bytes<T>::value>::type> {
   inline static void impl(serdes& s, std::array<T, N>& t) {
     s.copy(t.data(), N);
-  }
-};
-
-using pup_ptr = std::unique_ptr<PUP::er>;
-inline std::unique_ptr<PUP::er> make_puper(const serdes& s) {
-  switch (s.state) {
-    case serdes_state::UNPACKING: {
-      using pup_type = typename puper_for<serdes_state::UNPACKING>::type;
-      return pup_ptr(new pup_type(s.current));
-    }
-    case serdes_state::PACKING: {
-      using pup_type = typename puper_for<serdes_state::PACKING>::type;
-      return pup_ptr(new pup_type(s.current));
-    }
-    case serdes_state::SIZING: {
-      using pup_type = typename puper_for<serdes_state::SIZING>::type;
-      return pup_ptr(new pup_type);
-    }
-    default: {
-      return pup_ptr();
-    }
-  }
-}
-
-template <typename T>
-struct puper<T, typename std::enable_if<hypercomm::built_in<T>::value>::type> {
-  static constexpr auto is_proxy = std::is_base_of<CProxy, T>::value;
-
-  inline static void undelegate(serdes& s, T& t, std::true_type) {
-    if (!s.unpacking()) {
-      t.ckUndelegate();
-    }
-  }
-
-  inline static void undelegate(serdes& s, T& t, std::false_type) {}
-
-  inline static void impl(serdes& s, T& t) {
-    undelegate(s, t, typename std::integral_constant<bool, is_proxy>::type());
-    auto p = make_puper(s);
-    if (s.unpacking()) {
-      reconstruct(&t);
-    }
-    (*p) | t;
-    s.advanceBytes(p->size());
-  }
-};
-
-template <typename T>
-struct puper<
-    std::shared_ptr<T>,
-    typename std::enable_if<std::is_base_of<PUP::able, T>::value>::type> {
-  inline static void impl(serdes& s, std::shared_ptr<T>& t) {
-    if (s.unpacking()) {
-      PUP::able* p = nullptr;
-      pup<PUP::able*>(s, p);
-      ::new (&t) std::shared_ptr<T>(
-          std::dynamic_pointer_cast<T>(std::shared_ptr<PUP::able>(p)));
-    } else {
-      auto p = dynamic_cast<PUP::able*>(t.get());
-      pup<PUP::able*>(s, p);
-    }
-  }
-};
-
-template <>
-struct puper<CkCallback> {
-  inline static void impl(serdes& s, CkCallback& t) {
-    auto p = make_puper(s);
-    *p | t;
-    s.advanceBytes(p->size());
-  }
-};
-
-template <typename T>
-struct puper<T*, typename std::enable_if<is_message<T>::value>::type> {
-  inline static void impl(serdes& s, T*& t) {
-    auto p = make_puper(s);
-    CkPupMessage(*p, reinterpret_cast<void**>(&t), 1);
-    s.advanceBytes(p->size());
-  }
-};
-
-template <typename T>
-struct puper<std::shared_ptr<T>,
-             typename std::enable_if<is_message<T>::value>::type> {
-  inline static void impl(serdes& s, std::shared_ptr<T>& t) {
-    if (s.unpacking()) {
-      T* msg = nullptr;
-      pup(s, msg);
-      ::new (&t) std::shared_ptr<T>(static_cast<T*>(msg),
-                                    [](T* msg) { CkFreeMsg(msg); });
-    } else {
-      T* msg = t.get();
-      pup(s, msg);
-    }
   }
 };
 
@@ -281,7 +151,7 @@ inline static void pack_ptr(serdes& s, std::shared_ptr<T>& t,
 
 template <typename T>
 inline static void instance_unpack(serdes& s, std::shared_ptr<T>& t) {
-  if (is_bytes<T>()) {
+  if (is_bytes<T>::value) {
     ::new (&t) std::shared_ptr<T>(std::move(s.observe_source()),
                                   reinterpret_cast<T*>(s.current));
 
@@ -462,55 +332,6 @@ class puper<std::unique_ptr<T>,
       }
 
       s | *t;
-    }
-  }
-};
-
-template <typename T>
-class puper<std::shared_ptr<T>, typename std::enable_if<std::is_base_of<
-                                    hypercomm::proxy, T>::value>::type> {
-  template <typename A>
-  inline static void helper(serdes& s, std::shared_ptr<T>& t) {
-    if (s.unpacking()) {
-      ::new (&t) std::shared_ptr<proxy>(new A());
-    }
-
-    auto& proxy = dynamic_cast<A*>(t.get())->proxy_;
-    s | proxy;
-  }
-
- public:
-  static void impl(serdes& s, std::shared_ptr<T>& t) {
-    chare_t ty = s.unpacking() ? (chare_t::TypeInvalid) : t->type();
-    s | ty;
-    if (ty == chare_t::TypeChare || ty == chare_t::TypeMainChare) {
-      helper<chare_proxy>(s, t);
-    } else if (ty == chare_t::TypeArray || ty == chare_t::TypeGroup ||
-               ty == chare_t::TypeNodeGroup) {
-      uint8_t collective = s.unpacking() ? false : t->collective();
-      s | collective;
-      if (collective) {
-        CkAbort("collectives currently unsupported");
-      }
-      switch (ty) {
-        case chare_t::TypeArray: {
-          helper<array_element_proxy>(s, t);
-          break;
-        }
-        case chare_t::TypeGroup: {
-          helper<group_element_proxy>(s, t);
-          break;
-        }
-        case chare_t::TypeNodeGroup: {
-          helper<nodegroup_element_proxy>(s, t);
-          break;
-        }
-        default: {
-          CkAbort("unreachable");
-        }
-      }
-    } else {
-      CkAbort("invalid chare type %d", static_cast<int>(ty));
     }
   }
 };

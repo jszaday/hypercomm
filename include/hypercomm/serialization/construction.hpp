@@ -6,21 +6,25 @@
 
 namespace hypercomm {
 
+namespace tags {
+using reconstruct = PUP::reconstruct;
+}
+
 // reconstruct(ers) call placement new on a deserialized obj
 
-// reconstructer for types that use PUP::reconstruct
+// reconstructer for types that use tags::reconstruct
 template <typename T>
 inline typename std::enable_if<
-    std::is_constructible<T, PUP::reconstruct>::value>::type
+    std::is_constructible<T, tags::reconstruct>::value>::type
 reconstruct(T* p) {
-  ::new (p) T(PUP::reconstruct());
+  ::new (p) T(tags::reconstruct());
 }
 
 // reconstructer for chare-types that use CkMigrateMessage*
 template <typename T>
 inline typename std::enable_if<
     std::is_constructible<T, CkMigrateMessage*>::value &&
-    !std::is_constructible<T, PUP::reconstruct>::value>::type
+    !std::is_constructible<T, tags::reconstruct>::value>::type
 reconstruct(T* p) {
   ::new (p) T(nullptr);
 }
@@ -28,7 +32,7 @@ reconstruct(T* p) {
 // reconstructor for default constructible types
 template <typename T>
 inline typename std::enable_if<
-    !std::is_constructible<T, PUP::reconstruct>::value &&
+    !std::is_constructible<T, tags::reconstruct>::value &&
     !std::is_constructible<T, CkMigrateMessage*>::value &&
     std::is_default_constructible<T>::value>::type
 reconstruct(T* p) {
@@ -47,8 +51,6 @@ struct use_buffer {
   template <typename... Args>
   use_buffer(Args&&... args) : buffer(std::forward<Args>(args)...) {}
 };
-
-using reconstruct = PUP::reconstruct;
 }  // namespace tags
 
 enum storage_scheme { kInline, kBuffer };

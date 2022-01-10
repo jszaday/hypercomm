@@ -20,10 +20,10 @@ polymorph_id_t enroll(const std::type_index& index, const allocator_fn& alloc);
 
 template <typename T>
 inline polymorph_id_t enroll(void) {
-  //  assumes the type is reconstructible using PUP::reconstruct
+  //  assumes the type is reconstructible using tags::reconstruct
   // (looking forward, this could be alloc -> hypercomm::reconstruct)
   return enroll(std::type_index(typeid(T)),
-                []() -> polymorph* { return new T(PUP::reconstruct{}); });
+                []() -> polymorph* { return new T(tags::reconstruct{}); });
 }
 
 // determine the id for various permutations of polymorph ids

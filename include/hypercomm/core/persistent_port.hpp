@@ -7,7 +7,7 @@ namespace hypercomm {
 struct persistent_port : public entry_port {
   component_port_t id = 0;
 
-  persistent_port(PUP::reconstruct) {}
+  persistent_port(tags::reconstruct) {}
   persistent_port(const decltype(id)& _1) : id(_1) {}
 
   virtual std::string to_string(void) const override {

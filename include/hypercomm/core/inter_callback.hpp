@@ -2,7 +2,7 @@
 #define __HYPERCOMM_CORE_INTERCB_HPP__
 
 #include "callback.hpp"
-#include "../serialization/pup.hpp"
+#include "../serialization/special.hpp"
 #include "../messaging/deliverable.hpp"
 
 namespace hypercomm {
@@ -10,7 +10,7 @@ namespace hypercomm {
 struct inter_callback : public core::callback {
   CkCallback cb;
 
-  inter_callback(PUP::reconstruct) {}
+  inter_callback(tags::reconstruct) {}
 
   inter_callback(const CkCallback& _1) : cb(_1) {}
 
