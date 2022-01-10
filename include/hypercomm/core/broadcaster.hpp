@@ -17,7 +17,7 @@ class broadcaster : public immediate_action<void(indexed_locality_<Index>*)> {
   std::shared_ptr<hypercomm::message> msg_;
 
  public:
-  broadcaster(PUP::reconstruct) {}
+  broadcaster(tags::reconstruct) {}
 
   broadcaster(const stamp_type& _1, const imprintable_ptr& _2,
               decltype(msg_)&& _3)

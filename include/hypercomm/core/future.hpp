@@ -3,7 +3,7 @@
 
 #include "../core/math.hpp"
 #include "../core/entry_port.hpp"
-#include "../serialization/pup.hpp"
+#include "../serialization/special.hpp"
 #include "module.hpp"
 
 namespace hypercomm {
@@ -47,7 +47,7 @@ struct puper<future> {
 struct future_port : public entry_port {
   future f;
 
-  future_port(PUP::reconstruct) {}
+  future_port(tags::reconstruct) {}
   future_port(const future& _) : f(std::forward<const future&>(_)) {}
 
   virtual bool keep_alive(void) const override { return false; }

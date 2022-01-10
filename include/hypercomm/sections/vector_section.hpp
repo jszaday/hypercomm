@@ -25,19 +25,19 @@ struct vector_section
 
   vector_section(const indices_type& _1) : index_vector_(_1) {}
 
-  vector_section(PUP::reconstruct)
+  vector_section(tags::reconstruct)
       : index_vector_(*reinterpret_cast<indices_type*>(&index_store_)) {
     // TODO evaluate whether this is necessary
     new (const_cast<indices_type*>(&index_vector_)) indices_type();
   }
 
   vector_section(indices_type&& _1)
-      : vector_section<Index>(PUP::reconstruct{}) {
+      : vector_section<Index>(tags::reconstruct{}) {
     new (const_cast<indices_type*>(&index_vector_)) indices_type(std::move(_1));
   }
 
   vector_section(const vector_section<Index>& _1)
-      : vector_section<Index>(PUP::reconstruct{}) {
+      : vector_section<Index>(tags::reconstruct{}) {
     new (const_cast<indices_type*>(&index_vector_)) indices_type(_1.members());
   }
 

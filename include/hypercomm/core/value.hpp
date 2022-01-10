@@ -13,7 +13,7 @@ class hyper_value {
   virtual ~hyper_value() = default;
 
   hyper_value(CMK_REFNUM_TYPE flags_)
-      : flags(flags_), source(PUP::reconstruct()) {}
+      : flags(flags_), source(tags::reconstruct()) {}
 
   // returns true if wrapping was performed
   virtual bool pup_buffer(serdes& s, bool encapsulate) = 0;

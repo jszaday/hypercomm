@@ -25,7 +25,7 @@ struct deliverable {
 
  public:
   deliverable(void)
-      : kind(kInvalid), storage_(nullptr), ep_(PUP::reconstruct()) {}
+      : kind(kInvalid), storage_(nullptr), ep_(tags::reconstruct()) {}
 
   deliverable(CkMessage* msg) : kind(kMessage), storage_(msg), ep_(msg) {}
 

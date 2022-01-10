@@ -13,7 +13,7 @@ struct forwarding_callback<CkArrayIndex> : public core::callback {
   element_ptr<CkArrayIndex> proxy;
   endpoint ep;
 
-  forwarding_callback(PUP::reconstruct tag) : ep(tag) {}
+  forwarding_callback(tags::reconstruct tag) : ep(tag) {}
 
   template <typename T>
   forwarding_callback(const element_ptr<CkArrayIndex>& _1, const T& _2)

@@ -9,7 +9,7 @@ struct port_opener : public immediate_action<void(generic_locality_*)> {
   entry_port_ptr port;
   callback_ptr cb;
 
-  port_opener(PUP::reconstruct) {}
+  port_opener(tags::reconstruct) {}
 
   port_opener(const entry_port_ptr& _1, const callback_ptr& _2)
       : port(_1), cb(_2) {}

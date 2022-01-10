@@ -10,7 +10,7 @@ class managed_imprintable : public imprintable<Index> {
  public:
   managed_imprintable(void) = default;
 
-  managed_imprintable(PUP::reconstruct) {}
+  managed_imprintable(tags::reconstruct) {}
 
   // TODO include proxy in this as well :)
   virtual bool is_member(const Index&) const { return true; }
