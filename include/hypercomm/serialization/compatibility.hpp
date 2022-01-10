@@ -41,9 +41,21 @@ struct built_in<
   enum { value = true };
 };
 
+template <typename T>
+struct is_bytes<
+    T, typename std::enable_if<PUP::as_bytes<T>::value>::type> {
+  enum { value = true };
+};
+
 template <class T>
 struct is_message<
     T, typename std::enable_if<std::is_base_of<CkMessage, T>::value>::type> {
+  enum { value = true };
+};
+
+template <class T>
+struct is_polymorphic<
+    T, typename std::enable_if<std::is_base_of<PUP::able, T>::value>::type> {
   enum { value = true };
 };
 
@@ -81,12 +93,6 @@ struct puper<chare_t> {
       impl = (impl_type)smol;
     }
   }
-};
-
-template <class T>
-struct is_polymorphic<
-    T, typename std::enable_if<std::is_base_of<PUP::able, T>::value>::type> {
-  enum { value = true };
 };
 
 template <typename T>
