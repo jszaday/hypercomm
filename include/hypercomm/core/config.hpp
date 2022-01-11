@@ -19,6 +19,12 @@
 #include <cstdint>
 #include <pup.h>
 
+#if HYPERCOMM_USE_PHMAP
+#include <parallel_hashmap/phmap.h>
+#else
+#include <unordered_map>
+#endif
+
 namespace hypercomm {
 constexpr std::size_t kStackSize = HYPERCOMM_STACK_SIZE;
 constexpr std::size_t kMinPortSize = HYPERCOMM_PORT_SIZE;
@@ -27,6 +33,16 @@ constexpr std::size_t kZeroCopySize = 256 * 1024;
 namespace tags {
 using reconstruct = PUP::reconstruct;
 }
+
+#if HYPERCOMM_USE_PHMAP
+template <typename K, typename V, typename Hash = phmap::Hash<K>,
+          typename KeyEqual = phmap::EqualTo<K>>
+using hash_map = phmap::flat_hash_map<K, V, Hash, KeyEqual>;
+#else
+template <typename K, typename V, typename Hash = std::hash<K>,
+          typename KeyEqual = std::equal_to<K>>
+using hash_map = std::unordered_map<K, V, Hash, KeyEqual>;
+#endif
 }  // namespace hypercomm
 
 #endif

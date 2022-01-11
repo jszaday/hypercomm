@@ -1,11 +1,14 @@
 #ifndef __HYPERCOMM_UTILS_OTP_HPP__
 #define __HYPERCOMM_UTILS_OTP_HPP__
 
+#include <map>
 #include <memory>
 #include <cassert>
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
+
+#include "../core/config.hpp"
 
 namespace hypercomm {
 namespace utilities {
@@ -71,6 +74,9 @@ class fwd_pool {
   }
 };
 }  // namespace utilities
+
+template <typename Key, typename T, typename Compare = std::less<Key>, std::size_t N = kStackSize>
+using small_map = std::map<Key, T, Compare, utilities::fwd_pool<std::pair<const Key, T>, N>>;
 }  // namespace hypercomm
 
 #endif
