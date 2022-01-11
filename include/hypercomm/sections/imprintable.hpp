@@ -5,12 +5,6 @@
 
 namespace hypercomm {
 
-class imprintable_base_ : public virtual comparable {
- public:
-  virtual bool is_member(const CkArrayIndex&) const = 0;
-  virtual const CkArrayIndex* pick_root(const CkArrayID&) const = 0;
-};
-
 /* imprintables define a list of members for collective
  * operations. they can be "imprinted" onto a chare to
  * generate an "identity", and can also select roots for

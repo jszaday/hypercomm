@@ -2,6 +2,7 @@
 #define __HYPERCOMM_MATH_HPP__
 
 #include <cstdint>
+#include <vector>
 
 namespace hypercomm {
 

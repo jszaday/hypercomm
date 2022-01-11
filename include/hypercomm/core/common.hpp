@@ -4,6 +4,7 @@
 #include "../messaging/common.hpp"
 #include "../components/identifiers.hpp"
 
+#include "comparable.hpp"
 #include "proxy.hpp"
 
 namespace hypercomm {
@@ -11,7 +12,11 @@ namespace hypercomm {
 template <typename T>
 using impl_index_t = typename index_for<T>::type;
 
-class imprintable_base_;
+class imprintable_base_ : public virtual comparable {
+ public:
+  virtual bool is_member(const CkArrayIndex&) const = 0;
+  virtual const CkArrayIndex* pick_root(const CkArrayID&) const = 0;
+};
 
 template <typename Index>
 class imprintable;
