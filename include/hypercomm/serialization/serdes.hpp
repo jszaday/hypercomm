@@ -6,7 +6,7 @@
 #include <algorithm>
 
 #include "../core/config.hpp"
-#include "../utilities/otp.hpp"
+#include "../utilities/small_map.hpp"
 
 namespace hypercomm {
 
@@ -86,18 +86,11 @@ struct deferred_ : public deferred_base_ {
 };
 
 class serdes {
-  template <typename T>
-  using allocator_type = utilities::fwd_pool<T, kStackSize>;
-
-  template <typename K, typename V, typename Compare = std::less<K>>
-  using stacked_map =
-      std::map<K, V, Compare, allocator_type<std::pair<const K, V>>>;
-
   template <typename K, typename V>
-  using owner_less_map = stacked_map<K, V, std::owner_less<K>>;
+  using owner_less_map = small_map<K, V, std::owner_less<K>>;
 
-  stacked_map<ptr_id_t, std::unique_ptr<deferred_base_>> deferred;
-  stacked_map<ptr_id_t, std::weak_ptr<void>> instances;
+  small_map<ptr_id_t, std::unique_ptr<deferred_base_>> deferred;
+  small_map<ptr_id_t, std::weak_ptr<void>> instances;
 
   std::weak_ptr<void> source;
 
