@@ -1,6 +1,5 @@
 #include <hypercomm/serialization/construction.hpp>
 #include <hypercomm/serialization/enrollment.hpp>
-#include <hypercomm/core/module.hpp>
 
 namespace hypercomm {
 using type_registry_t = std::map<std::type_index, polymorph_id_t>;
@@ -8,6 +7,10 @@ using alloc_registry_t = std::map<polymorph_id_t, allocator_fn>;
 
 CsvDeclare(type_registry_t, type_registry_);
 CsvDeclare(alloc_registry_t, alloc_registry_);
+
+namespace core {
+extern void initialize(void);
+}
 
 void init_polymorph_registry(void) {
   // TODO ( we should probably move this out of here )
