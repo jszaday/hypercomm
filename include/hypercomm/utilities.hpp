@@ -9,6 +9,8 @@
 
 #include "utilities/hash.hpp"
 #include "utilities/errors.hpp"
+#include "serialization/traits.hpp"
+#include "serialization/enrollment.hpp"
 
 #define NOT_IMPLEMENTED CkAbort("not yet implemented!")
 
@@ -59,18 +61,6 @@ inline char* get_message_buffer(const std::shared_ptr<CkMessage>& msg) {
   return get_message_buffer(msg.get());
 }
 
-// TODO ( unecessary with C++17 )
-template <class... Args>
-using void_t = void;
-
-template <typename T, typename U, typename = void>
-struct is_safely_castable : std::false_type {};
-
-template <typename T, typename U>
-struct is_safely_castable<T, U,
-                          void_t<decltype(static_cast<U*>(std::declval<T*>()))>>
-    : std::true_type {};
-
 template <typename U, typename T>
 inline typename std::enable_if<is_safely_castable<T, U>::value, U*>::type
 fast_cast(T* t) {
@@ -83,20 +73,6 @@ fast_cast(T* t) {
   return dynamic_cast<U*>(t);
 }
 }  // namespace utilities
-
-template <class T, std::size_t = sizeof(T)>
-std::true_type is_complete_impl(T*);
-
-std::false_type is_complete_impl(...);
-
-template <class T>
-using is_complete = decltype(is_complete_impl(std::declval<T*>()));
-
-template <template <typename...> class Template, typename T>
-struct is_specialization_of : std::false_type {};
-
-template <template <typename...> class Template, typename... Args>
-struct is_specialization_of<Template, Template<Args...>> : std::true_type {};
 
 using dimension_type = decltype(CkArrayIndexBase::dimension);
 
@@ -140,6 +116,14 @@ inline Index conv2idx(const T& ord) {
   idx.dimension = dimensionality_of<T>::value;
   reinterpret_index<T>(idx) = ord;
   return idx;
+}
+
+//  hash the polymorph's id to get a unique hash for the type
+// (that will be the consistent between nodes)
+template <typename T>
+inline std::size_t hash_type(void) {
+  auto id = identify(typeid(T));
+  return std::hash<polymorph_id_t>()(id);
 }
 }  // namespace hypercomm
 

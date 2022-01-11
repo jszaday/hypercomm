@@ -3,10 +3,15 @@
 
 #include <map>
 #include <memory>
+#include <vector>
 #include <algorithm>
 
+// For CkAbort, CkAssert, etc.
+// ( superficial dependency )
+#include <charm.h>
+
 #include "../core/config.hpp"
-#include "../utilities/otp.hpp"
+#include "../utilities/fwd_pool.hpp"
 
 namespace hypercomm {
 

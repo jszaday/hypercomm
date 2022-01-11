@@ -4,7 +4,6 @@
 #include <functional>
 #include <typeindex>
 
-#include "../utilities.hpp"
 #include "polymorph.hpp"
 
 namespace hypercomm {
@@ -33,14 +32,6 @@ polymorph_id_t identify(const polymorph_ptr&);
 
 // instantiate a polymorph of a given id
 polymorph* instantiate(const polymorph_id_t&);
-
-//  hash the polymorph's id to get a unique hash for the type
-// (that will be the consistent between nodes)
-template <typename T>
-hash_code hash_type(void) {
-  utilities::hash<polymorph_id_t> hasher;
-  return hasher(identify(typeid(T)));
-}
 
 }  // namespace hypercomm
 

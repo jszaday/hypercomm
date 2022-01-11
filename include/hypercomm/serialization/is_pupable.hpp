@@ -1,7 +1,6 @@
 #ifndef __HYPERCOMM_IS_PUPABLE_HPP__
 #define __HYPERCOMM_IS_PUPABLE_HPP__
 
-#include "../utilities.hpp"
 #include "pup.hpp"
 
 namespace hypercomm {

@@ -1,14 +1,10 @@
 #ifndef __HYPERCOMM_CONSTRUCTION_HPP__
 #define __HYPERCOMM_CONSTRUCTION_HPP__
 
-#include <pup.h>
+#include "../core/config.hpp"
 #include <memory>
 
 namespace hypercomm {
-
-namespace tags {
-using reconstruct = PUP::reconstruct;
-}
 
 // reconstruct(ers) call placement new on a deserialized obj
 

@@ -1,7 +1,6 @@
 #ifndef __HYPERCOMM_PUP_HPP__
 #define __HYPERCOMM_PUP_HPP__
 
-#include "../core/config.hpp"
 #include "construction.hpp"
 #include "enrollment.hpp"
 #include "serdes.hpp"
@@ -57,7 +56,7 @@ template <typename T, typename Enable = void>
 struct puper;
 
 template <typename T>
-struct puper<T, typename std::enable_if<is_list_or_deque<T>::value>::type> {
+struct puper<T, typename std::enable_if<is_list_like<T>::value>::type> {
   using value_type = typename T::value_type;
 
   inline static void impl(serdes& s, T& t) {
@@ -463,15 +462,17 @@ inline void pup(serdes& s, const std::tuple<Ts...>& t) {
   puper<std::tuple<Ts...>>::impl(s, const_cast<std::tuple<Ts...>&>(t));
 }
 
-template <typename K, typename V>
-struct puper<comparable_map<K, V>> {
-  inline static void impl(serdes& s, comparable_map<K, V>& t) {
+template <typename Key, typename T, typename Hash, typename KeyEqual>
+struct puper<hash_map<Key, T, Hash, KeyEqual>> {
+  using map_type = hash_map<Key, T, Hash, KeyEqual>;
+
+  inline static void impl(serdes& s, map_type& t) {
     if (s.unpacking()) {
       std::size_t size;
       s.copy(&size);
-      ::new (&t) comparable_map<K, V>(size);
+      ::new (&t) map_type(size);
       for (auto i = 0; i < size; i++) {
-        std::pair<K, V> pair;
+        std::pair<Key, T> pair;
         s | pair;
         auto ins = t.insert(std::move(pair));
         CkAssertMsg(ins.second, "insertion did not occur!");

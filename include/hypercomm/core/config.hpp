@@ -17,11 +17,16 @@
 #define HYPERCOMM_ERROR_CHECKING 1
 
 #include <cstdint>
+#include <pup.h>
 
 namespace hypercomm {
 constexpr std::size_t kStackSize = HYPERCOMM_STACK_SIZE;
 constexpr std::size_t kMinPortSize = HYPERCOMM_PORT_SIZE;
 constexpr std::size_t kZeroCopySize = 256 * 1024;
+
+namespace tags {
+using reconstruct = PUP::reconstruct;
+}
 }  // namespace hypercomm
 
 #endif
