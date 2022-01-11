@@ -13,7 +13,7 @@ inline hash_code hash_combine(const hash_code &lhs, const hash_code &rhs) {
 }
 
 namespace utilities {
-template <class, typename Enable = void>
+template <typename, typename Enable = void>
 struct hash;
 }
 

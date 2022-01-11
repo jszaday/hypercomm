@@ -1,34 +1,14 @@
 #ifndef __HYCOMM_UTILS_HASH_HPP__
 #define __HYCOMM_UTILS_HASH_HPP__
 
-#include "charm++.h"
-
-#include "../core/comparable.hpp"
+#include <charm++.h>
+#include "../core/math.hpp"
 
 namespace hypercomm {
 namespace utilities {
 
 template <bool B>
 using Requires = PUP::Requires<B>;
-
-template <class T>
-struct hash<
-    T, typename std::enable_if<std::is_base_of<hashable, T>::value>::type> {
-  std::size_t operator()(const T& t) const { return const_cast<T&>(t).hash(); }
-};
-
-template <class T>
-struct hash<
-    T*, typename std::enable_if<std::is_base_of<hashable, T>::value>::type> {
-  using type = T*;
-  std::size_t operator()(const type& t) const { return t ? t->hash() : 0; }
-};
-
-template <class T>
-struct hash<
-    T*, typename std::enable_if<!std::is_base_of<hashable, T>::value>::type> {
-  std::size_t operator()(const T* t) const { return t ? hash<T>()(*t) : 0; }
-};
 
 template <class T>
 struct hash<
