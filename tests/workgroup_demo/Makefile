@@ -8,10 +8,9 @@ CMK_NUM_PES?=2
 CATCHSEGV?=$(shell which catchsegv)
 
 OPTS:=$(OPTS) -I$(HYPERCOMM_BUILD)/include/hypercomm/tasking
-LIBS=-L$(HYPERCOMM_BUILD)/lib -lhypercomm-tasking
 
 CHARMCFLAGS = $(OPTS)
-CHARMCLINKFLAGS = -language charm++ $(OPTS) $(LIBS)
+CHARMCLINKFLAGS = -language charm++ $(OPTS)
 
 %.o: %.cc
 
