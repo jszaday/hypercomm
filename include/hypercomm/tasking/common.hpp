@@ -56,6 +56,8 @@ task_puper_t get_task_puper_(task_kind_t kind);
 using continuation_t = void (*)(task_base_ *, task_payload &&);
 continuation_t get_continuation_(continuation_id_t id);
 std::vector<continuation_t> &get_continuations_(void);
+
+std::vector<CkMigratable *> *get_local_elements_(CkArray *);
 }  // namespace tasking
 }  // namespace hypercomm
 

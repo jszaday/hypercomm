@@ -2,18 +2,9 @@
 #define HYPERCOMM_TASKING_WORKGROUP_HPP
 
 #include "flex_pup.hpp"
-#include "../utilities/backstage_pass.hpp"
 #include <hypercomm/tasking/tasking.decl.h>
 
 namespace hypercomm {
-namespace detail {
-std::vector<CkMigratable *> CkArray::*get(backstage_pass);
-
-// Explicitly instantiating the class generates the fn declared above.
-template class access_bypass<std::vector<CkMigratable *> CkArray::*,
-                             &CkArray::localElemVec, backstage_pass>;
-}  // namespace detail
-
 namespace tasking {
 using workgroup_proxy = CProxy_workgroup;
 
@@ -210,8 +201,7 @@ task_message *pack(Args &&...args) {
 template <typename T, typename... Args>
 task_id launch(const workgroup_proxy &group, Args &&...args) {
   auto *local = group.ckLocalBranch();
-  auto *elems =
-      local ? &(local->*detail::get(detail::backstage_pass())) : nullptr;
+  auto *elems = get_local_elements_(local);
   CkAssert(elems && !elems->empty());
 
   auto *msg = pack(std::forward<Args>(args)...);
