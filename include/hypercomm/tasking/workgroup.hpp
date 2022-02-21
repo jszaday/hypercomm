@@ -2,8 +2,8 @@
 #define HYPERCOMM_TASKING_WORKGROUP_HPP
 
 #include "flex_pup.hpp"
-#include "tasking.decl.h"
 #include "../utilities/backstage_pass.hpp"
+#include <hypercomm/tasking/tasking.decl.h>
 
 namespace hypercomm {
 namespace detail {

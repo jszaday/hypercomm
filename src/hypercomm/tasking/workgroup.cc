@@ -135,5 +135,5 @@ void workgroup::pup(PUP::er &p) {
   p | this->tasks_;
   p | this->buffers_;
 }
-}
-}
+}  // namespace tasking
+}  // namespace hypercomm
