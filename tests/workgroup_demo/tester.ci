@@ -1,0 +1,7 @@
+mainmodule pgm {
+  extern module tasking;
+
+  mainchare pgm {
+    entry pgm(CkArgMsg*);
+  };
+};

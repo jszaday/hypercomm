@@ -1,6 +1,7 @@
 add_subdirectory(core)
 add_subdirectory(messaging)
 add_subdirectory(components)
+add_subdirectory(tasking)
 add_subdirectory(tree_builder)
 add_subdirectory(serialization)
 
