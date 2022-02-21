@@ -1,0 +1,18 @@
+module tasking {
+  namespace hypercomm {
+    namespace tasking {
+      message task_message {
+        task_id tid;
+        task_kind_t kind;
+        char* data;
+      };
+
+      array [1D] workgroup {
+        entry workgroup(void);
+        entry void create(task_message*);
+        entry void resume(task_message*);
+        entry void resume(CkReductionMsg*);
+      };
+    }
+  }
+}
