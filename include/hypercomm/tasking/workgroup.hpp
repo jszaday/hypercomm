@@ -22,7 +22,7 @@ struct task_base_ {
 
   task_base_(task_kind_t kind) : kind_(kind), active_(true) {}
 
-  void pup_base_(flex::puper_t &p) {
+  void pup_base_(PUP::er &p) {
     CkAssert(active_);
 
     p | this->continuation_;
@@ -75,10 +75,10 @@ struct task_payload {
     return (continuation_id_t)CkGetRefNum(src.get());
   }
 
-  void pup(flex::puper_t &p) {
-    if (flex::pup_is_unpacking(p)) {
+  void pup(PUP::er &p) {
+    if (p.isUnpacking()) {
       void *msg;
-      flex::pup_message(p, msg);
+      CkPupMessage(p, &msg);
       this->src.reset((CkMessage *)msg);
       p | this->len;
       std::uintptr_t offset;
@@ -86,7 +86,7 @@ struct task_payload {
       this->data = (char *)msg + offset;
     } else {
       void *msg = this->src.get();
-      flex::pup_message(p, msg);
+      CkPupMessage(p, &msg);
       CkAssert(msg == this->src.get());
       p | this->len;
       auto offset = (std::uintptr_t)this->data - (std::uintptr_t)msg;
@@ -134,7 +134,7 @@ struct task : public task_base_ {
 };
 
 using task_creator_t = task_base_ *(*)(task_payload &&);
-using task_puper_t = void (*)(flex::puper_t &, task_base_ *&);
+using task_puper_t = void (*)(PUP::er &, task_base_ *&);
 using continuation_t = void (*)(task_base_ *, task_payload &&);
 
 struct task_record_ {
@@ -161,8 +161,8 @@ struct task_creation_helper_ {
 
 template <typename T>
 struct task_puping_helper_ {
-  static void pup(flex::puper_t &p, task_base_ *&task) {
-    if (flex::pup_is_unpacking(p)) {
+  static void pup(PUP::er &p, task_base_ *&task) {
+    if (p.isUnpacking()) {
       task = new T(PUP::reconstruct{});
     }
 
@@ -223,7 +223,7 @@ struct workgroup : public CBase_workgroup {
   void resume(task_message *);
   void resume(CkReductionMsg *);
   bool resume(task_id, task_payload &, bool *active = nullptr);
-  void pup(flex::puper_t &p);
+  void pup(PUP::er &p);
 
   task_id generate_id(void) {
     return task_id{.host_ = thisIndex, .task_ = this->last_task_++};
@@ -345,7 +345,7 @@ void workgroup::buffer_(task_id tid, task_payload &&payload) {
   this->buffers_[tid][payload.id()].emplace_back(std::move(payload));
 }
 
-void workgroup::pup(flex::puper_t &p) {
+void workgroup::pup(PUP::er &p) {
   p | this->last_task_;
   p | this->tasks_;
   p | this->buffers_;
@@ -465,7 +465,6 @@ constexpr continuation_id_t task<T>::id_for(void) {
 }  // namespace tasking
 }  // namespace hypercomm
 
-#ifdef HYPERCOMM_USE_PUP
 namespace PUP {
 template <>
 struct ptr_helper<hypercomm::tasking::task_base_, false> {
@@ -478,6 +477,5 @@ struct ptr_helper<hypercomm::tasking::task_base_, false> {
   }
 };
 };  // namespace PUP
-#endif
 
 #endif

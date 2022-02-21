@@ -1,6 +1,10 @@
+// toggle this flag to enable PUP'ing:
+// #define HYPERCOMM_USE_PUP
+
 #include <hypercomm/tasking/workgroup.hpp>
 #include "pgm.decl.h"
 
+using namespace hypercomm;
 using namespace hypercomm::tasking;
 
 class relaxation_task : public task<relaxation_task> {
@@ -19,8 +23,7 @@ public:
       : converged(false), nRecvd(0), tolerance(-1) {
     auto args =
         std::forward_as_tuple(this->nWorkers, this->maxIters, this->tolerance);
-    PUP::fromMem p(payload.data);
-    p | args;
+    flex::pup_unpack(args, payload.data, std::move(payload.src));
 
     auto idx = this->index();
     this->hasLeft = idx > 0;

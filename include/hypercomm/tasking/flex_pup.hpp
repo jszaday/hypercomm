@@ -5,17 +5,9 @@
 
 PUPbytes(hypercomm::tasking::task_id);
 
-#define HYPERCOMM_USE_PUP
-
 #ifdef HYPERCOMM_USE_PUP
 namespace hypercomm {
 namespace flex {
-using puper_t = PUP::er;
-
-inline void pup_message(puper_t& p, void*& msg) { CkPupMessage(p, &msg); }
-
-inline bool pup_is_unpacking(puper_t& p) { return p.isUnpacking(); }
-
 template <typename T>
 inline int pup_size(const T& t) {
   return (int)PUP::size(const_cast<T&>(t));
@@ -25,14 +17,45 @@ template <typename T>
 inline void pup_pack(const T& t, char* buf, int len) {
   PUP::toMemBuf(const_cast<T&>(t), buf, (std::size_t)len);
 }
+
+template <typename T>
+inline void pup_unpack(T& t, char* buf, std::unique_ptr<CkMessage>&& src) {
+  PUP::fromMem p(buf);
+  p | t;
+}
 }  // namespace flex
 }  // namespace hypercomm
+#else
+#include "../core/proxy.hpp"
+#include "../serialization/pup.hpp"
+#include "../serialization/special.hpp"
+
+namespace hypercomm {
+namespace flex {
+template <typename T>
+inline int pup_size(const T& t) {
+  return (int)hypercomm::size(t);
+}
+
+template <typename T>
+inline void pup_pack(const T& t, char* buf, int len) {
+  hypercomm::packer s(buf);
+  s | t;
+  CkAssert(len == s.size());
+}
+
+template <typename T>
+inline void pup_unpack(T& t, char* buf, std::unique_ptr<CkMessage>&& src) {
+  hypercomm::unpacker s(std::move(src), buf);
+  s | t;
+}
+}  // namespace flex
+}  // namespace hypercomm
+#endif
 
 namespace PUP {
 template <>
 struct ptr_helper<hypercomm::tasking::task_base_, false>;
 }
-#else
-#endif
 
 #endif
