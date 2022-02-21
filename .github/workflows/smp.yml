@@ -57,6 +57,9 @@ jobs:
         cd ../tree_demo
         TESTOPTS="++local" make test
         TESTOPTS="++local --initialize" make test
+        echo "<!-- workgroup_demo --!>"
+        cd ../workgroup_demo
+        TESTOPTS="++local" make test
         echo "<!-- future_demo --!>"
         cd ../future_demo
         TESTOPTS="++local ++ppn 2 65" make test
