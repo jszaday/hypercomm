@@ -1,6 +1,8 @@
 path_classifiers:
   generated:
-    exclude: "include/hypercomm/**/*.de*.h"
+    exclude:
+    - "include/hypercomm/**/*.de*.h"
+    - "include/hypercomm/tasking/tasking.decl.h"
 extraction:
   cpp:
     configure:
