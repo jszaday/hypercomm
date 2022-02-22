@@ -19,8 +19,6 @@ struct inter_callback : public core::callback {
     // reset the queuing strategy of the message
     // in case it's incompatible with the callback
     UsrToEnv(msg)->setQueueing(_defaultQueueing);
-    // ensure the callback propagates the message's refnum
-    cb.setRefNum(CkGetRefNum(msg));
     // then fire n' forget!
     cb.send(msg);
   }
