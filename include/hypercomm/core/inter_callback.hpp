@@ -15,7 +15,12 @@ struct inter_callback : public core::callback {
   inter_callback(const CkCallback& _1) : cb(_1) {}
 
   virtual void send(core::callback::value_type&& value) override {
-    cb.send(deliverable::to_message(std::move(value)));
+    auto* msg = deliverable::to_message(std::move(value));
+    // reset the queuing strategy of the message
+    // in case it's incompatible with the callback
+    UsrToEnv(msg)->setQueueing(_defaultQueueing);
+    // then fire n' forget!
+    cb.send(msg);
   }
 
   virtual void __pup__(serdes& s) override { s | cb; }
