@@ -1,6 +1,6 @@
 path_classifiers:
   generated:
-    exclude:
+    exclude: /
     - "include/hypercomm/**/*.de*.h"
     - "include/hypercomm/tasking/tasking.decl.h"
 extraction:
