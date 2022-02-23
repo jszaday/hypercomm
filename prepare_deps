@@ -10,6 +10,6 @@ git clone https://github.com/UIUC-PPL/charm.git
 
 pushd charm
 
-./build charm++ netlrts-linux-x86_64 smp -g3 -j2 --with-production --enable-error-checking
+./build charm++ netlrts-linux-x86_64 smp -g3 -2 --with-production --enable-error-checking
 
 popd
