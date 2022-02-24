@@ -1,6 +1,6 @@
 path_classifiers:
   generated:
-    exclude: "include/hypercomm/**/*.de*.h"
+    - build
 extraction:
   cpp:
     configure:
@@ -8,5 +8,6 @@ extraction:
     before_index: "export CHARM_HOME=$LGTM_SRC/charm"
     index:
       build_command:
-      - "cmake ."
+      - "cmake -H. -Bbuild/"
+      - "cd build"
       - "make -j2"
