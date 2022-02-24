@@ -26,7 +26,7 @@ CkMessage* pack(const Args&... _args) {
   auto* msg = CkAllocateMarshallMsg(size);
   s.reset(msg->msgBuf);
   auto real_size = pup_size(s, args);
-  CkAssert(size == real_size);
+  CkAssert((s.n_deferred() == 0) && (size == real_size));
   return msg;
 }
 

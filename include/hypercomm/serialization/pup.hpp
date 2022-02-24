@@ -99,9 +99,11 @@ struct puper<temporary<T, kInline>> {
 
 template <typename T, std::size_t N>
 struct puper<std::array<T, N>,
-             typename std::enable_if<is_bytes<T>::value>::type> {
+             typename std::enable_if<!is_bytes<T>::value>::type> {
   inline static void impl(serdes& s, std::array<T, N>& t) {
-    s.copy(t.data(), N);
+    for (auto& elt : t) {
+      s | elt;
+    }
   }
 };
 
