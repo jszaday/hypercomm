@@ -1,18 +1,24 @@
 #include <hypercomm/tasking/workgroup.hpp>
-#include <hypercomm/utilities/backstage_pass.hpp>
 
 namespace hypercomm {
 namespace detail {
-std::vector<CkMigratable *> CkArray::*get(backstage_pass);
+template <typename Tag, typename Tag::type M>
+struct backstage_pass {
+  friend typename Tag::type get(Tag) { return M; }
+};
 
-// Explicitly instantiating the class generates the fn declared above.
-template class access_bypass<std::vector<CkMigratable *> CkArray::*,
-                             &CkArray::localElemVec, backstage_pass>;
+struct CkArrayFriend {
+  typedef std::vector<CkMigratable *> CkArray::*type;
+
+  friend type get(CkArrayFriend);
+};
+
+template struct backstage_pass<CkArrayFriend, &CkArray::localElemVec>;
 }  // namespace detail
 
 namespace tasking {
 std::vector<CkMigratable *> *get_local_elements_(CkArray *arr) {
-  return arr ? &(arr->*detail::get(detail::backstage_pass())) : nullptr;
+  return arr ? &(arr->*get(detail::CkArrayFriend())) : nullptr;
 }
 
 void task_base_::pup_base_(PUP::er &p) {

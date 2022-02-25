@@ -42,8 +42,7 @@ struct built_in<
 };
 
 template <typename T>
-struct is_bytes<
-    T, typename std::enable_if<PUP::as_bytes<T>::value>::type> {
+struct is_bytes<T, typename std::enable_if<PUP::as_bytes<T>::value>::type> {
   enum { value = true };
 };
 
@@ -95,27 +94,48 @@ struct puper<chare_t> {
   }
 };
 
-template <typename T>
-void interpup(PUP::er& p, T& t) {
-  if (typeid(p) == typeid(PUP::fromMem)) {
-    auto& mem = *static_cast<PUP::fromMem*>(&p);
-    unpacker s(nullptr, mem.get_current_pointer());
-    pup(s, t);
-    mem.advance(s.size());
-  } else if (typeid(p) == typeid(PUP::toMem)) {
-    auto& mem = *static_cast<PUP::toMem*>(&p);
-    packer s(mem.get_current_pointer());
-    pup(s, t);
-    mem.advance(s.size());
-  } else if (typeid(p) == typeid(PUP::sizer)) {
-    p(static_cast<char*>(nullptr), size(t));
+struct serdes_deleter_ {
+  using callback_fn = std::function<void(std::size_t)>;
+
+  callback_fn cb;
+
+  template <typename... Args>
+  serdes_deleter_(Args&&... args) : cb(std::forward<Args>(args)...) {}
+
+  void operator()(serdes* s) const {
+    this->cb(s->size());
+
+    delete s;
+  }
+};
+
+using serdes_ptr = std::unique_ptr<serdes, serdes_deleter_>;
+
+inline serdes_ptr make_serdes(PUP::er& p) {
+  if (auto* fromMem = dynamic_cast<PUP::fromMem*>(&p)) {
+    return serdes_ptr(new unpacker(nullptr, fromMem->get_current_pointer()),
+                      [=](std::size_t sz) { fromMem->advance(sz); });
+  } else if (auto* toMem = dynamic_cast<PUP::toMem*>(&p)) {
+    return serdes_ptr(new packer(toMem->get_current_pointer()),
+                      [=](std::size_t sz) { toMem->advance(sz); });
+  } else if (auto* sizer = dynamic_cast<PUP::sizer*>(&p)) {
+    return serdes_ptr(new hypercomm::sizer, [=](std::size_t sz) {
+      (*sizer)(static_cast<char*>(nullptr), sz);
+    });
   } else {
     CkAbort("unsure how to convert an %s into a serdes", typeid(p).name());
   }
 }
 
 using pup_ptr = std::unique_ptr<PUP::er>;
-inline std::unique_ptr<PUP::er> make_puper(const serdes& s) {
+
+template <typename T>
+void interpup(PUP::er& p, T& t) {
+  auto s = make_serdes(p);
+  pup(*s, t);
+}
+
+inline pup_ptr make_puper(const serdes& s) {
   switch (s.state) {
     case serdes_state::UNPACKING: {
       using pup_type = typename puper_for<serdes_state::UNPACKING>::type;
