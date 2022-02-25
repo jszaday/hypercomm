@@ -45,8 +45,9 @@ inline void pup_pack(const T& t, char* buf, int len) {
 }
 
 template <typename T>
-inline void pup_unpack(T& t, char* buf, std::unique_ptr<CkMessage>&& src) {
-  hypercomm::unpacker s(std::move(src), buf);
+inline void pup_unpack(T& t, char* buf, std::unique_ptr<CkMessage>&& msg) {
+  std::shared_ptr<void> src((void*)msg.release(), CkFreeMsg);
+  hypercomm::unpacker s(src, buf);
   s | t;
 }
 }  // namespace flex
