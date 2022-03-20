@@ -119,6 +119,7 @@ void initialize(void) {
   }
   // register the handler for delivery
   delivery::handler();
+  hyper_value::handler();
   interceptor::deliver_handler();
   // zero the per-pe interceptor proxy
   CkpvInitialize(CProxy_interceptor, interceptor_);
@@ -136,7 +137,7 @@ const int& delivery::handler(void) {
   return CmiAutoRegister(delivery::handler_);
 }
 
-// registers delivery::handler_ as a converse handler
+// registers interceptor::deliver_handler_ as a converse handler
 const int& interceptor::deliver_handler(void) {
   return CmiAutoRegister(interceptor::deliver_handler_);
 }
@@ -278,10 +279,10 @@ void delivery::handler_(void* raw) {
 }
 
 void hyper_value::handler_(void* raw) {
-  auto* val = (hyper_value*)raw;
+  auto* msg = static_cast<detail::array_message*>(raw);
+  auto* val = static_cast<hyper_value*>(msg);
   auto* local = interceptor::local_branch();
   local->deliver(val->aid, val->idx, val, true);
-  delete val;
 }
 
 // try to send any messages buffered for a given idx
@@ -442,8 +443,11 @@ void delivery::process(ArrayElement* elt, deliverable&& dev, bool immediate) {
 #endif
     if (dev.kind == deliverable::kValue) {
       auto* val = dev.release<hyper_value>();
+      // update *both* destinations of the value
+      val->source = dev.endpoint();
       val->set_destination(aid, idx);
-      CmiPushPE(CkMyRank(), val);
+      // then route it like a converse message
+      CmiPushPE(CkMyRank(), static_cast<detail::array_message*>(val));
     } else {
       CmiPushPE(CkMyRank(), new delivery(aid, idx, std::move(dev)));
     }
