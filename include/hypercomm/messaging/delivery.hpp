@@ -3,33 +3,23 @@
 
 #include "destination.hpp"
 #include "deliverable.hpp"
+#include "messages.hpp"
 
 namespace hypercomm {
-
-struct delivery {
-  char core[CmiReservedHeaderSize];
-
-  CkArrayID aid;
-  CkArrayIndex idx;
+struct delivery : public detail::array_message {
   deliverable payload;
 
   delivery(const CkArrayID& _1, const CkArrayIndex& _2, deliverable&& _3)
-      : aid(_1), idx(_2), payload(std::move(_3)) {
+      : array_message(_1, _2, handler()), payload(std::move(_3)) {
     CkAssert((bool)this->payload);
-    std::fill(this->core, this->core + CmiReservedHeaderSize, '\0');
-    CmiSetHandler(this, handler());
   }
-
-  static const int& handler(void);
-
-  void* operator new(std::size_t count) { return CmiAlloc(count); }
-
-  void operator delete(void* blk) { CmiFree(blk); }
 
   static void process(ArrayElement*, deliverable&&, bool);
 
+  static const int& handler(void);
+
  private:
-  static void handler_(delivery* msg);
+  static void handler_(void*);
 };
 }  // namespace hypercomm
 

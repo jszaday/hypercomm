@@ -126,6 +126,11 @@ void initialize(void) {
 }
 }  // namespace messaging
 
+// registers hyper_value::handler_ as a converse handler
+const int& hyper_value::handler(void) {
+  return CmiAutoRegister(hyper_value::handler_);
+}
+
 // registers delivery::handler_ as a converse handler
 const int& delivery::handler(void) {
   return CmiAutoRegister(delivery::handler_);
@@ -265,10 +270,18 @@ void interceptor::send_to_branch(const int& pe, const CkArrayID& aid,
 }
 
 // locally delivers the payload to the interceptor with immediacy
-void delivery::handler_(delivery* msg) {
+void delivery::handler_(void* raw) {
+  auto* msg = (delivery*)raw;
   auto* local = interceptor::local_branch();
   local->deliver(msg->aid, msg->idx, std::move(msg->payload), true);
   delete msg;
+}
+
+void hyper_value::handler_(void* raw) {
+  auto* val = (hyper_value*)raw;
+  auto* local = interceptor::local_branch();
+  local->deliver(val->aid, val->idx, val, true);
+  delete val;
 }
 
 // try to send any messages buffered for a given idx
@@ -427,7 +440,13 @@ void delivery::process(ArrayElement* elt, deliverable&& dev, bool immediate) {
     CkPrintf("pe%d> pushing a message/value onto the queue for %s.\n", CkMyPe(),
              utilities::idx2str(elt->ckGetArrayIndex()).c_str());
 #endif
-    CmiPushPE(CkMyRank(), new delivery(aid, idx, std::move(dev)));
+    if (dev.kind == deliverable::kValue) {
+      auto* val = dev.release<hyper_value>();
+      val->set_destination(aid, idx);
+      CmiPushPE(CkMyRank(), val);
+    } else {
+      CmiPushPE(CkMyRank(), new delivery(aid, idx, std::move(dev)));
+    }
   }
 }
 
