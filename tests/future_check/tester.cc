@@ -27,15 +27,13 @@ struct main : public CBase_main {
     auto cb = std::static_pointer_cast<callback>(std::move(p));
     auto t = make_typed_value<std::tuple<int, int>>(20, 22);
 
+    this->microcheck();
+
     CkPrintf("checking typed callbacks: ");
     cb->send(deliverable(std::move(t)));
 
     make_grouplike<CProxy_locality>().run();
   }
-};
-
-struct locality : public vil<CBase_locality, int> {
-  locality(void) = default;
 
   void microcheck(void) {
     auto hi = hypercomm::link(32);
@@ -45,18 +43,32 @@ struct locality : public vil<CBase_locality, int> {
     CkEnforce(lo->get<0>() == 32);
     CkEnforce(lo->get<1>() == 64);
     CkEnforce(lo->get<2>() == 128);
-    
+
     CkEnforce(lo->get<1>() == mi->get<1>());
 
     CkEnforce(mi == lo->unwind());
     CkEnforce(hi == mi->unwind());
     CkEnforce(!hi->unwind());
 
-    auto lolo = lo->clone();
-    lolo->get<2>() += 1;
-    CkEnforce(lo->get<2>() == (lolo->get<2>() - 1));
-    CkEnforce(mi == lolo->unwind());
+    auto loclone = lo->clone();
+    loclone->get<2>() += 1;
+    CkEnforce(lo->get<2>() == (loclone->get<2>() - 1));
+    CkEnforce(mi == loclone->unwind());
+
+    microstack<std::tuple<std::string, std::vector<int>>,
+               typename decltype(mi)::element_type> lolo(mi, tags::no_init());
+
+    new (&lolo.get<2>()) std::string("hello, world!");
+    CkPrintf("%s\n", lolo.get<2>().c_str());
+
+    new (&lolo.get<3>()) std::vector<int>();
+
+    CkEnforce(mi == lolo.unwind());
   }
+};
+
+struct locality : public vil<CBase_locality, int> {
+  locality(void) = default;
 
   void run(void) {
     auto f = this->make_future();
@@ -80,8 +92,6 @@ struct locality : public vil<CBase_locality, int> {
     CkEnforce((bool)value);
     CkEnforce(t != std::get<0>(value->value()));
     CkEnforce(std::get<0>(value->value()) == std::get<1>(value->value()));
-
-    this->microcheck();
 
     this->contribute(CkCallback(CkCallback::ckExit));
   }

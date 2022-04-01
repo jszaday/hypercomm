@@ -20,6 +20,37 @@ struct microstack_base {};
 template <typename T, typename Base = microstack_base>
 struct microstack;
 
+namespace {
+template <typename>
+struct microstack_base_extractor_;
+
+template <typename T, typename Base>
+struct microstack_base_extractor_<microstack<T, Base>> {
+  using type = Base;
+};
+
+template <typename Tuple, typename... Ts>
+struct microstack_initializer_ {
+  template <typename... Args>
+  void operator()(Tuple* t, Args&&... args) const {
+    new (t) Tuple(std::forward<Args>(args)...);
+  }
+};
+
+template <typename Tuple>
+struct microstack_initializer_<Tuple, tags::no_init> {
+  void operator()(Tuple*, tags::no_init) const {}
+};
+}  // namespace
+
+namespace detail {
+template <typename T>
+using decay_t = typename std::decay<T>::type;
+}
+
+template <typename T>
+using microstack_base_t = typename microstack_base_extractor_<T>::type;
+
 template <typename T>
 struct microstack_features;
 
@@ -39,10 +70,9 @@ struct microstack_features<microstack<std::tuple<Ts...>, Base>>
 
   template <typename... Args>
   microstack_features(Args&&... args) {
-    new (&(**this)) tuple_type(std::forward<Args>(args)...);
+    microstack_initializer_<tuple_type, detail::decay_t<Args>...>()(
+        &(**this), std::forward<Args>(args)...);
   }
-
-  microstack_features(tags::no_init) {}
 
  public:
   ~microstack_features() { (**this).~tuple_type(); }
@@ -75,8 +105,14 @@ struct microstack<std::tuple<Ts...>, microstack_base>
   using tuple_type = std::tuple<Ts...>;
 
   template <typename... Args>
+  microstack(const std::shared_ptr<microstack_base>&, Args&&... args)
+      : microstack_features<self_type>(std::forward<Args>(args)...) {}
+
+  template <typename... Args>
   microstack(Args&&... args)
       : microstack_features<self_type>(std::forward<Args>(args)...) {}
+
+  int depth(void) const { return 0; }
 
   std::shared_ptr<self_type> clone(void) const {
     return std::make_shared<self_type>(**this);
@@ -104,6 +140,8 @@ struct microstack<std::tuple<Ts...>, Base>
   microstack(const std::shared_ptr<Base>& base, Args&&... args)
       : microstack_features<self_type>(std::forward<Args>(args)...),
         base_(base) {}
+
+  int depth(void) const { return (base_ ? base_->depth() : 0) + 1; }
 
   std::shared_ptr<self_type> clone(void) const {
     return std::make_shared<self_type>(this->base_, **this);

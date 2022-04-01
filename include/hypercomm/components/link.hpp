@@ -17,9 +17,6 @@ struct linker<std::shared_ptr<microstack<std::tuple<Ts...>, Base>>, Us...> {
   using base_type = microstack<std::tuple<Ts...>, Base>;
   using type = microstack<std::tuple<Us...>, base_type>;
 };
-
-template <typename T>
-using decay_t = typename std::decay<T>::type;
 }  // namespace detail
 
 template <typename... Ts>
