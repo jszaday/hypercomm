@@ -5,6 +5,8 @@
 #include <tuple>
 #include <type_traits>
 
+#include <hypercomm/serialization/tags.hpp>
+
 namespace hypercomm {
 
 template <std::size_t I, typename T, typename Enable = void>
@@ -39,6 +41,8 @@ struct microstack_features<microstack<std::tuple<Ts...>, Base>>
   microstack_features(Args&&... args) {
     new (&(**this)) tuple_type(std::forward<Args>(args)...);
   }
+
+  microstack_features(tags::no_init) {}
 
  public:
   ~microstack_features() { (**this).~tuple_type(); }
