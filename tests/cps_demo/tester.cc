@@ -93,7 +93,7 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto mine = this->__index__();
     auto nExpected = mine ? mine : 1;
     // set up initial stack state
-    auto top = std::make_shared<hypercomm::microstack<std::tuple<int>>>(mine + 1);
+    auto top = hypercomm::link(mine + 1);
     // create a server for managing state
     auto srv = std::make_shared<server_type>();
     auto com = this->emplace_component<accumulator_com>(srv);
@@ -105,9 +105,8 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     // forall [i] (0:(nExpected - 1),1)
     for (auto i = 0; i < nExpected; i++) {
       // when receive_msg(int sum) =>
-      // set value of i in child's stack
-      auto* stk = new hypercomm::microstack<std::tuple<int>, hypercomm::microstack<std::tuple<int>>>(top, i);
-      srv->put_state(i, stk);
+      // generate a stack with this iteration's contents
+      srv->put_state(i, hypercomm::link(top, i));
       // make a remote request to it
       this->mbox->put_request_to({}, com->id, i);
     }
@@ -147,11 +146,11 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto com1 = this->emplace_component<accumulator_two_com>(srv1);
     auto com2 = this->emplace_component<accumulator_two_com>(srv1);
     // create a stack for receiving values
-    auto* stk = new hypercomm::microstack<std::tuple<int, int, bool>>(mine, nElts, true);
+    auto stk = hypercomm::link(mine, nElts, true);
     CkEnforce(stk->get<0>() == mine);
     CkEnforce(stk->get<1>() == nElts);
     CkEnforce(stk->get<2>() == true);
-    srv1->put_state(0, stk);
+    srv1->put_state(0, std::move(stk));
     srv1->done_inserting();  // IMPORTANT!
     // ensure the component is invalidated
     auto* arg = &(this->inv);

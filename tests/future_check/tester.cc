@@ -1,6 +1,6 @@
 #include <hypercomm/core/locality.hpp>
 #include <hypercomm/core/resuming_callback.hpp>
-#include <hypercomm/components/microstack.hpp>
+#include <hypercomm/components/link.hpp>
 
 #include "tester.decl.h"
 
@@ -38,17 +38,17 @@ struct locality : public vil<CBase_locality, int> {
   locality(void) = default;
 
   void microcheck(void) {
-    auto top = std::make_shared<microstack<std::tuple<int>>>(63);
-    auto* src = new microstack<std::tuple<int, double>, microstack<std::tuple<int>>>(top, 42, 21.0);
-    // auto* dst = src->clone();
+    auto hi = hypercomm::link(32);
+    auto mi = hypercomm::link(hi, 64);
+    auto lo = hypercomm::link(mi, 128);
 
-    // CkEnforce((*top)[0] == (*dst)[0]);
-    CkEnforce(src->get<0>() == 63);
-    CkEnforce(src->get<1>() == 42);
-    CkEnforce(src->get<2>() == 21.0);
-
-    delete src;
-    // delete dst;
+    CkEnforce(lo->get<0>() == 32);
+    CkEnforce(lo->get<1>() == 64);
+    CkEnforce(lo->get<2>() == 128);
+    
+    CkEnforce(mi == lo->unwind());
+    CkEnforce(hi == mi->unwind());
+    CkEnforce(!hi->unwind());
   }
 
   void run(void) {
