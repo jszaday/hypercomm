@@ -29,7 +29,7 @@ struct microstack_base_extractor_<microstack<T, Base>> {
   using type = Base;
 };
 
-template <typename Tuple, typename... Ts>
+template <typename Tuple, typename...>
 struct microstack_initializer_ {
   template <typename... Args>
   void operator()(Tuple* t, Args&&... args) const {
@@ -105,7 +105,7 @@ struct microstack<std::tuple<Ts...>, microstack_base>
   using tuple_type = std::tuple<Ts...>;
 
   template <typename... Args>
-  microstack(const std::shared_ptr<microstack_base>&, Args&&... args)
+  microstack(std::shared_ptr<microstack_base>, Args&&... args)
       : microstack_features<self_type>(std::forward<Args>(args)...) {}
 
   template <typename... Args>
