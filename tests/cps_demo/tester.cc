@@ -93,7 +93,7 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto mine = this->__index__();
     auto nExpected = mine ? mine : 1;
     // set up initial stack state
-    auto top = std::make_shared<hypercomm::microstack<std::tuple<int>>>(nullptr, mine + 1);
+    auto top = std::make_shared<hypercomm::microstack<std::tuple<int>>>(mine + 1);
     // create a server for managing state
     auto srv = std::make_shared<server_type>();
     auto com = this->emplace_component<accumulator_com>(srv);
@@ -147,7 +147,7 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto com1 = this->emplace_component<accumulator_two_com>(srv1);
     auto com2 = this->emplace_component<accumulator_two_com>(srv1);
     // create a stack for receiving values
-    auto* stk = new hypercomm::microstack<std::tuple<int, int, bool>>({}, mine, nElts, true);
+    auto* stk = new hypercomm::microstack<std::tuple<int, int, bool>>(mine, nElts, true);
     CkEnforce(stk->get<0>() == mine);
     CkEnforce(stk->get<1>() == nElts);
     CkEnforce(stk->get<2>() == true);

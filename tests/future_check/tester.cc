@@ -38,7 +38,7 @@ struct locality : public vil<CBase_locality, int> {
   locality(void) = default;
 
   void microcheck(void) {
-    auto top = std::make_shared<microstack<std::tuple<int>>>(nullptr, 63);
+    auto top = std::make_shared<microstack<std::tuple<int>>>(63);
     auto* src = new microstack<std::tuple<int, double>, microstack<std::tuple<int>>>(top, 42, 21.0);
     // auto* dst = src->clone();
 
