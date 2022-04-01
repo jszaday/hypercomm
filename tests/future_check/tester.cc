@@ -49,6 +49,11 @@ struct locality : public vil<CBase_locality, int> {
     CkEnforce(mi == lo->unwind());
     CkEnforce(hi == mi->unwind());
     CkEnforce(!hi->unwind());
+
+    auto lolo = lo->clone();
+    lolo->get<2>() += 1;
+    CkEnforce(lo->get<2>() == (lolo->get<2>() - 1));
+    CkEnforce(mi == lolo->unwind());
   }
 
   void run(void) {

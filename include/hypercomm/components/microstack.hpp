@@ -74,6 +74,10 @@ struct microstack<std::tuple<Ts...>, microstack_base>
   microstack(Args&&... args)
       : microstack_features<self_type>(std::forward<Args>(args)...) {}
 
+  std::shared_ptr<self_type> clone(void) const {
+    return std::make_shared<self_type>(**this);
+  }
+
   constexpr static std::size_t size(void) { return sizeof...(Ts); }
 
   std::shared_ptr<microstack_base> unwind(void) const { return {}; }
@@ -96,6 +100,10 @@ struct microstack<std::tuple<Ts...>, Base>
   microstack(const std::shared_ptr<Base>& base, Args&&... args)
       : microstack_features<self_type>(std::forward<Args>(args)...),
         base_(base) {}
+
+  std::shared_ptr<self_type> clone(void) const {
+    return std::make_shared<self_type>(this->base_, **this);
+  }
 
   constexpr static std::size_t size(void) {
     return Base::size() + sizeof...(Ts);
