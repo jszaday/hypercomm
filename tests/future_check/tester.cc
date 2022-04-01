@@ -38,17 +38,17 @@ struct locality : public vil<CBase_locality, int> {
   locality(void) = default;
 
   void microcheck(void) {
-    auto* top = new typed_microstack<int>(nullptr, 63);
-    auto* src = new typed_microstack<int, double>(top, 42, 21.0);
-    auto* dst = src->clone();
+    auto top = std::make_shared<microstack<std::tuple<int>>>(nullptr, 63);
+    auto* src = new microstack<std::tuple<int, double>, microstack<std::tuple<int>>>(top, 42, 21.0);
+    // auto* dst = src->clone();
 
-    CkEnforce((*top)[0] == (*dst)[0]);
-    CkEnforce(dst->at<int>(0) == 63);
-    CkEnforce(dst->at<int>(1) == 42);
-    CkEnforce(dst->at<double>(2) == 21.0);
+    // CkEnforce((*top)[0] == (*dst)[0]);
+    CkEnforce(src->get<0>() == 63);
+    CkEnforce(src->get<1>() == 42);
+    CkEnforce(src->get<2>() == 21.0);
 
     delete src;
-    delete dst;
+    // delete dst;
   }
 
   void run(void) {
