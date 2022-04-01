@@ -125,7 +125,7 @@ struct test_chare : public hypercomm::vil<CBase_test_chare, int> {
       thisProxy.recv_value(pack_value(i));
 
       for (auto j = 0; j < n; j++) {
-        auto* stk = new hypercomm::typed_microstack<int, int>(nullptr, i, j);
+        auto* stk = new hypercomm::microstack<void, int, int>(nullptr, i, j);
         auto it = i * n + j;
         srv->put_state(it, stk);
         mbox->put_request_to({}, com, it);

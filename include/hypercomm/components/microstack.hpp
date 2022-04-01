@@ -1,137 +1,123 @@
 #ifndef __HYPERCOMM_COMPONENTS_MICROSTACK_HPP__
 #define __HYPERCOMM_COMPONENTS_MICROSTACK_HPP__
 
-#include <utility>
-#include <vector>
-
-#include "../serialization/serdes.hpp"
-#include "../serialization/storage.hpp"
+#include <memory>
+#include <tuple>
+#include <type_traits>
 
 namespace hypercomm {
 
-struct microstack;
+template <std::size_t I, typename T, typename Enable = void>
+struct microstack_element;
 
-namespace detail {
+template <std::size_t I, typename T>
+using microstack_element_t = typename microstack_element<I, T>::type;
+
+namespace {
 template <typename T>
-inline std::size_t get_depth(const T&);
-}  // namespace detail
-
-struct microstack {
-  const std::size_t depth;
-
- protected:
-  std::shared_ptr<microstack> prev_;
-  std::size_t start_, size_, end_;
-  void** storage_;
-
-  microstack(void** storage, std::size_t size)
-      : microstack(nullptr, storage, size) {}
-
-  microstack(std::nullptr_t&&, void** storage, std::size_t size)
-      : depth(1),
-        storage_(storage),
-        start_(0),
-        size_(size),
-        end_(start_ + size) {}
-
-  template <typename T>
-  microstack(T&& prev, void** storage, std::size_t size)
-      : depth(detail::get_depth(prev) + 1),
-        storage_(storage),
-        prev_(std::forward<T>(prev)),
-        start_(prev ? prev_->end_ : 0),
-        size_(size),
-        end_(start_ + size) {}
-
- public:
-  virtual ~microstack() = default;
-
-  std::shared_ptr<microstack>& unwind(void) { return this->prev_; }
-
-  inline void* operator[](std::size_t pos) {
-    if ((this->start_ <= pos) && (pos < this->end_)) {
-      return this->storage_[pos - this->start_];
-    } else if (this->start_ > pos) {
-      return (*this->prev_)[pos];
-    } else {
-      return nullptr;
-    }
-  }
-
-  template <typename T>
-  inline T& at(std::size_t pos) {
-    return *(static_cast<T*>((*this)[pos]));
-  }
-
-  inline std::size_t size(void) const { return this->size_; }
-
-  virtual microstack* clone(void) const = 0;
-};
-
-template <typename... Ts>
-struct typed_microstack : public microstack {
- private:
-  static constexpr auto n_items_ = sizeof...(Ts);
-
-  static_assert(n_items_ >= 1, "only defined for non-zero stacks");
-
-  using storage_type = tuple_storage<Ts...>;
-
-  storage_type storage_;
-  void* items_[n_items_];
-
- public:
-  friend puper<typed_microstack<Ts...>>;
-
-  virtual ~typed_microstack() = default;
-
-  template <typename... Args>
-  typed_microstack(const std::shared_ptr<microstack>& prev, Args&&... args)
-      : microstack(prev, items_, n_items_),
-        storage_(std::forward<Args>(args)...) {
-    this->template initialize_address_<(n_items_ - 1)>();
-  }
-
-  template <typename T, typename... Args>
-  typed_microstack(T* prev, Args&&... args)
-      : microstack(prev, items_, n_items_),
-        storage_(std::forward<Args>(args)...) {
-    this->template initialize_address_<(n_items_ - 1)>();
-  }
-
-  virtual microstack* clone(void) const override {
-    return new typed_microstack<Ts...>(this->prev_, this->storage_);
-  }
-
- private:
-  template <std::size_t I>
-  void* address_of_(void) {
-    return &(element_at<I>(this->storage_));
-  }
-
-  template <std::size_t I>
-  inline typename std::enable_if<(I == 0)>::type initialize_address_(void) {
-    this->items_[I] = this->template address_of_<I>();
-  }
-
-  template <std::size_t I>
-  inline typename std::enable_if<(I > 0)>::type initialize_address_(void) {
-    this->template initialize_address_<(I - 1)>();
-    this->items_[I] = this->template address_of_<I>();
-  }
-};
-
-namespace detail {
-template <typename T>
-inline std::size_t get_depth(const T& stk) {
-  return stk ? stk->depth : 0;
+constexpr std::size_t get_size_(void) {
+  return T::size();
 }
 
 template <>
-inline std::size_t get_depth<std::nullptr_t>(const std::nullptr_t&) {
+constexpr std::size_t get_size_<void>(void) {
   return 0;
 }
-}  // namespace detail
+}
+
+struct typeless_microstack {};
+
+template <typename Base, typename... Ts>
+struct microstack : public typeless_microstack {
+  using self_type = microstack<Base, Ts...>;
+  using tuple_type = std::tuple<Ts...>;
+  using storage_type = typename std::aligned_storage<sizeof(tuple_type),
+                                                     alignof(tuple_type)>::type;
+
+  template <std::size_t I, typename T, typename Enable>
+  friend struct microstack_element;
+
+ private:
+  std::shared_ptr<Base> base_;
+  storage_type storage_;
+
+ public:
+  template <typename... Args>
+  microstack(const std::shared_ptr<Base>& base, Args&&... args)
+      : base_(base) {
+    new (&(**this)) tuple_type(std::forward<Args>(args)...);
+  }
+
+  ~microstack() { (**this).~tuple_type(); }
+
+  tuple_type& operator*(void) {
+    return reinterpret_cast<tuple_type&>(this->storage_);
+  }
+
+  const tuple_type& operator*(void) const {
+    return reinterpret_cast<const tuple_type&>(this->storage_);
+  }
+
+  template <std::size_t I>
+  microstack_element_t<I, self_type>& get(void) {
+    return microstack_element<I, self_type>()(*this);
+  }
+
+  template <std::size_t I>
+  const microstack_element_t<I, self_type>& get(void) const {
+    return microstack_element<I, self_type>()(*this);
+  }
+
+  constexpr static std::size_t size(void) {
+    return get_size_<Base>() + sizeof...(Ts);
+  }
+};
+
+template <std::size_t I, typename... Ts>
+struct microstack_element<I, microstack<void, Ts...>> {
+  using type = typename std::tuple_element<I, std::tuple<Ts...>>::type;
+
+  type& operator()(microstack<void, Ts...>& stack) const {
+    return std::get<I>(*stack);
+  }
+
+  const type& operator()(const microstack<void, Ts...>& stack) const {
+    return std::get<I>(*stack);
+  }
+};
+
+template <std::size_t I, typename Base, typename... Ts>
+struct microstack_element<
+    I, microstack<Base, Ts...>,
+    typename std::enable_if<!std::is_same<Base, void>::value and
+                            (I < Base::size())>::type> {
+  using type = microstack_element_t<I, Base>;
+
+  type& operator()(microstack<Base, Ts...>& stack) const {
+    return (stack.base_)->template get<I>();
+  }
+
+  const type& operator()(const microstack<Base, Ts...>& stack) const {
+    return (stack.base_)->template get<I>();
+  }
+};
+
+template <std::size_t I, typename Base, typename... Ts>
+struct microstack_element<
+    I, microstack<Base, Ts...>,
+    typename std::enable_if<!std::is_same<Base, void>::value and
+                            (I >= Base::size())>::type> {
+  using type =
+      typename std::tuple_element<(I - Base::size()), std::tuple<Ts...>>::type;
+
+  type& operator()(microstack<Base, Ts...>& stack) const {
+    return std::get<(I - Base::size())>(*stack);
+  }
+
+  const type& operator()(const microstack<Base, Ts...>& stack) const {
+    return std::get<(I - Base::size())>(*stack);
+  }
+};
 }  // namespace hypercomm
 
 #endif
