@@ -63,7 +63,7 @@ class multistate_component
   using acceptor_type = typename parent_t::acceptor_type;
 
  protected:
-  using state_t = microstack;
+  using state_t = microstack_base;
   using server_t = state_server<state_t>;
   using in_set = typename parent_t::in_set;
 

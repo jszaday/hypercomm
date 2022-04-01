@@ -1,14 +1,9 @@
 #ifndef __HYPERCOMM_CONSTRUCTION_HPP__
 #define __HYPERCOMM_CONSTRUCTION_HPP__
 
-#include <pup.h>
-#include <memory>
+#include <hypercomm/serialization/tags.hpp>
 
 namespace hypercomm {
-
-namespace tags {
-using reconstruct = PUP::reconstruct;
-}
 
 // reconstruct(ers) call placement new on a deserialized obj
 
@@ -38,20 +33,6 @@ inline typename std::enable_if<
 reconstruct(T* p) {
   ::new (p) T();
 }
-
-namespace tags {
-struct no_init {};
-
-struct allocate {};
-
-template <typename T>
-struct use_buffer {
-  std::shared_ptr<T> buffer;
-
-  template <typename... Args>
-  use_buffer(Args&&... args) : buffer(std::forward<Args>(args)...) {}
-};
-}  // namespace tags
 
 enum storage_scheme { kInline, kBuffer };
 

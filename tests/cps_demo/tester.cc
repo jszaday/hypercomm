@@ -36,6 +36,7 @@ struct accumulator_com
     : public hypercomm::multistate_component<int, std::tuple<>> {
   using parent_t = hypercomm::multistate_component<int, std::tuple<>>;
   using in_set_t = typename parent_t::in_set;
+  using stack_t = hypercomm::microstack<std::tuple<int>, hypercomm::microstack<std::tuple<int>>>;
 
   accumulator_com(hypercomm::component_id_t id,
                   const std::shared_ptr<server_type>& server)
@@ -46,13 +47,13 @@ struct accumulator_com
   virtual std::tuple<> action(in_set_t& in_set) override {
     auto* ctx = hypercomm::access_context_();
     auto& val = std::get<0>(in_set)->value();
-    auto& stk = this->get_state();
+    auto& stk = static_cast<stack_t&>(*(this->get_state()));
 
     auto idx = hypercomm::utilities::idx2str(ctx->ckGetArrayIndex());
     CkPrintf("com%llu@vil%s> received value %d in iteration %d.\n", this->id,
-             idx.c_str(), val, stk->at<int>(iOff));
+             idx.c_str(), val, stk.template get<iOff>());
 
-    stk->at<int>(sumOff) += val;
+    stk.template get<sumOff>() += val;
 
     return {};
   };
@@ -92,21 +93,20 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto mine = this->__index__();
     auto nExpected = mine ? mine : 1;
     // set up initial stack state
-    auto top = std::make_shared<hypercomm::typed_microstack<int>>(nullptr, mine + 1);
+    auto top = hypercomm::link(mine + 1);
     // create a server for managing state
     auto srv = std::make_shared<server_type>();
     auto com = this->emplace_component<accumulator_com>(srv);
     // setup a listener to propagate sum after all iters finish
     com->add_listener(listener_fn_,
-                      new std::shared_ptr<hypercomm::microstack>(top));
+                      new std::shared_ptr<hypercomm::microstack_base>(top));
     // bring component online to start handling iters
     this->activate_component(com);
     // forall [i] (0:(nExpected - 1),1)
     for (auto i = 0; i < nExpected; i++) {
       // when receive_msg(int sum) =>
-      // set value of i in child's stack
-      auto* stk = new hypercomm::typed_microstack<int>(top, i);
-      srv->put_state(i, stk);
+      // generate a stack with this iteration's contents
+      srv->put_state(i, hypercomm::link(top, i));
       // make a remote request to it
       this->mbox->put_request_to({}, com->id, i);
     }
@@ -146,11 +146,11 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto com1 = this->emplace_component<accumulator_two_com>(srv1);
     auto com2 = this->emplace_component<accumulator_two_com>(srv1);
     // create a stack for receiving values
-    auto* stk = new hypercomm::typed_microstack<int, int, bool>(nullptr, mine, nElts, true);
-    CkEnforce(stk->at<int>(0) == mine);
-    CkEnforce(stk->at<int>(1) == nElts);
-    CkEnforce(stk->at<bool>(2) == true);
-    srv1->put_state(0, stk);
+    auto stk = hypercomm::link(mine, nElts, true);
+    CkEnforce(stk->get<0>() == mine);
+    CkEnforce(stk->get<1>() == nElts);
+    CkEnforce(stk->get<2>() == true);
+    srv1->put_state(0, std::move(stk));
     srv1->done_inserting();  // IMPORTANT!
     // ensure the component is invalidated
     auto* arg = &(this->inv);
@@ -205,8 +205,8 @@ struct accumulator_chare : public hypercomm::vil<CBase_accumulator_chare, int> {
     auto* self = (accumulator_chare*)hypercomm::access_context_();
     auto mine = self->__index__();
 
-    auto* stk = (std::shared_ptr<hypercomm::microstack>*)arg;
-    auto& sum = (*stk)->at<int>(sumOff);
+    auto* stk = (std::shared_ptr<hypercomm::microstack<std::tuple<int>>>*)arg;
+    auto& sum = (*stk)->template get<sumOff>();
     auto val = hypercomm::make_typed_value<int>(sum);
 
     if (mine == (self->nElts - 1)) {
@@ -233,10 +233,10 @@ std::tuple<> accumulator_two_com::action(
   auto& aid = ctx->ckGetArrayID();
   auto& tru = std::get<0>(in_set);
   auto& val = tru->value();
-  auto& stk = this->get_state();
-  auto& mine = stk->at<int>(0);
-  auto& nElts = stk->at<int>(1);
-  auto& init = stk->at<bool>(2);
+  auto& stk = static_cast<hypercomm::microstack<std::tuple<int, int, bool>>&>(*this->get_state());
+  auto& mine = stk.template get<0>();
+  auto& nElts = stk.template get<1>();
+  auto& init = stk.template get<2>();
 
   auto left = (mine + nElts - 1) % nElts;
   auto right = (mine + 1) % nElts;
