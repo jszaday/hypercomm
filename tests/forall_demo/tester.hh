@@ -10,7 +10,7 @@
 
 #include "tester.decl.h"
 
-using server_type = hypercomm::state_server<hypercomm::typeless_microstack>;
+using server_type = hypercomm::state_server<hypercomm::microstack_base>;
 
 struct test_multistate_component
     : public hypercomm::multistate_component<int, std::tuple<>> {

@@ -13,6 +13,8 @@ struct microstack_element;
 template <std::size_t I, typename T>
 using microstack_element_t = typename microstack_element<I, T>::type;
 
+struct microstack_base {};
+
 namespace {
 template <typename T>
 constexpr std::size_t get_size_(void) {
@@ -20,16 +22,17 @@ constexpr std::size_t get_size_(void) {
 }
 
 template <>
-constexpr std::size_t get_size_<void>(void) {
+constexpr std::size_t get_size_<microstack_base>(void) {
   return 0;
 }
-}
+}  // namespace
 
-struct typeless_microstack {};
+template <typename T, typename Base = microstack_base>
+struct microstack;
 
 template <typename Base, typename... Ts>
-struct microstack : public typeless_microstack {
-  using self_type = microstack<Base, Ts...>;
+struct microstack<std::tuple<Ts...>, Base> : public microstack_base {
+  using self_type = microstack<std::tuple<Ts...>, Base>;
   using tuple_type = std::tuple<Ts...>;
   using storage_type = typename std::aligned_storage<sizeof(tuple_type),
                                                      alignof(tuple_type)>::type;
@@ -43,8 +46,7 @@ struct microstack : public typeless_microstack {
 
  public:
   template <typename... Args>
-  microstack(const std::shared_ptr<Base>& base, Args&&... args)
-      : base_(base) {
+  microstack(const std::shared_ptr<Base>& base, Args&&... args) : base_(base) {
     new (&(**this)) tuple_type(std::forward<Args>(args)...);
   }
 
@@ -68,53 +70,57 @@ struct microstack : public typeless_microstack {
     return microstack_element<I, self_type>()(*this);
   }
 
+  const std::shared_ptr<Base>& unwind(void) const { return this->base_; }
+
   constexpr static std::size_t size(void) {
     return get_size_<Base>() + sizeof...(Ts);
   }
 };
 
 template <std::size_t I, typename... Ts>
-struct microstack_element<I, microstack<void, Ts...>> {
+struct microstack_element<I, microstack<std::tuple<Ts...>>> {
   using type = typename std::tuple_element<I, std::tuple<Ts...>>::type;
 
-  type& operator()(microstack<void, Ts...>& stack) const {
+  type& operator()(microstack<std::tuple<Ts...>>& stack) const {
     return std::get<I>(*stack);
   }
 
-  const type& operator()(const microstack<void, Ts...>& stack) const {
+  const type& operator()(const microstack<std::tuple<Ts...>>& stack) const {
     return std::get<I>(*stack);
   }
 };
 
 template <std::size_t I, typename Base, typename... Ts>
 struct microstack_element<
-    I, microstack<Base, Ts...>,
-    typename std::enable_if<!std::is_same<Base, void>::value and
+    I, microstack<std::tuple<Ts...>, Base>,
+    typename std::enable_if<!std::is_same<Base, microstack_base>::value and
                             (I < Base::size())>::type> {
   using type = microstack_element_t<I, Base>;
 
-  type& operator()(microstack<Base, Ts...>& stack) const {
+  type& operator()(microstack<std::tuple<Ts...>, Base>& stack) const {
     return (stack.base_)->template get<I>();
   }
 
-  const type& operator()(const microstack<Base, Ts...>& stack) const {
+  const type& operator()(
+      const microstack<std::tuple<Ts...>, Base>& stack) const {
     return (stack.base_)->template get<I>();
   }
 };
 
 template <std::size_t I, typename Base, typename... Ts>
 struct microstack_element<
-    I, microstack<Base, Ts...>,
-    typename std::enable_if<!std::is_same<Base, void>::value and
+    I, microstack<std::tuple<Ts...>, Base>,
+    typename std::enable_if<!std::is_same<Base, microstack_base>::value and
                             (I >= Base::size())>::type> {
   using type =
       typename std::tuple_element<(I - Base::size()), std::tuple<Ts...>>::type;
 
-  type& operator()(microstack<Base, Ts...>& stack) const {
+  type& operator()(microstack<std::tuple<Ts...>, Base>& stack) const {
     return std::get<(I - Base::size())>(*stack);
   }
 
-  const type& operator()(const microstack<Base, Ts...>& stack) const {
+  const type& operator()(
+      const microstack<std::tuple<Ts...>, Base>& stack) const {
     return std::get<(I - Base::size())>(*stack);
   }
 };
